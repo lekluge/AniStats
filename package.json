@@ -9,7 +9,7 @@
     "preview": "nuxt preview",
     "generate": "nuxt generate",
 
-    "postinstall": "prisma generate",
+    "postinstall": "npm rebuild better-sqlite3 --build-from-source && prisma generate",
 
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
