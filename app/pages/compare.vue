@@ -16,7 +16,7 @@ const entriesByUser = ref<Record<string, AnimeEntry[]>>({});
 
 const search = ref("");
 
-type SeenFilter = "all" | "any" | "allUsers";
+type SeenFilter = "all" | "allUsers";
 const seenFilter = ref<SeenFilter>("all");
 
 /* -----------------------------
@@ -126,9 +126,6 @@ const filteredAnime = computed(() => {
 
     if (seenFilter.value === "all") return true;
 
-    if (seenFilter.value === "any") {
-      return seenCount > 0;
-    }
 
     // ✅ NEU: Alle User müssen COMPLETED haben
     if (seenFilter.value === "allUsers") {
@@ -198,7 +195,7 @@ function anilistUrl(id: number) {
     <!-- Seen Filter -->
     <div class="flex gap-2">
       <button
-        v-for="f in ['all', 'any', 'allUsers']"
+        v-for="f in ['all', 'allUsers']"
         :key="f"
         @click="seenFilter = f as any"
         class="px-3 py-1 text-xs rounded border transition"
@@ -209,7 +206,7 @@ function anilistUrl(id: number) {
         "
       >
         {{
-          f === "all" ? "Alle" : f === "any" ? "Mind. ein User" : "Alle User"
+          f === "all" ? "Alle Anime" : "Alle gesehen"
         }}
       </button>
     </div>
