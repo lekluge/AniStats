@@ -3,11 +3,17 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
     "dev": "nuxt dev",
-    "generate": "nuxt generate",
+
+    "build": "prisma generate && nuxt build",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "generate": "nuxt generate",
+
+    "postinstall": "prisma generate",
+
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.2.0",
