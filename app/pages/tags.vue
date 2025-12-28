@@ -35,7 +35,9 @@ async function loadAnime() {
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
-    entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
+    entries.value = normalizeAnilist(
+      res.data.data.MediaListCollection.lists
+    );
   } catch (e: any) {
     error.value = e?.message ?? "Unbekannter Fehler";
   } finally {
@@ -49,18 +51,37 @@ onMounted(loadAnime);
  * Tag Filter
  * ----------------------------- */
 const selectedTags = ref<string[]>([]);
+const tagSearch = ref("");
+const showAllTags = ref(false);
 
 const allTags = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.tags?.forEach((t) => set.add(t.name)));
+  entries.value.forEach((e) =>
+    e.tags?.forEach((t) => set.add(t.name))
+  );
   return [...set].sort();
+});
+
+const filteredTags = computed(() => {
+  if (!tagSearch.value.trim()) return [];
+  const q = tagSearch.value.toLowerCase();
+  return allTags.value.filter((t) =>
+    t.toLowerCase().includes(q)
+  );
+});
+
+const visibleTags = computed(() => {
+  if (showAllTags.value) return filteredTags.value;
+  return filteredTags.value.slice(0, 40);
 });
 
 const filteredEntries = computed(() => {
   if (!selectedTags.value.length) return entries.value;
 
   return entries.value.filter((e) =>
-    selectedTags.value.every((t) => e.tags?.some((et) => et.name === t))
+    selectedTags.value.every((t) =>
+      e.tags?.some((et) => et.name === t)
+    )
   );
 });
 
@@ -113,10 +134,16 @@ const normalTagStats = computed(() => {
               e.coverImage.large ||
               e.coverImage.medium;
 
-        if (cover) {
+        if (
+          cover &&
+          !map[tagName].covers.some((c) => c.id === e.id)
+        ) {
           map[tagName].covers.push({
             id: e.id,
-            title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+            title:
+              e.title?.english ??
+              e.title?.romaji ??
+              "Unknown title",
             cover,
           });
         }
@@ -125,16 +152,18 @@ const normalTagStats = computed(() => {
   }
 
   return Object.entries(map).map(([tag, t]) => ({
-    genre: tag, // 👈 bewusst "genre", damit GenreCard wiederverwendet wird
+    genre: tag,
     count: t.count,
-    meanScore: t.scoreCount ? Math.round(t.scoreSum / t.scoreCount) : 0,
+    meanScore: t.scoreCount
+      ? Math.round(t.scoreSum / t.scoreCount)
+      : 0,
     minutesWatched: t.minutes,
     covers: t.covers,
   }));
 });
 
 /* -----------------------------
- * COMBINED Tag Stats
+ * COMBINED
  * ----------------------------- */
 const combinedStats = computed(() => {
   if (!isCombinedMode.value) return null;
@@ -160,10 +189,16 @@ const combinedStats = computed(() => {
             e.coverImage.large ||
             e.coverImage.medium;
 
-      if (cover) {
+      if (
+        cover &&
+        !covers.some((c) => c.id === e.id)
+      ) {
         covers.push({
           id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+          title:
+            e.title?.english ??
+            e.title?.romaji ??
+            "Unknown title",
           cover,
         });
       }
@@ -173,140 +208,132 @@ const combinedStats = computed(() => {
   return {
     genre: selectedTags.value.join(" + "),
     count: filteredEntries.value.length,
-    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
+    meanScore: scoreCount
+      ? Math.round(scoreSum / scoreCount)
+      : 0,
     minutesWatched: minutes,
     covers,
   };
 });
 
+/* -----------------------------
+ * displayedTags
+ * ✅ FEATURED COVER FIX
+ * ----------------------------- */
 const displayedTags = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
-  return normalTagStats.value;
-});
 
-/* -----------------------------
- * LIST MODE
- * ----------------------------- */
-const listSummary = computed(() => {
-  if (!filteredEntries.value.length) return null;
+  const used = new Set<number>();
 
-  let minutes = 0;
-  let scoreSum = 0;
-  let scoreCount = 0;
+  return normalTagStats.value.map((g) => {
+    if (!g.covers?.length) return g;
 
-  for (const e of filteredEntries.value) {
-    minutes += (e.progress ?? 0) * (e.duration ?? 0);
-    if (e.score && e.score > 0) {
-      scoreSum += e.score;
-      scoreCount++;
-    }
-  }
+    const featured =
+      g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
 
-  return {
-    title: selectedTags.value.length
-      ? selectedTags.value.join(" + ")
-      : "Alle Tags",
-    count: filteredEntries.value.length,
-    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
-    hours: Math.round(minutes / 60),
-  };
-});
+    used.add(featured.id);
 
-const listAnime = computed(() =>
-  filteredEntries.value.map((e) => {
-    const relevantTags = selectedTags.value.length
-      ? e.tags?.filter((t) => selectedTags.value.includes(t.name)) ?? []
-      : [];
+    const rest = g.covers.filter((c) => c.id !== featured.id);
 
     return {
-      id: e.id,
-      title: e.title?.english ?? e.title?.romaji ?? "Unknown",
-      cover:
-        typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
-      score: e.score,
-
-      tagRanks: relevantTags.map((t) => ({
-        name: t.name,
-        rank: t.rank,
-      })),
+      ...g,
+      covers: [featured, ...rest],
     };
-  })
-);
+  });
+});
 
 /* -----------------------------
  * Helpers
  * ----------------------------- */
 function toggleTag(tag: string) {
   const i = selectedTags.value.indexOf(tag);
-  i === -1 ? selectedTags.value.push(tag) : selectedTags.value.splice(i, 1);
-}
-function anilistUrl(id: number) {
-  return `https://anilist.co/anime/${id}`;
+  i === -1
+    ? selectedTags.value.push(tag)
+    : selectedTags.value.splice(i, 1);
 }
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div
+      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+    >
       <h1 class="text-3xl font-bold">Tags</h1>
-      <div class="flex gap-2">
+
+      <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-44"
+          placeholder="AniList Username"
         />
-        <button @click="loadAnime" class="bg-indigo-600 px-4 py-2 rounded">
+        <button
+          @click="loadAnime"
+          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
+        >
           Laden
         </button>
       </div>
     </div>
 
     <!-- Layout Switch -->
-    <div class="flex justify-end gap-2">
+    <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
       <button
         @click="layoutMode = 'grid'"
-        class="px-3 py-1 text-xs rounded border"
-        :class="
-          layoutMode === 'grid'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
+        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+        :class="layoutMode === 'grid'
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
       >
         Grid
       </button>
       <button
         @click="layoutMode = 'list'"
-        class="px-3 py-1 text-xs rounded border"
-        :class="
-          layoutMode === 'list'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
+        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+        :class="layoutMode === 'list'
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
       >
         List
       </button>
     </div>
 
-    <!-- Tag Filter -->
-    <div class="flex flex-wrap gap-2">
+    <!-- 🔍 TAG SEARCH -->
+    <input
+      v-model="tagSearch"
+      placeholder="Tags suchen…"
+      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+    />
+
+    <!-- TAGS NUR BEI EINGABE -->
+    <div
+      v-if="tagSearch.trim()"
+      class="flex flex-wrap gap-2"
+    >
       <button
-        v-for="t in allTags"
+        v-for="t in visibleTags"
         :key="t"
         @click="toggleTag(t)"
-        class="px-3 py-1 rounded-full text-xs border"
-        :class="
-          selectedTags.includes(t)
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
+        class="px-3 py-2 rounded-full text-xs border"
+        :class="selectedTags.includes(t)
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
       >
         {{ t }}
       </button>
 
       <button
+        v-if="filteredTags.length > 40"
+        @click="showAllTags = !showAllTags"
+        class="px-3 py-2 rounded-full text-xs bg-zinc-800 text-zinc-200"
+      >
+        {{ showAllTags ? "Weniger anzeigen" : "Mehr anzeigen" }}
+      </button>
+
+      <button
         v-if="selectedTags.length"
         @click="selectedTags = []"
-        class="px-3 py-1 rounded-full text-xs bg-zinc-800"
+        class="px-3 py-2 rounded-full text-xs bg-zinc-800 text-zinc-100"
       >
         Reset
       </button>
@@ -323,53 +350,6 @@ function anilistUrl(id: number) {
         :rank="i + 1"
         :data="g"
       />
-    </div>
-
-    <!-- LIST -->
-    <div v-else class="space-y-3">
-      <div
-        v-if="listSummary"
-        class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 flex gap-6"
-      >
-        <div class="font-semibold">
-          {{ listSummary.title }}
-        </div>
-        <div class="flex gap-6 text-sm text-zinc-300">
-          <span>{{ listSummary.count }} Anime</span>
-          <span>{{ listSummary.meanScore || "—" }}</span>
-          <span>{{ listSummary.hours }} h</span>
-        </div>
-      </div>
-
-      <div
-        v-for="a in listAnime"
-        :key="a.id"
-        class="flex gap-4 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
-      >
-        <img
-          v-if="a.cover"
-          :src="a.cover"
-          class="h-14 aspect-2/3 rounded object-cover"
-        />
-        <a
-          :href="anilistUrl(a.id)"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex-1 truncate hover:underline hover:text-indigo-400 cursor-pointer"
-        >
-          {{ a.title }}
-        </a>
-        <div class="flex flex-col items-end text-xs text-zinc-400">
-          <span>{{ a.score || "—" }}</span>
-
-          <span v-if="a.tagRanks.length" class="text-zinc-500">
-            <template v-for="(t, i) in a.tagRanks" :key="t.name">
-              <span v-if="i > 0"> + </span>
-              {{ t.name }} {{ t.rank }}%
-            </template>
-          </span>
-        </div>
-      </div>
     </div>
   </div>
 </template>

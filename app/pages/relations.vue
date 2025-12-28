@@ -18,7 +18,8 @@ function matchesQuery(query: string, en?: string | null, ro?: string | null) {
   if (!query) return true;
   const q = query.toLowerCase();
   return (
-    (en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q))
+    (en && en.toLowerCase().includes(q)) ||
+    (ro && ro.toLowerCase().includes(q))
   );
 }
 
@@ -30,35 +31,27 @@ async function loadRelations() {
   error.value = null;
 
   try {
-    // 1) Userliste
     const userRes = await api.get("/api/anilist-user-list", {
       params: { user: username.value },
     });
-    const statusMap: Record<number, string> = userRes.data?.statusMap ?? {};
+    const statusMap: Record<number, string> =
+      userRes.data?.statusMap ?? {};
 
-    // 2) Alle Franchises
     const relRes = await api.get("/api/relations");
     const allGroups = relRes.data?.groups ?? [];
 
-    // 3) Filtern: irgendeine ID bekannt?
     const visibleGroups = allGroups.filter((g: any) => {
-      // Root
       if (statusMap[g.rootId]) return true;
 
-      // Chain
       for (const c of g.chain) {
         if (statusMap[c.id]) return true;
-
-        // Related unter Chain
         for (const r of c.related ?? []) {
           if (statusMap[r.id]) return true;
         }
       }
-
       return false;
     });
 
-    // 4) Status nur ANREICHERN (Anzeige!)
     groups.value = visibleGroups.map((g: any) => ({
       ...g,
       rootStatus: statusMap[g.rootId],
@@ -81,23 +74,18 @@ async function loadRelations() {
 onMounted(loadRelations);
 
 /* -----------------------------
- * Search-filtered Groups
+ * Computed
  * ----------------------------- */
 const filteredGroups = computed(() => {
   if (!search.value) return groups.value;
 
   return groups.value.filter((g: any) => {
-    if (matchesQuery(search.value, g.chain[0]?.titleEn, g.chain[0]?.titleRo))
-      return true;
-
     for (const c of g.chain) {
       if (matchesQuery(search.value, c.titleEn, c.titleRo)) return true;
-
       for (const r of c.related ?? []) {
         if (matchesQuery(search.value, r.titleEn, r.titleRo)) return true;
       }
     }
-
     return false;
   });
 });
@@ -131,28 +119,24 @@ function anilistUrl(id: number) {
 function displayTitle(en?: string | null, ro?: string | null) {
   return en || ro || "—";
 }
-
-function showRomaji(en?: string | null, ro?: string | null) {
-  return !!en && !!ro && en !== ro;
-}
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center gap-4">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
       <h1 class="text-3xl font-bold">Anime Relations</h1>
 
-      <div class="flex gap-2 items-center">
+      <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm w-40"
+          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm w-full sm:w-40"
           placeholder="AniList User"
         />
 
         <button
           @click="loadRelations"
-          class="bg-indigo-600 px-4 py-2 rounded text-sm"
+          class="bg-indigo-600 px-4 py-2 rounded text-sm w-full sm:w-auto"
         >
           Laden
         </button>
@@ -163,7 +147,7 @@ function showRomaji(en?: string | null, ro?: string | null) {
     <input
       v-model="search"
       placeholder="Anime suchen (English / Romaji)…"
-      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-3 md:py-2 rounded"
     />
 
     <!-- Summary -->
@@ -180,27 +164,30 @@ function showRomaji(en?: string | null, ro?: string | null) {
       <div
         v-for="group in filteredGroups"
         :key="group.rootId"
-        class="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4"
+        class="p-3 md:p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4"
       >
-        <!-- Chain -->
-        <div class="pl-4 space-y-4 text-sm">
+        <div class="pl-2 md:pl-4 space-y-4 text-sm">
           <div v-for="item in group.chain" :key="item.id" class="space-y-2">
-            <div class="flex items-center gap-3">
+            <!-- Main -->
+            <div class="flex items-start gap-3">
               <img
                 v-if="item.cover"
                 :src="item.cover"
-                class="h-12 aspect-[2/3] rounded object-cover"
+                class="h-14 sm:h-12 aspect-[2/3] rounded object-cover flex-shrink-0"
               />
 
               <a
                 :href="anilistUrl(item.id)"
                 target="_blank"
-                class="flex-1 truncate hover:text-indigo-400"
+                class="flex-1 break-words leading-tight hover:text-indigo-400"
               >
                 {{ displayTitle(item.titleEn, item.titleRo) }}
               </a>
 
-              <span class="text-xs" :class="statusColor(item.status)">
+              <span
+                class="text-xs whitespace-nowrap"
+                :class="statusColor(item.status)"
+              >
                 {{ item.status ?? "—" }}
               </span>
             </div>
@@ -208,23 +195,23 @@ function showRomaji(en?: string | null, ro?: string | null) {
             <!-- Related -->
             <div
               v-if="item.related?.length"
-              class="pl-8 space-y-1 text-xs text-zinc-400"
+              class="pl-4 sm:pl-8 space-y-2 text-xs text-zinc-400"
             >
               <div
                 v-for="r in item.related"
                 :key="r.id"
-                class="flex items-center gap-2"
+                class="flex items-start gap-2"
               >
                 <img
                   v-if="r.cover"
                   :src="r.cover"
-                  class="h-8 aspect-[2/3] rounded object-cover opacity-80"
+                  class="h-10 sm:h-8 aspect-[2/3] rounded object-cover opacity-80 flex-shrink-0"
                 />
 
                 <a
                   :href="anilistUrl(r.id)"
                   target="_blank"
-                  class="truncate hover:text-indigo-400"
+                  class="flex-1 break-words hover:text-indigo-400"
                 >
                   {{ displayTitle(r.titleEn, r.titleRo) }}
                   <span class="ml-1 text-zinc-500">
@@ -232,8 +219,11 @@ function showRomaji(en?: string | null, ro?: string | null) {
                   </span>
                 </a>
 
-                <span class="ml-auto text-xs" :class="statusColor(item.status)">
-                  {{ item.status ?? "—" }}
+                <span
+                  class="text-xs whitespace-nowrap"
+                  :class="statusColor(r.status)"
+                >
+                  {{ r.status ?? "—" }}
                 </span>
               </div>
             </div>

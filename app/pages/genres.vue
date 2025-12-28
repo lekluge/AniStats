@@ -110,7 +110,7 @@ const normalGenreStats = computed(() => {
               e.coverImage.large ||
               e.coverImage.medium;
 
-        if (cover) {
+        if (cover && !map[genre].covers.find((c) => c.id === e.id)) {
           map[genre].covers.push({
             id: e.id,
             title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
@@ -154,7 +154,7 @@ const combinedStats = computed(() => {
             e.coverImage.large ||
             e.coverImage.medium;
 
-      if (cover) {
+      if (cover && !covers.find((c) => c.id === e.id)) {
         covers.push({
           id: e.id,
           title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
@@ -173,59 +173,40 @@ const combinedStats = computed(() => {
   };
 });
 
+/* -----------------------------
+ * displayedGenres
+ * ✅ FIX: unique featured cover per card
+ * ----------------------------- */
 const displayedGenres = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
-  return normalGenreStats.value;
+
+  const used = new Set<number>();
+
+  return normalGenreStats.value.map((g) => {
+    if (!g.covers.length) return g;
+
+    const featured =
+      g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
+
+    used.add(featured.id);
+
+    const rest = g.covers.filter((c) => c.id !== featured.id);
+
+    return {
+      ...g,
+      covers: [featured, ...rest],
+    };
+  });
 });
-
-/* -----------------------------
- * LIST MODE: Summary + Anime
- * ----------------------------- */
-const listSummary = computed(() => {
-  if (!filteredEntries.value.length) return null;
-
-  let minutes = 0;
-  let scoreSum = 0;
-  let scoreCount = 0;
-
-  for (const e of filteredEntries.value) {
-    minutes += (e.progress ?? 0) * (e.duration ?? 0);
-    if (e.score && e.score > 0) {
-      scoreSum += e.score;
-      scoreCount++;
-    }
-  }
-
-  return {
-    title: selectedGenres.value.length
-      ? selectedGenres.value.join(" + ")
-      : "Alle Anime",
-    count: filteredEntries.value.length,
-    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
-    hours: Math.round(minutes / 60),
-  };
-});
-
-const listAnime = computed(() =>
-  filteredEntries.value.map((e) => ({
-    id: e.id,
-    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
-    cover:
-      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
-    score: e.score,
-    progress: e.progress,
-  }))
-);
 
 /* -----------------------------
  * Helpers
  * ----------------------------- */
 function toggleGenre(genre: string) {
   const i = selectedGenres.value.indexOf(genre);
-  i === -1
-    ? selectedGenres.value.push(genre)
-    : selectedGenres.value.splice(i, 1);
+  i === -1 ? selectedGenres.value.push(genre) : selectedGenres.value.splice(i, 1);
 }
+
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
@@ -234,123 +215,93 @@ function anilistUrl(id: number) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <h1 class="text-3xl font-bold">Genres</h1>
-      <div class="flex gap-2">
+
+      <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-44"
+          placeholder="AniList Username"
         />
-        <button @click="loadAnime" class="bg-indigo-600 px-4 py-2 rounded">
+        <button
+          @click="loadAnime"
+          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto disabled:opacity-50"
+          :disabled="loading"
+        >
           Laden
         </button>
       </div>
     </div>
 
-    <!-- Layout Switch -->
-    <div class="flex justify-end gap-2">
-      <button
-        @click="layoutMode = 'grid'"
-        class="px-3 py-1 text-xs rounded border"
-        :class="
-          layoutMode === 'grid'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        Grid
-      </button>
-      <button
-        @click="layoutMode = 'list'"
-        class="px-3 py-1 text-xs rounded border"
-        :class="
-          layoutMode === 'list'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        List
-      </button>
-    </div>
+    <!-- States -->
+    <div v-if="loading" class="text-zinc-400">Lade AniList Daten…</div>
+    <div v-else-if="error" class="text-red-400">Fehler: {{ error }}</div>
 
-    <!-- Genre Filter -->
-    <div class="flex flex-wrap gap-2">
-      <button
-        v-for="g in allGenres"
-        :key="g"
-        @click="toggleGenre(g)"
-        class="px-3 py-1 rounded-full text-xs border"
-        :class="
-          selectedGenres.includes(g)
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        {{ g }}
-      </button>
-
-      <button
-        v-if="selectedGenres.length"
-        @click="selectedGenres = []"
-        class="px-3 py-1 rounded-full text-xs bg-zinc-800"
-      >
-        Reset
-      </button>
-    </div>
-
-    <!-- GRID -->
-    <div
-      v-if="layoutMode === 'grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <GenreCard
-        v-for="(g, i) in displayedGenres"
-        :key="g.genre"
-        :rank="i + 1"
-        :data="g"
-      />
-    </div>
-
-    <!-- LIST -->
-    <div v-else class="space-y-3">
-      <!-- Summary -->
-      <div
-        v-if="listSummary"
-        class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 flex gap-6"
-      >
-        <div class="font-semibold">
-          {{ listSummary.title }}
-        </div>
-        <div class="flex gap-6 text-sm text-zinc-300">
-          <span>{{ listSummary.count }} Anime</span>
-          <span>{{ listSummary.meanScore || "—" }}</span>
-          <span>{{ listSummary.hours }} h</span>
-        </div>
-      </div>
-
-      <!-- Anime List -->
-      <div
-        v-for="a in listAnime"
-        :key="a.id"
-        class="flex gap-4 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
-      >
-        <img
-          v-if="a.cover"
-          :src="a.cover"
-          class="h-14 aspect-2/3 rounded object-cover"
-        />
-        <a
-          :href="anilistUrl(a.id)"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex-1 truncate hover:underline hover:text-indigo-400 cursor-pointer"
+    <template v-else>
+      <!-- Layout Switch -->
+      <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+        <button
+          @click="layoutMode = 'grid'"
+          class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+          :class="
+            layoutMode === 'grid'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+          "
         >
-          {{ a.title }}
-        </a>
-        <div class="text-xs text-zinc-400">
-          {{ a.score || "—" }}
-        </div>
+          Grid
+        </button>
+        <button
+          @click="layoutMode = 'list'"
+          class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+          :class="
+            layoutMode === 'list'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+          "
+        >
+          List
+        </button>
       </div>
-    </div>
+
+      <!-- Genre Filter -->
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="g in allGenres"
+          :key="g"
+          @click="toggleGenre(g)"
+          class="px-3 py-1.5 rounded-full text-xs border"
+          :class="
+            selectedGenres.includes(g)
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+          "
+        >
+          {{ g }}
+        </button>
+
+        <button
+          v-if="selectedGenres.length"
+          @click="selectedGenres = []"
+          class="px-3 py-1.5 rounded-full text-xs bg-zinc-800 text-zinc-100"
+        >
+          Reset
+        </button>
+      </div>
+
+      <!-- GRID -->
+      <div
+        v-if="layoutMode === 'grid'"
+        class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <GenreCard
+          v-for="(g, i) in displayedGenres"
+          :key="g.genre"
+          :rank="i + 1"
+          :data="g"
+        />
+      </div>
+    </template>
   </div>
 </template>
