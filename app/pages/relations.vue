@@ -8,7 +8,7 @@ const username = ref("Lichtgott");
 const loading = ref(false);
 const error = ref<string | null>(null);
 const groups = ref<any[]>([]);
-
+definePageMeta({ title: 'Relations' })
 /* -----------------------------
  * Search
  * ----------------------------- */

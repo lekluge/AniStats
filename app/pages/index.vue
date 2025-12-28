@@ -37,6 +37,7 @@ const username = ref("Tiggy");
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
+definePageMeta({ title: '' })
 
 /* -----------------------------
  * API Call

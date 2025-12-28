@@ -3,7 +3,7 @@ import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 import GenreCard from "../components/GenreCard.vue";
-
+definePageMeta({ title: 'Combine' })
 /* -----------------------------
  * Types
  * ----------------------------- */

@@ -7,10 +7,10 @@
         <!-- Logo / Home -->
         <NuxtLink
           to="/"
-          class="font-semibold tracking-tight hover:text-indigo-400"
+          class="flex items-center gap-2 hover:opacity-80 transition"
           @click="closeMenu"
         >
-          AniList Stats
+          <img src="/logo.png" alt="AniList Stats" class="h-8 w-auto" />
         </NuxtLink>
 
         <!-- Desktop Navigation -->
@@ -37,8 +37,12 @@
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 6h16M4 12h16M4 18h16" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
 
           <svg
@@ -49,8 +53,12 @@
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M6 18L18 6M6 6l12 12" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
@@ -61,11 +69,21 @@
         class="md:hidden border-t border-zinc-800 bg-zinc-950"
       >
         <nav class="flex flex-col px-4 py-4 gap-3 text-sm">
-          <NuxtLink to="/genres" class="nav-link" @click="closeMenu">Genres</NuxtLink>
-          <NuxtLink to="/tags" class="nav-link" @click="closeMenu">Tags</NuxtLink>
-          <NuxtLink to="/combine" class="nav-link" @click="closeMenu">Combine</NuxtLink>
-          <NuxtLink to="/relations" class="nav-link" @click="closeMenu">Relations</NuxtLink>
-          <NuxtLink to="/compare" class="nav-link" @click="closeMenu">Compare</NuxtLink>
+          <NuxtLink to="/genres" class="nav-link" @click="closeMenu"
+            >Genres</NuxtLink
+          >
+          <NuxtLink to="/tags" class="nav-link" @click="closeMenu"
+            >Tags</NuxtLink
+          >
+          <NuxtLink to="/combine" class="nav-link" @click="closeMenu"
+            >Combine</NuxtLink
+          >
+          <NuxtLink to="/relations" class="nav-link" @click="closeMenu"
+            >Relations</NuxtLink
+          >
+          <NuxtLink to="/compare" class="nav-link" @click="closeMenu"
+            >Compare</NuxtLink
+          >
         </nav>
       </div>
     </header>
@@ -77,11 +95,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from "vue";
 
-const menuOpen = ref(false)
+const menuOpen = ref(false);
 
 const closeMenu = () => {
-  menuOpen.value = false
-}
+  menuOpen.value = false;
+};
 </script>

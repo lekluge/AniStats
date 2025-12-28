@@ -12,6 +12,7 @@ type FilterState = "include" | "exclude";
 /* -----------------------------
  * State
  * ----------------------------- */
+definePageMeta({ title: 'Compare' })
 const userInput = ref("");
 const users = ref<string[]>(["Tiggy", "Lichtgott"]);
 

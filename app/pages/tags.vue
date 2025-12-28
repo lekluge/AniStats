@@ -24,7 +24,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
-
+definePageMeta({ title: 'Tags' })
 /* -----------------------------
  * API
  * ----------------------------- */
