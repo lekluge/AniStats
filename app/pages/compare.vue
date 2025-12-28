@@ -4,6 +4,12 @@ import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 
 /* -----------------------------
+ * Types
+ * ----------------------------- */
+type SeenFilter = "all" | "allUsers" | "noneUsers";
+type FilterState = "include" | "exclude";
+
+/* -----------------------------
  * State
  * ----------------------------- */
 const userInput = ref("");
@@ -13,11 +19,15 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 const entriesByUser = ref<Record<string, AnimeEntry[]>>({});
-
 const search = ref("");
-
-type SeenFilter = "all" | "allUsers" | "noneUsers";
 const seenFilter = ref<SeenFilter>("all");
+
+/* -----------------------------
+ * Genre / Tag Filters
+ * ----------------------------- */
+const genreStates = ref<Record<string, FilterState>>({});
+const tagStates = ref<Record<string, FilterState>>({});
+const tagSearch = ref("");
 
 /* -----------------------------
  * User Input
@@ -110,7 +120,45 @@ const comparedAnime = computed(() => {
 });
 
 /* -----------------------------
- * Filter (Search + Seen)
+ * Available Genres & Tags
+ * ----------------------------- */
+const allGenres = computed(() => {
+  const s = new Set<string>();
+  comparedAnime.value.forEach((a) =>
+    Object.values(a.users).forEach((e: any) =>
+      e.genres?.forEach((g: string) => s.add(g))
+    )
+  );
+  return [...s].sort();
+});
+
+const allTags = computed(() => {
+  const s = new Set<string>();
+  comparedAnime.value.forEach((a) =>
+    Object.values(a.users).forEach((e: any) =>
+      e.tags?.forEach((t: any) => s.add(t.name))
+    )
+  );
+  return [...s].sort();
+});
+
+const filteredTags = computed(() => {
+  if (!tagSearch.value.trim()) return [];
+  const q = tagSearch.value.toLowerCase();
+  return allTags.value.filter((t) => t.toLowerCase().includes(q));
+});
+
+const selectedTags = computed(() => Object.keys(tagStates.value));
+
+const visibleTags = computed(() => {
+  const set = new Set<string>();
+  selectedTags.value.forEach((t) => set.add(t));
+  filteredTags.value.forEach((t) => set.add(t));
+  return [...set].sort((a, b) => a.localeCompare(b));
+});
+
+/* -----------------------------
+ * Filter (Search + Seen + Genres + Tags)
  * ----------------------------- */
 const filteredAnime = computed(() => {
   const q = search.value.toLowerCase();
@@ -123,18 +171,40 @@ const filteredAnime = computed(() => {
 
     if (!matchesSearch) return false;
 
-    if (seenFilter.value === "all") return true;
-
     if (seenFilter.value === "allUsers") {
-      return users.value.every(
-        (u) => a.users[u] && a.users[u].status === "COMPLETED"
-      );
+      if (
+        !users.value.every(
+          (u) => a.users[u] && a.users[u].status === "COMPLETED"
+        )
+      )
+        return false;
     }
 
     if (seenFilter.value === "noneUsers") {
-      return users.value.every(
-        (u) => !a.users[u] || a.users[u].status !== "COMPLETED"
-      );
+      if (
+        !users.value.every(
+          (u) => !a.users[u] || a.users[u].status !== "COMPLETED"
+        )
+      )
+        return false;
+    }
+
+    const genres = new Set<string>();
+    const tags = new Set<string>();
+
+    Object.values(a.users).forEach((e: any) => {
+      e.genres?.forEach((g: string) => genres.add(g));
+      e.tags?.forEach((t: any) => tags.add(t.name));
+    });
+
+    for (const [g, s] of Object.entries(genreStates.value)) {
+      if (s === "include" && !genres.has(g)) return false;
+      if (s === "exclude" && genres.has(g)) return false;
+    }
+
+    for (const [t, s] of Object.entries(tagStates.value)) {
+      if (s === "include" && !tags.has(t)) return false;
+      if (s === "exclude" && tags.has(t)) return false;
     }
 
     return true;
@@ -142,6 +212,15 @@ const filteredAnime = computed(() => {
 });
 
 const animeCount = computed(() => filteredAnime.value.length);
+
+/* -----------------------------
+ * Helpers
+ * ----------------------------- */
+function cycleState(map: Record<string, FilterState>, key: string) {
+  if (!map[key]) map[key] = "include";
+  else if (map[key] === "include") map[key] = "exclude";
+  else delete map[key];
+}
 
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
@@ -219,6 +298,51 @@ function anilistUrl(id: number) {
       </button>
     </div>
 
+    <!-- Genres -->
+    <div class="flex flex-wrap gap-2">
+      <h2 class="w-full font-semibold">Genres</h2>
+      <button
+        v-for="g in allGenres"
+        :key="g"
+        @click="cycleState(genreStates, g)"
+        class="px-3 py-2 sm:py-1.5 text-xs rounded-full border"
+        :class="{
+          'bg-indigo-600 text-white': genreStates[g] === 'include',
+          'bg-red-600 text-white': genreStates[g] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !genreStates[g],
+        }"
+      >
+        {{ g }}
+      </button>
+    </div>
+
+    <!-- Tag Search -->
+    <input
+      v-model="tagSearch"
+      placeholder="Tags suchen…"
+      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+    />
+
+    <!-- Tags -->
+    <div
+      v-if="tagSearch.trim() || selectedTags.length"
+      class="flex flex-wrap gap-2"
+    >
+      <button
+        v-for="t in visibleTags"
+        :key="t"
+        @click="cycleState(tagStates, t)"
+        class="px-3 py-2 rounded-full text-xs border"
+        :class="{
+          'bg-indigo-600 text-white': tagStates[t] === 'include',
+          'bg-red-600 text-white': tagStates[t] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !tagStates[t],
+        }"
+      >
+        {{ t }}
+      </button>
+    </div>
+
     <!-- Summary -->
     <div class="text-sm text-zinc-400">
       {{ animeCount }} Anime gefunden
@@ -273,9 +397,7 @@ function anilistUrl(id: number) {
             :key="u"
             class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-2 text-sm"
           >
-            <div class="text-xs text-zinc-400 mb-1">
-              {{ u }}
-            </div>
+            <div class="text-xs text-zinc-400 mb-1">{{ u }}</div>
 
             <template v-if="a.users[u]">
               <div
@@ -284,7 +406,6 @@ function anilistUrl(id: number) {
               >
                 ✔ Gesehen
               </div>
-
               <div
                 v-else
                 :class="{
@@ -296,7 +417,6 @@ function anilistUrl(id: number) {
               >
                 {{ a.users[u].status }}
               </div>
-
               <div class="text-xs text-zinc-400">
                 Score: {{ a.users[u].score || "—" }}
               </div>
