@@ -22,7 +22,7 @@ const entriesByUser = ref<Record<string, AnimeEntry[]>>({});
 const allAnime = ref<any[]>([]);
 
 const search = ref("");
-const seenFilter = ref<SeenFilter>("all");
+const seenFilter = ref<SeenFilter>("allUsers");
 
 /* -----------------------------
  * Pagination
@@ -363,7 +363,7 @@ function anilistUrl(id: number) {
     <!-- Seen Filter -->
     <div class="flex flex-col sm:flex-row gap-2">
       <button
-        v-for="f in ['all', 'allUsers', 'noneUsers']"
+        v-for="f in ['allUsers', 'all', 'noneUsers']"
         :key="f"
         @click="seenFilter = f as any"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto transition"
@@ -374,10 +374,10 @@ function anilistUrl(id: number) {
         "
       >
         {{
-          f === "all"
-            ? "Alle Anime"
-            : f === "allUsers"
+          f === "allUsers"
             ? "Alle gesehen"
+            : f === "all"
+            ? "mind. einer gesehen"
             : "Keiner gesehen"
         }}
       </button>
