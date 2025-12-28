@@ -244,7 +244,7 @@ export class AniListSyncService {
 
       this.setInitialEta(etaMs);
 
-      console.log(
+      console.warn(
         `[Phase1] Page ${pageCount} | processed ${processed} | upserted ${upserted} | skipped ${skipped}`
       );
     }
