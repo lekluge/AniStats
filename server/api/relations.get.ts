@@ -35,7 +35,10 @@ export default defineEventHandler(async (event) => {
   });
 
   const byId = new Map(anime.map((a) => [a.id, a]));
+  const ROOT_REL = new Set(["PREQUEL", "PARENT"] as const);
 
+  
+  
   /* ----------------------------------
    * 2) Helper = IDENTISCHE Root-Find-Logik
    * ---------------------------------- */
@@ -48,7 +51,7 @@ export default defineEventHandler(async (event) => {
       visited.add(current.id);
 
       const prequels = (current.relationsFrom ?? [])
-        .filter((r: any) => r.relationType === "PREQUEL")
+        .filter((r: any) => ROOT_REL.has(r.relationType))
         .filter((r: any) => r.toId && r.toId !== current.id);
 
       const next = pickDeterministic(prequels);
