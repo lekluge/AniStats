@@ -76,9 +76,9 @@ const remainingCount = computed(() =>
           <div class="font-semibold">{{ data.count }}</div>
         </div>
         <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
-          <div class="text-xs text-zinc-400">Score</div>
+          <div class="text-xs text-zinc-400">Ø Score</div>
           <div class="font-semibold">
-            {{ data.meanScore || "—" }}%
+            {{ data.meanScore || "—" }}
           </div>
         </div>
         <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
