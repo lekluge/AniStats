@@ -1,25 +1,20 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
-import type { RelationGroup } from "~/types/animeRelation";
 
 /* -----------------------------
  * State
  * ----------------------------- */
-const username = ref("Tiggy");
+const username = ref("Lichtgott");
 const loading = ref(false);
 const error = ref<string | null>(null);
-const groups = ref<RelationGroup[]>([]);
+const groups = ref<any[]>([]);
 
 /* -----------------------------
  * Search
  * ----------------------------- */
 const search = ref("");
 
-function matchesQuery(
-  query: string,
-  en?: string | null,
-  ro?: string | null
-) {
+function matchesQuery(query: string, en?: string | null, ro?: string | null) {
   if (!query) return true;
   const q = query.toLowerCase();
   return (
@@ -29,79 +24,61 @@ function matchesQuery(
 }
 
 /* -----------------------------
- * Filter User List
+ * Load Relations + User List
  * ----------------------------- */
-function filterGroupsByUserList(
-  groups: RelationGroup[],
-  statusMap: Record<number, string>
-): RelationGroup[] {
-  return groups.filter((g) => {
-    if (statusMap[g.rootId]) return true;
-    if (g.chain.some((c) => statusMap[c.id])) return true;
-    if (g.related.some((r) => statusMap[r.id])) return true;
-    return false;
-  });
-}
-
-/* -----------------------------
- * Merge User Status
- * ----------------------------- */
-function applyUserStatus(
-  groups: RelationGroup[],
-  statusMap: Record<number, string>
-): RelationGroup[] {
-  return groups.map((g) => ({
-    ...g,
-    rootStatus: statusMap[g.rootId],
-    chain: g.chain.map((c) => ({
-      ...c,
-      status: statusMap[c.id],
-    })),
-    related: g.related.map((r) => ({
-      ...r,
-      status: statusMap[r.id],
-    })),
-  }));
-}
-
-/* -----------------------------
- * Load Relations (cached)
- * ----------------------------- */
-const relationsCache = ref<RelationGroup[] | null>(null);
-
 async function loadRelations() {
   loading.value = true;
   error.value = null;
 
   try {
-    // 🔥 Relations nur EINMAL laden & cachen
-    if (!relationsCache.value) {
-      const relRes = await api.get("/api/relations");
-      relationsCache.value = relRes.data?.groups ?? [];
-    }
-
-    // 👤 Userliste IMMER neu
+    // 1) Userliste
     const userRes = await api.get("/api/anilist-user-list", {
       params: { user: username.value },
     });
+    const statusMap: Record<number, string> =
+      userRes.data?.statusMap ?? {};
 
-    const statusMap = userRes.data?.statusMap ?? {};
+    // 2) Alle Franchises
+    const relRes = await api.get("/api/relations");
+    const allGroups = relRes.data?.groups ?? [];
 
-    const filtered = filterGroupsByUserList(
-      relationsCache.value,
-      statusMap
-    );
+    // 3) Filtern: irgendeine ID bekannt?
+    const visibleGroups = allGroups.filter((g: any) => {
+      // Root
+      if (statusMap[g.rootId]) return true;
 
-    const result = applyUserStatus(filtered, statusMap);
+      // Chain
+      for (const c of g.chain) {
+        if (statusMap[c.id]) return true;
 
-    groups.value = result;
+        // Related unter Chain
+        for (const r of c.related ?? []) {
+          if (statusMap[r.id]) return true;
+        }
+      }
+
+      return false;
+    });
+
+    // 4) Status nur ANREICHERN (Anzeige!)
+    groups.value = visibleGroups.map((g: any) => ({
+      ...g,
+      rootStatus: statusMap[g.rootId],
+      chain: g.chain.map((c: any) => ({
+        ...c,
+        status: statusMap[c.id],
+        related: (c.related ?? []).map((r: any) => ({
+          ...r,
+          status: statusMap[r.id],
+        })),
+      })),
+    }));
   } catch (e: any) {
     error.value = e?.message ?? "Fehler beim Laden";
   } finally {
     loading.value = false;
   }
 }
-
 
 onMounted(loadRelations);
 
@@ -111,20 +88,18 @@ onMounted(loadRelations);
 const filteredGroups = computed(() => {
   if (!search.value) return groups.value;
 
-  return groups.value.filter((g) => {
-    if (matchesQuery(search.value, g.rootTitleEn, g.rootTitleRo)) return true;
-    if (
-      g.chain.some((c) =>
-        matchesQuery(search.value, c.titleEn, c.titleRo)
-      )
-    )
+  return groups.value.filter((g: any) => {
+    if (matchesQuery(search.value, g.chain[0]?.titleEn, g.chain[0]?.titleRo))
       return true;
-    if (
-      g.related.some((r) =>
-        matchesQuery(search.value, r.titleEn, r.titleRo)
-      )
-    )
-      return true;
+
+    for (const c of g.chain) {
+      if (matchesQuery(search.value, c.titleEn, c.titleRo)) return true;
+
+      for (const r of c.related ?? []) {
+        if (matchesQuery(search.value, r.titleEn, r.titleRo)) return true;
+      }
+    }
+
     return false;
   });
 });
@@ -209,109 +184,61 @@ function showRomaji(en?: string | null, ro?: string | null) {
         :key="group.rootId"
         class="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4"
       >
-        <!-- Root -->
-        <div class="flex gap-4">
-          <img
-            v-if="group.rootCover"
-            :src="group.rootCover"
-            class="h-24 aspect-[2/3] rounded object-cover"
-          />
+        <!-- Chain -->
+        <div class="pl-4 space-y-4 text-sm">
+          <div v-for="item in group.chain" :key="item.id" class="space-y-2">
+            <div class="flex items-center gap-3">
+              <img
+                v-if="item.cover"
+                :src="item.cover"
+                class="h-12 aspect-[2/3] rounded object-cover"
+              />
 
-          <div class="flex-1">
-            <div class="flex justify-between">
-              <div>
+              <a
+                :href="anilistUrl(item.id)"
+                target="_blank"
+                class="flex-1 truncate hover:text-indigo-400"
+              >
+                {{ displayTitle(item.titleEn, item.titleRo) }}
+              </a>
+
+              <span class="text-xs" :class="statusColor(item.status)">
+                {{ item.status ?? "—" }}
+              </span>
+            </div>
+
+            <!-- Related -->
+            <div
+              v-if="item.related?.length"
+              class="pl-8 space-y-1 text-xs text-zinc-400"
+            >
+              <div
+                v-for="r in item.related"
+                :key="r.id"
+                class="flex items-center gap-2"
+              >
+                <img
+                  v-if="r.cover"
+                  :src="r.cover"
+                  class="h-8 aspect-[2/3] rounded object-cover opacity-80"
+                />
+
                 <a
-                  :href="anilistUrl(group.rootId)"
+                  :href="anilistUrl(r.id)"
                   target="_blank"
-                  class="font-semibold hover:text-indigo-400"
+                  class="truncate hover:text-indigo-400"
                 >
-                  {{ displayTitle(group.rootTitleEn, group.rootTitleRo) }}
+                  {{ displayTitle(r.titleEn, r.titleRo) }}
+                  <span class="ml-1 text-zinc-500">
+                    ({{ r.relationType }})
+                  </span>
                 </a>
 
-                <div
-                  v-if="showRomaji(group.rootTitleEn, group.rootTitleRo)"
-                  class="text-xs text-zinc-500"
-                >
-                  {{ group.rootTitleRo }}
-                </div>
-              </div>
-
-              <div
-                class="text-sm font-semibold"
-                :class="statusColor(group.rootStatus)"
-              >
-                {{ group.rootStatus ?? "—" }}
+                <span class="text-xs" :class="statusColor(r.status)">
+                  {{ r.status ?? "—" }}
+                </span>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Chain -->
-        <div
-          v-if="group.chain.length > 1"
-          class="pl-28 space-y-2 text-sm"
-        >
-          <div
-            v-for="item in group.chain.slice(1)"
-            :key="item.id"
-            class="flex items-center gap-3"
-          >
-            <img
-              v-if="item.cover"
-              :src="item.cover"
-              class="h-12 aspect-[2/3] rounded object-cover"
-            />
-
-            <a
-              :href="anilistUrl(item.id)"
-              target="_blank"
-              class="flex-1 truncate hover:text-indigo-400"
-            >
-              {{ displayTitle(item.titleEn, item.titleRo) }}
-            </a>
-
-            <span
-              class="text-xs"
-              :class="statusColor(item.status)"
-            >
-              {{ item.status ?? "—" }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Related -->
-        <div
-          v-if="group.related.length"
-          class="pl-28 space-y-2 text-sm"
-        >
-          <div
-            v-for="r in group.related"
-            :key="r.id"
-            class="flex items-center gap-3 text-zinc-300"
-          >
-            <img
-              v-if="r.cover"
-              :src="r.cover"
-              class="h-12 aspect-[2/3] rounded object-cover opacity-80"
-            />
-
-            <a
-              :href="anilistUrl(r.id)"
-              target="_blank"
-              class="flex-1 truncate hover:text-indigo-400"
-            >
-              {{ displayTitle(r.titleEn, r.titleRo) }}
-              <span class="text-xs text-zinc-500 ml-1">
-                ({{ r.relationLabel }})
-              </span>
-            </a>
-
-            <span
-              class="text-xs"
-              :class="statusColor(r.status)"
-            >
-              {{ r.status ?? "—" }}
-            </span>
           </div>
         </div>
       </div>

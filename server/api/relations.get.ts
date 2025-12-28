@@ -1,172 +1,170 @@
-import { defineEventHandler, setHeader } from "h3"
-import { prisma } from "../utils/prisma"
+import { defineEventHandler, setHeader } from "h3";
+import { prisma } from "../utils/prisma";
 
-/* ----------------------------------
- * Cache (Server Memory)
- * ---------------------------------- */
-let cachedResult: any | null = null
-let cachedAt = 0
-const CACHE_TTL = 1000 * 60 * 5 // 5 Minuten
+const CHAIN_REL = new Set(["PREQUEL", "SEQUEL"] as const);
 
-/* ----------------------------------
- * Config
- * ---------------------------------- */
-const STORY_RELATIONS = new Set([
-  "PREQUEL",
-  "SEQUEL",
-  "SIDE_STORY",
-  "SPIN_OFF",
-  "SUMMARY",
-  "ADAPTATION",
-  "ALTERNATIVE",
-  "COMPILATION",
-])
-
-const TYPE_SCORE: Record<string, number> = {
-  TV: 100,
-  ONA: 80,
-  OVA: 70,
-  MOVIE: 60,
-  SPECIAL: 50,
-  MUSIC: 10,
+function pickDeterministic<T extends { toId: number }>(edges: T[]) {
+  return [...edges].sort((a, b) => a.toId - b.toId)[0] ?? null;
 }
 
 /* ----------------------------------
- * Helpers
+ * ✅ Server Cache (IN-MEMORY)
  * ---------------------------------- */
-function relationLabel(type: string) {
-  return type
-    .replace("_", " ")
-    .toLowerCase()
-    .replace(/^\w/, (c) => c.toUpperCase())
-}
+let cachedResult: any | null = null;
+let cachedAt = 0;
+const CACHE_TTL = 1000 * 60 * 60; // 5 Minuten
 
-function pickRoot(cluster: any[]) {
-  return [...cluster].sort((a, b) => {
-    const scoreA =
-      (TYPE_SCORE[a.format] ?? 0) -
-      ((a.relationsTo ?? []).some((r) => r.relationType === "PREQUEL")
-        ? 20
-        : 0)
-
-    const scoreB =
-      (TYPE_SCORE[b.format] ?? 0) -
-      ((b.relationsTo ?? []).some((r) => r.relationType === "PREQUEL")
-        ? 20
-        : 0)
-
-    return scoreB - scoreA
-  })[0]
-}
-
-/* ----------------------------------
- * Handler
- * ---------------------------------- */
 export default defineEventHandler(async (event) => {
-  // 🌍 CDN / Browser Cache
-  setHeader(event, "Cache-Control", "public, max-age=300, s-maxage=300")
-  setHeader(event, "CDN-Cache-Control", "public, max-age=300")
+  // HTTP cache header darf bleiben (optional)
+  setHeader(event, "Cache-Control", "public, max-age=300");
 
-  // 🧠 In-Memory Cache
-  const now = Date.now()
+  // ✅ SERVER cache hit
+  const now = Date.now();
   if (cachedResult && now - cachedAt < CACHE_TTL) {
-    return cachedResult
+    return cachedResult;
   }
 
+  /* ----------------------------------
+   * 1) ALLE Daten einmal laden
+   * ---------------------------------- */
   const anime = await prisma.anime.findMany({
     include: {
-      relationsFrom: { include: { to: true } },
-      relationsTo: { include: { from: true } },
+      relationsFrom: true,
+      relationsTo: true,
     },
-  })
+  });
 
-  const visited = new Set<number>()
-  const groups: any[] = []
+  const byId = new Map(anime.map((a) => [a.id, a]));
 
-  for (const start of anime) {
-    if (visited.has(start.id)) continue
+  /* ----------------------------------
+   * 2) Helper = IDENTISCHE Root-Find-Logik
+   * ---------------------------------- */
+  function findRoot(start: any) {
+    let current = start;
+    const visited = new Set<number>();
 
-    const queue = [start]
-    const cluster: any[] = []
+    while (true) {
+      if (visited.has(current.id)) break;
+      visited.add(current.id);
 
-    visited.add(start.id)
+      const prequels = (current.relationsFrom ?? [])
+        .filter((r: any) => r.relationType === "PREQUEL")
+        .filter((r: any) => r.toId && r.toId !== current.id);
 
-    while (queue.length) {
-      const current = queue.shift()!
-      cluster.push(current)
+      const next = pickDeterministic(prequels);
+      if (!next) break;
 
-      const neighbors = [
-        ...(current.relationsFrom ?? [])
-          .filter((r) => STORY_RELATIONS.has(r.relationType))
-          .map((r) => r.to),
-        ...(current.relationsTo ?? [])
-          .filter((r) => STORY_RELATIONS.has(r.relationType))
-          .map((r) => r.from),
-      ]
+      const nextNode = byId.get(next.toId);
+      if (!nextNode) break;
 
-      for (const n of neighbors) {
-        if (!visited.has(n.id)) {
-          visited.add(n.id)
-          queue.push(n)
-        }
-      }
+      current = nextNode;
     }
 
-    const root = pickRoot(cluster)
+    return current;
+  }
 
-    const chain = cluster
-      .filter((a) =>
-        [...(a.relationsFrom ?? []), ...(a.relationsTo ?? [])].some(
-          (r) => r.relationType === "PREQUEL" || r.relationType === "SEQUEL"
-        )
-      )
-      .sort((a, b) => {
-        const sa = TYPE_SCORE[a.format] ?? 0
-        const sb = TYPE_SCORE[b.format] ?? 0
-        return sb - sa || a.id - b.id
-      })
+  /* ----------------------------------
+   * 3) Alle Roots eindeutig bestimmen
+   * ---------------------------------- */
+  const rootMap = new Map<number, any>();
 
-    const related = cluster
-      .filter((a) => a.id !== root.id && !chain.includes(a))
-      .map((a) => {
-        const rel =
-          a.relationsFrom?.find((r) => STORY_RELATIONS.has(r.relationType)) ??
-          a.relationsTo?.find((r) => STORY_RELATIONS.has(r.relationType))
+  for (const a of anime) {
+    const root = findRoot(a);
+    if (!rootMap.has(root.id)) {
+      rootMap.set(root.id, root);
+    }
+  }
 
-        return {
-          id: a.id,
-          titleEn: a.titleEn,
-          titleRo: a.titleRo,
-          cover: a.cover,
-          relationLabel: rel
-            ? relationLabel(rel.relationType)
-            : "Related",
-        }
-      })
+  /* ----------------------------------
+   * 4) Für jeden Root: EXAKT deine Chain
+   * ---------------------------------- */
+  const groups: any[] = [];
+
+  for (const root of rootMap.values()) {
+    let current = root;
+    const chain: any[] = [];
+    const fwdVisited = new Set<number>();
+
+    while (true) {
+      if (fwdVisited.has(current.id)) break;
+      fwdVisited.add(current.id);
+
+      chain.push({
+        id: current.id,
+        titleEn: current.titleEn,
+        titleRo: current.titleRo,
+        cover: current.cover,
+      });
+
+      const sequels = (current.relationsFrom ?? [])
+        .filter((r: any) => r.relationType === "SEQUEL")
+        .filter((r: any) => r.toId && r.toId !== current.id);
+
+      const next = pickDeterministic(sequels);
+      if (!next) break;
+
+      const nextNode = byId.get(next.toId);
+      if (!nextNode) break;
+
+      current = nextNode;
+    }
+
+    const chainIds = new Set(chain.map((c) => c.id));
+
+    /* ----------------------------------
+     * 5) Related – IDENTISCH zu vorher
+     * ---------------------------------- */
+    const chainWithRelated: any[] = [];
+    const globallySeenRelated = new Set<number>();
+
+    for (const item of chain) {
+      const node = byId.get(item.id);
+      if (!node) continue;
+
+      const related = (node.relationsFrom ?? [])
+        .filter((r: any) => r.toId && r.toId !== node.id)
+        .filter((r: any) => !CHAIN_REL.has(r.relationType))
+        .filter((r: any) => !chainIds.has(r.toId))
+        .filter((r: any) => {
+          if (globallySeenRelated.has(r.toId)) return false;
+          globallySeenRelated.add(r.toId);
+          return true;
+        })
+        .map((r: any) => {
+          const to = byId.get(r.toId);
+          if (!to) return null;
+          return {
+            id: to.id,
+            titleEn: to.titleEn,
+            titleRo: to.titleRo,
+            cover: to.cover,
+            relationType: r.relationType,
+          };
+        })
+        .filter(Boolean);
+
+      chainWithRelated.push({
+        ...item,
+        related,
+      });
+    }
 
     groups.push({
       rootId: root.id,
-      rootTitleEn: root.titleEn,
-      rootTitleRo: root.titleRo,
-      rootCover: root.cover,
-      chain: chain.map((a) => ({
-        id: a.id,
-        titleEn: a.titleEn,
-        titleRo: a.titleRo,
-        cover: a.cover,
-      })),
-      related,
-    })
+      chainLength: chainWithRelated.length,
+      chain: chainWithRelated,
+    });
   }
 
   const result = {
     ok: true,
     count: groups.length,
     groups,
-  }
+  };
 
-  cachedResult = result
-  cachedAt = Date.now()
+  // ✅ SERVER cache set
+  cachedResult = result;
+  cachedAt = Date.now();
 
-  return result
-})
+  return result;
+});
