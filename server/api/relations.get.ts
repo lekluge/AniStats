@@ -12,35 +12,33 @@ function pickDeterministic<T extends { toId: number }>(edges: T[]) {
  * ---------------------------------- */
 let cachedResult: any | null = null;
 let cachedAt = 0;
-const CACHE_TTL = 1000 * 60 * 60; // 5 Minuten
+const CACHE_TTL = 1000 * 60 * 60; // 1 Stunde
 
 export default defineEventHandler(async (event) => {
-  // HTTP cache header darf bleiben (optional)
   setHeader(event, "Cache-Control", "public, max-age=300");
 
-  // ✅ SERVER cache hit
   const now = Date.now();
   if (cachedResult && now - cachedAt < CACHE_TTL) {
     return cachedResult;
   }
 
   /* ----------------------------------
-   * 1) ALLE Daten einmal laden
+   * 1) ALLE Anime inkl. Relations + Genres + Tags
    * ---------------------------------- */
   const anime = await prisma.anime.findMany({
     include: {
       relationsFrom: true,
       relationsTo: true,
+      genres: true,
+      tags: true,
     },
   });
 
   const byId = new Map(anime.map((a) => [a.id, a]));
   const ROOT_REL = new Set(["PREQUEL", "PARENT"] as const);
 
-  
-  
   /* ----------------------------------
-   * 2) Helper = IDENTISCHE Root-Find-Logik
+   * 2) Root-Finder
    * ---------------------------------- */
   function findRoot(start: any) {
     let current = start;
@@ -67,7 +65,7 @@ export default defineEventHandler(async (event) => {
   }
 
   /* ----------------------------------
-   * 3) Alle Roots eindeutig bestimmen
+   * 3) Alle Roots bestimmen
    * ---------------------------------- */
   const rootMap = new Map<number, any>();
 
@@ -79,7 +77,7 @@ export default defineEventHandler(async (event) => {
   }
 
   /* ----------------------------------
-   * 4) Für jeden Root: EXAKT deine Chain
+   * 4) Chains mit METADATEN
    * ---------------------------------- */
   const groups: any[] = [];
 
@@ -97,6 +95,13 @@ export default defineEventHandler(async (event) => {
         titleEn: current.titleEn,
         titleRo: current.titleRo,
         cover: current.cover,
+        genres: current.genres.map((g: any) => g.name),
+        tags: current.tags.map((t: any) => ({
+          id: t.tagId,
+          name: t.name,
+          rank: t.rank,
+          isAdult: t.isAdult,
+        })),
       });
 
       const sequels = (current.relationsFrom ?? [])
@@ -115,7 +120,7 @@ export default defineEventHandler(async (event) => {
     const chainIds = new Set(chain.map((c) => c.id));
 
     /* ----------------------------------
-     * 5) Related – IDENTISCH zu vorher
+     * 5) Related (MIT GENRES & TAGS)
      * ---------------------------------- */
     const chainWithRelated: any[] = [];
     const globallySeenRelated = new Set<number>();
@@ -136,12 +141,20 @@ export default defineEventHandler(async (event) => {
         .map((r: any) => {
           const to = byId.get(r.toId);
           if (!to) return null;
+
           return {
             id: to.id,
             titleEn: to.titleEn,
             titleRo: to.titleRo,
             cover: to.cover,
             relationType: r.relationType,
+            genres: to.genres.map((g: any) => g.name),
+            tags: to.tags.map((t: any) => ({
+              id: t.tagId,
+              name: t.name,
+              rank: t.rank,
+              isAdult: t.isAdult,
+            })),
           };
         })
         .filter(Boolean);
@@ -165,7 +178,6 @@ export default defineEventHandler(async (event) => {
     groups,
   };
 
-  // ✅ SERVER cache set
   cachedResult = result;
   cachedAt = Date.now();
 

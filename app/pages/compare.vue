@@ -19,8 +19,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 const entriesByUser = ref<Record<string, AnimeEntry[]>>({});
+const allAnime = ref<any[]>([]);
+
 const search = ref("");
 const seenFilter = ref<SeenFilter>("all");
+
+/* -----------------------------
+ * Pagination
+ * ----------------------------- */
+const pageSize = 50;
+const currentPage = ref(1);
 
 /* -----------------------------
  * Genre / Tag Filters
@@ -30,20 +38,23 @@ const tagStates = ref<Record<string, FilterState>>({});
 const tagSearch = ref("");
 
 /* -----------------------------
- * User Input
+ * API
  * ----------------------------- */
-async function addUser() {
-  const name = userInput.value.trim();
-  if (!name || users.value.includes(name)) return;
+async function loadAllAnime() {
+  const res = await api.get("/api/relations");
 
-  users.value.push(name);
-  userInput.value = "";
-  await loadSingleUser(name);
-}
-
-function removeUser(name: string) {
-  users.value = users.value.filter((u) => u !== name);
-  delete entriesByUser.value[name];
+  allAnime.value = res.data.groups.flatMap((g: any) =>
+    g.chain.map((c: any) => ({
+      id: c.id,
+      titleEn: c.titleEn ?? "",
+      titleRo: c.titleRo ?? "",
+      title: c.titleEn ?? c.titleRo ?? "Unknown",
+      cover: c.cover,
+      genres: c.genres ?? [],
+      tags: c.tags ?? [],
+      related: c.related ?? [],
+    }))
+  );
 }
 
 async function loadSingleUser(username: string) {
@@ -56,21 +67,18 @@ async function loadSingleUser(username: string) {
     entriesByUser.value[username] = normalizeAnilist(
       res.data.data.MediaListCollection.lists
     );
-  } catch {
-    error.value = `Fehler beim Laden von ${username}`;
   } finally {
     loading.value = false;
   }
 }
 
-/* -----------------------------
- * API
- * ----------------------------- */
 async function loadUsers() {
   loading.value = true;
   error.value = null;
 
   try {
+    await loadAllAnime();
+
     const results = await Promise.all(
       users.value.map((u) =>
         api.post("/api/anilist", null, { params: { user: u } })
@@ -79,19 +87,18 @@ async function loadUsers() {
 
     const map: Record<string, AnimeEntry[]> = {};
     users.value.forEach((u, i) => {
-      map[u] = normalizeAnilist(
-        results[i].data.data.MediaListCollection.lists
-      );
+      map[u] = normalizeAnilist(results[i].data.data.MediaListCollection.lists);
     });
 
     entriesByUser.value = map;
+    currentPage.value = 1;
   } finally {
     loading.value = false;
   }
 }
 
 /* -----------------------------
- * Build combined list
+ * Build compared lists
  * ----------------------------- */
 const comparedAnime = computed(() => {
   const map = new Map<number, any>();
@@ -111,7 +118,6 @@ const comparedAnime = computed(() => {
           users: {},
         });
       }
-
       map.get(e.id).users[user] = e;
     }
   }
@@ -119,26 +125,50 @@ const comparedAnime = computed(() => {
   return [...map.values()];
 });
 
+const allComparedAnime = computed(() => {
+  const map = new Map<number, any>();
+
+  for (const a of allAnime.value) {
+    map.set(a.id, { ...a, users: {} });
+  }
+
+  for (const user of users.value) {
+    for (const e of entriesByUser.value[user] ?? []) {
+      const entry = map.get(e.id);
+      if (entry) entry.users[user] = e;
+    }
+  }
+
+  return [...map.values()];
+});
+
 /* -----------------------------
- * Available Genres & Tags
+ * ACTIVE BASE
+ * ----------------------------- */
+const activeBase = computed(() =>
+  seenFilter.value === "noneUsers"
+    ? allComparedAnime.value
+    : comparedAnime.value
+);
+
+/* -----------------------------
+ * Genres & Tags (relations-based)
  * ----------------------------- */
 const allGenres = computed(() => {
   const s = new Set<string>();
-  comparedAnime.value.forEach((a) =>
-    Object.values(a.users).forEach((e: any) =>
-      e.genres?.forEach((g: string) => s.add(g))
-    )
-  );
+  allAnime.value.forEach((a: any) => {
+    a.genres?.forEach((g: string) => s.add(g));
+    a.related?.forEach((r: any) => r.genres?.forEach((g: string) => s.add(g)));
+  });
   return [...s].sort();
 });
 
 const allTags = computed(() => {
   const s = new Set<string>();
-  comparedAnime.value.forEach((a) =>
-    Object.values(a.users).forEach((e: any) =>
-      e.tags?.forEach((t: any) => s.add(t.name))
-    )
-  );
+  allAnime.value.forEach((a: any) => {
+    a.tags?.forEach((t: any) => s.add(t.name));
+    a.related?.forEach((r: any) => r.tags?.forEach((t: any) => s.add(t.name)));
+  });
   return [...s].sort();
 });
 
@@ -154,48 +184,52 @@ const visibleTags = computed(() => {
   const set = new Set<string>();
   selectedTags.value.forEach((t) => set.add(t));
   filteredTags.value.forEach((t) => set.add(t));
-  return [...set].sort((a, b) => a.localeCompare(b));
+  return [...set].sort();
 });
 
 /* -----------------------------
- * Filter (Search + Seen + Genres + Tags)
+ * Filtered Anime
  * ----------------------------- */
 const filteredAnime = computed(() => {
   const q = search.value.toLowerCase();
 
-  return comparedAnime.value.filter((a) => {
-    const matchesSearch =
-      !q ||
-      a.titleEn.toLowerCase().includes(q) ||
-      a.titleRo.toLowerCase().includes(q);
-
-    if (!matchesSearch) return false;
+  return activeBase.value.filter((a: any) => {
+    if (
+      q &&
+      !a.titleEn.toLowerCase().includes(q) &&
+      !a.titleRo.toLowerCase().includes(q)
+    )
+      return false;
 
     if (seenFilter.value === "allUsers") {
-      if (
-        !users.value.every(
-          (u) => a.users[u] && a.users[u].status === "COMPLETED"
-        )
-      )
+      if (!users.value.every((u) => a.users[u]?.status === "COMPLETED"))
         return false;
     }
 
     if (seenFilter.value === "noneUsers") {
-      if (
-        !users.value.every(
-          (u) => !a.users[u] || a.users[u].status !== "COMPLETED"
-        )
-      )
+      if (users.value.some((u) => a.users[u]?.status === "COMPLETED"))
         return false;
     }
 
-    const genres = new Set<string>();
-    const tags = new Set<string>();
+    let genres = new Set<string>();
+    let tags = new Set<string>();
 
-    Object.values(a.users).forEach((e: any) => {
-      e.genres?.forEach((g: string) => genres.add(g));
-      e.tags?.forEach((t: any) => tags.add(t.name));
-    });
+    if (seenFilter.value === "noneUsers") {
+      // 🌍 Basis: /api/relations
+      a.genres?.forEach((g: string) => genres.add(g));
+      a.tags?.forEach((t: any) => tags.add(t.name));
+
+      a.related?.forEach((r: any) => {
+        r.genres?.forEach((g: string) => genres.add(g));
+        r.tags?.forEach((t: any) => tags.add(t.name));
+      });
+    } else {
+      // 👤 Basis: Userliste (AniList)
+      Object.values(a.users).forEach((e: any) => {
+        e.genres?.forEach((g: string) => genres.add(g));
+        e.tags?.forEach((t: any) => tags.add(t.name));
+      });
+    }
 
     for (const [g, s] of Object.entries(genreStates.value)) {
       if (s === "include" && !genres.has(g)) return false;
@@ -209,6 +243,18 @@ const filteredAnime = computed(() => {
 
     return true;
   });
+});
+
+/* -----------------------------
+ * Pagination
+ * ----------------------------- */
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredAnime.value.length / pageSize))
+);
+
+const paginatedAnime = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredAnime.value.slice(start, start + pageSize);
 });
 
 const animeCount = computed(() => filteredAnime.value.length);
@@ -227,10 +273,14 @@ function anilistUrl(id: number) {
 }
 </script>
 
+<!-- TEMPLATE BLEIBT 1:1 UNVERÄNDERT -->
+
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+    >
       <h1 class="text-3xl font-bold">Compare Users</h1>
 
       <button
@@ -289,11 +339,11 @@ function anilistUrl(id: number) {
         "
       >
         {{
-          f === 'all'
-            ? 'Alle Anime'
-            : f === 'allUsers'
-            ? 'Alle gesehen'
-            : 'Keiner gesehen'
+          f === "all"
+            ? "Alle Anime"
+            : f === "allUsers"
+            ? "Alle gesehen"
+            : "Keiner gesehen"
         }}
       </button>
     </div>
@@ -344,8 +394,27 @@ function anilistUrl(id: number) {
     </div>
 
     <!-- Summary -->
-    <div class="text-sm text-zinc-400">
-      {{ animeCount }} Anime gefunden
+    <div class="text-sm text-zinc-400">{{ animeCount }} Anime gefunden</div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-sm">
+      <button
+        class="px-3 py-1 rounded border"
+        :disabled="currentPage === 1"
+        @click="currentPage--"
+      >
+        ← Zurück
+      </button>
+
+      <span>Seite {{ currentPage }} / {{ totalPages }}</span>
+
+      <button
+        class="px-3 py-1 rounded border"
+        :disabled="currentPage === totalPages"
+        @click="currentPage++"
+      >
+        Weiter →
+      </button>
     </div>
 
     <!-- States -->
@@ -359,7 +428,7 @@ function anilistUrl(id: number) {
     <!-- Compare -->
     <div v-else class="space-y-3">
       <div
-        v-for="a in filteredAnime"
+        v-for="a in paginatedAnime"
         :key="a.id"
         class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 space-y-3"
       >
@@ -429,7 +498,7 @@ function anilistUrl(id: number) {
         </div>
       </div>
 
-      <div v-if="!filteredAnime.length" class="text-zinc-500">
+      <div v-if="!paginatedAnime.length" class="text-zinc-500">
         Keine Anime gefunden
       </div>
     </div>
