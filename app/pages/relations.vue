@@ -18,8 +18,7 @@ function matchesQuery(query: string, en?: string | null, ro?: string | null) {
   if (!query) return true;
   const q = query.toLowerCase();
   return (
-    (en && en.toLowerCase().includes(q)) ||
-    (ro && ro.toLowerCase().includes(q))
+    (en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q))
   );
 }
 
@@ -35,8 +34,7 @@ async function loadRelations() {
     const userRes = await api.get("/api/anilist-user-list", {
       params: { user: username.value },
     });
-    const statusMap: Record<number, string> =
-      userRes.data?.statusMap ?? {};
+    const statusMap: Record<number, string> = userRes.data?.statusMap ?? {};
 
     // 2) Alle Franchises
     const relRes = await api.get("/api/relations");
@@ -234,8 +232,8 @@ function showRomaji(en?: string | null, ro?: string | null) {
                   </span>
                 </a>
 
-                <span class="text-xs" :class="statusColor(r.status)">
-                  {{ r.status ?? "—" }}
+                <span class="ml-auto text-xs" :class="statusColor(item.status)">
+                  {{ item.status ?? "—" }}
                 </span>
               </div>
             </div>
