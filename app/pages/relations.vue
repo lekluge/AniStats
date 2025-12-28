@@ -189,7 +189,7 @@ function showRomaji(en?: string | null, ro?: string | null) {
               <img
                 v-if="item.cover"
                 :src="item.cover"
-                class="h-12 aspect-[2/3] rounded object-cover"
+                class="h-24 aspect-[2/3] rounded object-cover"
               />
 
               <a
@@ -218,7 +218,7 @@ function showRomaji(en?: string | null, ro?: string | null) {
                 <img
                   v-if="r.cover"
                   :src="r.cover"
-                  class="h-8 aspect-[2/3] rounded object-cover opacity-80"
+                  class="h-12 aspect-[2/3] rounded object-cover opacity-80"
                 />
 
                 <a
