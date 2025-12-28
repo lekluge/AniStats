@@ -57,7 +57,20 @@ async function loadAllAnime() {
     }))
   );
 }
+async function addUser() {
+  const name = userInput.value.trim();
+  if (!name || users.value.includes(name)) return;
 
+  users.value.push(name);
+  userInput.value = "";
+
+  await loadSingleUser(name);
+}
+
+function removeUser(name: string) {
+  users.value = users.value.filter((u) => u !== name);
+  delete entriesByUser.value[name];
+}
 async function loadSingleUser(username: string) {
   loading.value = true;
   try {
