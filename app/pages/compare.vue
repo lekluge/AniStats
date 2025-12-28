@@ -213,7 +213,11 @@ function anilistUrl(id: number) {
     </div>
 
     <!-- States -->
-    <div v-if="loading" class="text-zinc-400">Lade Daten…</div>
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div
+        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
+      />
+    </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <!-- Compare -->

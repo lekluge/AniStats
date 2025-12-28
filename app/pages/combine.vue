@@ -35,9 +35,7 @@ async function loadAnime() {
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
-    entries.value = normalizeAnilist(
-      res.data.data.MediaListCollection.lists
-    );
+    entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } finally {
     loading.value = false;
   }
@@ -53,37 +51,30 @@ const tagSearch = ref("");
 
 const allGenres = computed(() => {
   const s = new Set<string>();
-  entries.value.forEach(e => e.genres?.forEach(g => s.add(g)));
+  entries.value.forEach((e) => e.genres?.forEach((g) => s.add(g)));
   return [...s].sort();
 });
 
 const allTags = computed(() => {
   const s = new Set<string>();
-  entries.value.forEach(e => e.tags?.forEach(t => s.add(t.name)));
+  entries.value.forEach((e) => e.tags?.forEach((t) => s.add(t.name)));
   return [...s].sort();
 });
 
 const filteredTags = computed(() => {
   if (!tagSearch.value.trim()) return [];
   const q = tagSearch.value.toLowerCase();
-  return allTags.value.filter(t => t.toLowerCase().includes(q));
+  return allTags.value.filter((t) => t.toLowerCase().includes(q));
 });
 
-/* 🔑 NEU: ausgewählte Tags (include + exclude) */
-const selectedTags = computed(() =>
-  Object.keys(tagStates.value)
-);
+/* 🔑 ausgewählte Tags */
+const selectedTags = computed(() => Object.keys(tagStates.value));
 
-/* 🔑 FIX: sichtbare Tags */
+/* 🔑 sichtbare Tags */
 const visibleTags = computed(() => {
   const set = new Set<string>();
-
-  // immer anzeigen: ausgewählte Tags
-  selectedTags.value.forEach(t => set.add(t));
-
-  // zusätzlich: Suchergebnisse
-  filteredTags.value.forEach(t => set.add(t));
-
+  selectedTags.value.forEach((t) => set.add(t));
+  filteredTags.value.forEach((t) => set.add(t));
   return [...set].sort((a, b) => a.localeCompare(b));
 });
 
@@ -91,9 +82,9 @@ const visibleTags = computed(() => {
  * FILTERED ENTRIES
  * ----------------------------- */
 const filteredEntries = computed(() => {
-  return entries.value.filter(e => {
+  return entries.value.filter((e) => {
     const genres = e.genres ?? [];
-    const tags = e.tags?.map(t => t.name) ?? [];
+    const tags = e.tags?.map((t) => t.name) ?? [];
 
     for (const [g, s] of Object.entries(genreStates.value)) {
       if (s === "include" && !genres.includes(g)) return false;
@@ -110,8 +101,12 @@ const filteredEntries = computed(() => {
 });
 
 const includedFilters = computed(() => [
-  ...Object.entries(genreStates.value).filter(([,s])=>s==="include").map(([k])=>k),
-  ...Object.entries(tagStates.value).filter(([,s])=>s==="include").map(([k])=>k),
+  ...Object.entries(genreStates.value)
+    .filter(([, s]) => s === "include")
+    .map(([k]) => k),
+  ...Object.entries(tagStates.value)
+    .filter(([, s]) => s === "include")
+    .map(([k]) => k),
 ]);
 
 const isCombinedMode = computed(() => includedFilters.value.length > 1);
@@ -124,11 +119,17 @@ const gridStats = computed(() => {
 
   for (const e of filteredEntries.value) {
     const minutes = (e.progress ?? 0) * (e.duration ?? 0);
-    const keys = [...(e.genres ?? []), ...(e.tags?.map(t => t.name) ?? [])];
+    const keys = [...(e.genres ?? []), ...(e.tags?.map((t) => t.name) ?? [])];
 
     for (const key of keys) {
       if (!map[key]) {
-        map[key] = { count:0, scoreSum:0, scoreCount:0, minutes:0, covers:[] };
+        map[key] = {
+          count: 0,
+          scoreSum: 0,
+          scoreCount: 0,
+          minutes: 0,
+          covers: [],
+        };
       }
 
       map[key].count++;
@@ -145,7 +146,7 @@ const gridStats = computed(() => {
             e.coverImage?.large ||
             e.coverImage?.medium;
 
-      if (cover && !map[key].covers.some((c:any)=>c.id===e.id)) {
+      if (cover && !map[key].covers.some((c: any) => c.id === e.id)) {
         map[key].covers.push({
           id: e.id,
           title: e.title?.english ?? e.title?.romaji ?? "Unknown",
@@ -157,12 +158,14 @@ const gridStats = computed(() => {
     }
   }
 
-  return Object.entries(map).map(([k,g]:any)=>({
+  return Object.entries(map).map(([k, g]: any) => ({
     genre: k,
     count: g.count,
-    meanScore: g.scoreCount ? Math.round(g.scoreSum/g.scoreCount) : 0,
+    meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
     minutesWatched: g.minutes,
-    covers: g.covers.sort((a:any,b:any)=>b.score-a.score || b.minutes-a.minutes),
+    covers: g.covers.sort(
+      (a: any, b: any) => b.score - a.score || b.minutes - a.minutes
+    ),
   }));
 });
 
@@ -172,14 +175,19 @@ const gridStats = computed(() => {
 const combinedGridCard = computed(() => {
   if (!isCombinedMode.value) return null;
 
-  let minutes = 0, scoreSum = 0, scoreCount = 0;
+  let minutes = 0,
+    scoreSum = 0,
+    scoreCount = 0;
   const covers: Cover[] = [];
 
   for (const e of filteredEntries.value) {
     const m = (e.progress ?? 0) * (e.duration ?? 0);
     minutes += m;
 
-    if (e.score) { scoreSum += e.score; scoreCount++; }
+    if (e.score) {
+      scoreSum += e.score;
+      scoreCount++;
+    }
 
     const cover =
       typeof e.coverImage === "string"
@@ -188,7 +196,7 @@ const combinedGridCard = computed(() => {
           e.coverImage?.large ||
           e.coverImage?.medium;
 
-    if (cover && !covers.some(c=>c.id===e.id)) {
+    if (cover && !covers.some((c) => c.id === e.id)) {
       covers.push({
         id: e.id,
         title: e.title?.english ?? e.title?.romaji ?? "Unknown",
@@ -202,7 +210,7 @@ const combinedGridCard = computed(() => {
   return {
     genre: includedFilters.value.join(" + "),
     count: filteredEntries.value.length,
-    meanScore: scoreCount ? Math.round(scoreSum/scoreCount) : 0,
+    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
     covers,
   };
@@ -215,11 +223,14 @@ const displayedGrid = computed(() => {
   if (combinedGridCard.value) return [combinedGridCard.value];
 
   const used = new Set<number>();
-  return gridStats.value.map(g => {
+  return gridStats.value.map((g) => {
     if (!g.covers.length) return g;
-    const featured = g.covers.find((c:any)=>!used.has(c.id)) ?? g.covers[0];
+    const featured = g.covers.find((c: any) => !used.has(c.id)) ?? g.covers[0];
     used.add(featured.id);
-    return { ...g, covers: [featured, ...g.covers.filter((c:any)=>c.id!==featured.id)] };
+    return {
+      ...g,
+      covers: [featured, ...g.covers.filter((c: any) => c.id !== featured.id)],
+    };
   });
 });
 
@@ -227,13 +238,11 @@ const displayedGrid = computed(() => {
  * LIST VIEW
  * ----------------------------- */
 const listAnime = computed(() =>
-  filteredEntries.value.map(e => ({
+  filteredEntries.value.map((e) => ({
     id: e.id,
     title: e.title?.english ?? e.title?.romaji ?? "Unknown",
     cover:
-      typeof e.coverImage === "string"
-        ? e.coverImage
-        : e.coverImage?.medium,
+      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
   }))
 );
@@ -247,7 +256,7 @@ function cycleState(map: Record<string, FilterState>, key: string) {
   else delete map[key];
 }
 
-function anilistUrl(id:number){
+function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
 </script>
@@ -255,7 +264,9 @@ function anilistUrl(id:number){
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+    >
       <h1 class="text-3xl font-bold">Combined</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -266,6 +277,7 @@ function anilistUrl(id:number){
         <button
           @click="loadAnime"
           class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
+          :disabled="loading"
         >
           Laden
         </button>
@@ -277,102 +289,117 @@ function anilistUrl(id:number){
       <button
         @click="layoutMode = 'grid'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="layoutMode === 'grid'
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="
+          layoutMode === 'grid'
+            ? 'bg-indigo-600 text-white'
+            : 'bg-zinc-900 text-zinc-300'
+        "
       >
         Grid
       </button>
       <button
         @click="layoutMode = 'list'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="layoutMode === 'list'
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="
+          layoutMode === 'list'
+            ? 'bg-indigo-600 text-white'
+            : 'bg-zinc-900 text-zinc-300'
+        "
       >
         List
       </button>
     </div>
 
-    <!-- Genres -->
-    <div class="flex flex-wrap gap-2">
-      <h2 class="w-full font-semibold">Genres</h2>
-      <button
-        v-for="g in allGenres"
-        :key="g"
-        @click="cycleState(genreStates, g)"
-        class="px-3 py-2 sm:py-1.5 text-xs rounded-full border"
-        :class="{
-          'bg-indigo-600 text-white': genreStates[g]==='include',
-          'bg-red-600 text-white': genreStates[g]==='exclude',
-          'bg-zinc-900 text-zinc-300': !genreStates[g],
-        }"
-      >
-        {{ g }}
-      </button>
-    </div>
-
-    <!-- Tag Search -->
-    <input
-      v-model="tagSearch"
-      placeholder="Tags suchen…"
-      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
-    />
-
-    <!-- Tags -->
-    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
-      <button
-        v-for="t in visibleTags"
-        :key="t"
-        @click="cycleState(tagStates, t)"
-        class="px-3 py-2 rounded-full text-xs border"
-        :class="{
-          'bg-indigo-600 text-white': tagStates[t] === 'include',
-          'bg-red-600 text-white': tagStates[t] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !tagStates[t],
-        }"
-      >
-        {{ t }}
-      </button>
-    </div>
-
-    <!-- GRID -->
-    <div
-      v-if="layoutMode==='grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <GenreCard
-        v-for="(g,i) in displayedGrid"
-        :key="g.genre"
-        :rank="i+1"
-        :data="g"
+    <!-- 🔑 Loading -->
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div
+        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
       />
     </div>
 
-    <!-- LIST -->
-    <div v-else class="space-y-2">
-      <div
-        v-for="a in listAnime"
-        :key="a.id"
-        class="flex gap-3 items-center p-3 rounded-xl
-               border border-zinc-800 bg-zinc-900/30"
-      >
-        <img
-          v-if="a.cover"
-          :src="a.cover"
-          class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
-        />
-        <a
-          :href="anilistUrl(a.id)"
-          target="_blank"
-          class="flex-1 min-w-0 break-words hover:underline hover:text-indigo-400"
+    <template v-else>
+      <!-- Genres -->
+      <div class="flex flex-wrap gap-2">
+        <h2 class="w-full font-semibold">Genres</h2>
+        <button
+          v-for="g in allGenres"
+          :key="g"
+          @click="cycleState(genreStates, g)"
+          class="px-3 py-2 sm:py-1.5 text-xs rounded-full border"
+          :class="{
+            'bg-indigo-600 text-white': genreStates[g] === 'include',
+            'bg-red-600 text-white': genreStates[g] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !genreStates[g],
+          }"
         >
-          {{ a.title }}
-        </a>
-        <span class="text-xs text-zinc-400 whitespace-nowrap">
-          {{ a.score ?? "—" }}
-        </span>
+          {{ g }}
+        </button>
       </div>
-    </div>
+
+      <!-- Tag Search -->
+      <input
+        v-model="tagSearch"
+        placeholder="Tags suchen…"
+        class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+      />
+
+      <!-- Tags -->
+      <div
+        v-if="tagSearch.trim() || selectedTags.length"
+        class="flex flex-wrap gap-2"
+      >
+        <button
+          v-for="t in visibleTags"
+          :key="t"
+          @click="cycleState(tagStates, t)"
+          class="px-3 py-2 rounded-full text-xs border"
+          :class="{
+            'bg-indigo-600 text-white': tagStates[t] === 'include',
+            'bg-red-600 text-white': tagStates[t] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !tagStates[t],
+          }"
+        >
+          {{ t }}
+        </button>
+      </div>
+
+      <!-- GRID -->
+      <div
+        v-if="layoutMode === 'grid'"
+        class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <GenreCard
+          v-for="(g, i) in displayedGrid"
+          :key="g.genre"
+          :rank="i + 1"
+          :data="g"
+        />
+      </div>
+
+      <!-- LIST -->
+      <div v-else class="space-y-2">
+        <div
+          v-for="a in listAnime"
+          :key="a.id"
+          class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
+        >
+          <img
+            v-if="a.cover"
+            :src="a.cover"
+            class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
+          />
+          <a
+            :href="anilistUrl(a.id)"
+            target="_blank"
+            class="flex-1 min-w-0 break-words hover:underline hover:text-indigo-400"
+          >
+            {{ a.title }}
+          </a>
+          <span class="text-xs text-zinc-400 whitespace-nowrap">
+            {{ a.score ?? "—" }}
+          </span>
+        </div>
+      </div>
+    </template>
   </div>
 </template>

@@ -36,9 +36,7 @@ async function loadAnime() {
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
-    entries.value = normalizeAnilist(
-      res.data.data.MediaListCollection.lists
-    );
+    entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e: any) {
     error.value = e?.message ?? "Unbekannter Fehler";
   } finally {
@@ -60,33 +58,24 @@ const showAllTags = ref(false);
  * ----------------------------- */
 const allTags = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) =>
-    e.tags?.forEach((t) => set.add(t.name))
-  );
+  entries.value.forEach((e) => e.tags?.forEach((t) => set.add(t.name)));
   return [...set].sort();
 });
 
 const filteredTags = computed(() => {
   if (!tagSearch.value.trim()) return [];
   const q = tagSearch.value.toLowerCase();
-  return allTags.value.filter((t) =>
-    t.toLowerCase().includes(q)
-  );
+  return allTags.value.filter((t) => t.toLowerCase().includes(q));
 });
 
-/* 🔑 NEU: ausgewählte Tags (include + exclude) */
-const selectedTags = computed(() =>
-  Object.keys(tagStates.value)
-);
+/* 🔑 ausgewählte Tags */
+const selectedTags = computed(() => Object.keys(tagStates.value));
 
-/* 🔑 FIX: sichtbare Tags */
+/* 🔑 sichtbare Tags */
 const visibleTags = computed(() => {
   const set = new Set<string>();
 
-  // Immer anzeigen: ausgewählte Tags
   selectedTags.value.forEach((t) => set.add(t));
-
-  // Zusätzlich: Suchergebnisse
   filteredTags.value.forEach((t) => set.add(t));
 
   const all = [...set].sort((a, b) => a.localeCompare(b));
@@ -172,10 +161,7 @@ const normalTagStats = computed(() => {
       if (cover && !map[name].covers.some((c) => c.id === e.id)) {
         map[name].covers.push({
           id: e.id,
-          title:
-            e.title?.english ??
-            e.title?.romaji ??
-            "Unknown title",
+          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
           cover,
         });
       }
@@ -185,9 +171,7 @@ const normalTagStats = computed(() => {
   return Object.entries(map).map(([tag, t]) => ({
     genre: tag,
     count: t.count,
-    meanScore: t.scoreCount
-      ? Math.round(t.scoreSum / t.scoreCount)
-      : 0,
+    meanScore: t.scoreCount ? Math.round(t.scoreSum / t.scoreCount) : 0,
     minutesWatched: t.minutes,
     covers: t.covers,
   }));
@@ -215,17 +199,12 @@ const combinedStats = computed(() => {
     const cover =
       typeof e.coverImage === "string"
         ? e.coverImage
-        : e.coverImage.extraLarge ||
-          e.coverImage.large ||
-          e.coverImage.medium;
+        : e.coverImage.extraLarge || e.coverImage.large || e.coverImage.medium;
 
     if (cover && !covers.some((c) => c.id === e.id)) {
       covers.push({
         id: e.id,
-        title:
-          e.title?.english ??
-          e.title?.romaji ??
-          "Unknown title",
+        title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
         cover,
       });
     }
@@ -234,9 +213,7 @@ const combinedStats = computed(() => {
   return {
     genre: includedTags.value.join(" + "),
     count: filteredEntries.value.length,
-    meanScore: scoreCount
-      ? Math.round(scoreSum / scoreCount)
-      : 0,
+    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
     covers,
   };
@@ -253,8 +230,7 @@ const displayedTags = computed(() => {
   return normalTagStats.value.map((g) => {
     if (!g.covers?.length) return g;
 
-    const featured =
-      g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
+    const featured = g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
     used.add(featured.id);
 
     return {
@@ -270,14 +246,9 @@ const displayedTags = computed(() => {
 const listAnime = computed(() =>
   filteredEntries.value.map((e) => ({
     id: e.id,
-    title:
-      e.title?.english ??
-      e.title?.romaji ??
-      "Unknown",
+    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
     cover:
-      typeof e.coverImage === "string"
-        ? e.coverImage
-        : e.coverImage?.medium,
+      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
   }))
 );
@@ -323,18 +294,22 @@ function anilistUrl(id: number) {
       <button
         @click="layoutMode = 'grid'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="layoutMode === 'grid'
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="
+          layoutMode === 'grid'
+            ? 'bg-indigo-600 text-white'
+            : 'bg-zinc-900 text-zinc-300'
+        "
       >
         Grid
       </button>
       <button
         @click="layoutMode = 'list'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="layoutMode === 'list'
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="
+          layoutMode === 'list'
+            ? 'bg-indigo-600 text-white'
+            : 'bg-zinc-900 text-zinc-300'
+        "
       >
         List
       </button>
@@ -342,13 +317,27 @@ function anilistUrl(id: number) {
 
     <!-- Tag Search -->
     <input
+      v-if="!loading"
       v-model="tagSearch"
       placeholder="Tags suchen…"
       class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
     />
 
+    <!-- 🔑 States -->
+    <!-- 🔑 Loading -->
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div
+        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
+      />
+    </div>
+
+    <div v-else-if="error" class="text-red-400">{{ error }}</div>
+
     <!-- Tags -->
-    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
+    <div
+      v-else-if="tagSearch.trim() || selectedTags.length"
+      class="flex flex-wrap gap-2"
+    >
       <button
         v-for="t in visibleTags"
         :key="t"
@@ -366,9 +355,9 @@ function anilistUrl(id: number) {
 
     <!-- GRID -->
     <div
-      v-if="layoutMode === 'grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
+  v-if="!loading && !error && layoutMode === 'grid'"
+  class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+>
       <GenreCard
         v-for="(g, i) in displayedTags"
         :key="g.genre"
@@ -378,12 +367,11 @@ function anilistUrl(id: number) {
     </div>
 
     <!-- LIST -->
-    <div v-else class="space-y-2">
+    <div v-else-if="!loading && !error" class="space-y-2">
       <div
         v-for="a in listAnime"
         :key="a.id"
-        class="flex gap-3 items-center p-3 rounded-xl
-               border border-zinc-800 bg-zinc-900/30"
+        class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
       >
         <img
           v-if="a.cover"

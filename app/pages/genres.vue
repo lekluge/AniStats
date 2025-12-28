@@ -36,9 +36,7 @@ async function loadAnime() {
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
-    entries.value = normalizeAnilist(
-      res.data.data.MediaListCollection.lists
-    );
+    entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e: any) {
     error.value = e?.message ?? "Unbekannter Fehler";
   } finally {
@@ -55,9 +53,7 @@ const genreStates = ref<Record<string, GenreState>>({});
 
 const allGenres = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach(e =>
-    e.genres?.forEach(g => set.add(g))
-  );
+  entries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
   return [...set].sort();
 });
 
@@ -65,7 +61,7 @@ const allGenres = computed(() => {
  * FILTERED ENTRIES
  * ----------------------------- */
 const filteredEntries = computed(() => {
-  return entries.value.filter(e => {
+  return entries.value.filter((e) => {
     const genres = e.genres ?? [];
 
     for (const [g, state] of Object.entries(genreStates.value)) {
@@ -128,7 +124,7 @@ const normalGenreStats = computed(() => {
             e.coverImage?.large ||
             e.coverImage?.medium;
 
-      if (cover && !map[genre].covers.some(c => c.id === e.id)) {
+      if (cover && !map[genre].covers.some((c) => c.id === e.id)) {
         map[genre].covers.push({
           id: e.id,
           title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
@@ -141,9 +137,7 @@ const normalGenreStats = computed(() => {
   return Object.entries(map).map(([genre, g]) => ({
     genre,
     count: g.count,
-    meanScore: g.scoreCount
-      ? Math.round(g.scoreSum / g.scoreCount)
-      : 0,
+    meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
     minutesWatched: g.minutes,
     covers: g.covers,
   }));
@@ -175,7 +169,7 @@ const combinedStats = computed(() => {
           e.coverImage?.large ||
           e.coverImage?.medium;
 
-    if (cover && !covers.some(c => c.id === e.id)) {
+    if (cover && !covers.some((c) => c.id === e.id)) {
       covers.push({
         id: e.id,
         title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
@@ -187,9 +181,7 @@ const combinedStats = computed(() => {
   return {
     genre: includedGenres.value.join(" + "),
     count: filteredEntries.value.length,
-    meanScore: scoreCount
-      ? Math.round(scoreSum / scoreCount)
-      : 0,
+    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
     covers,
   };
@@ -203,20 +195,16 @@ const displayedGenres = computed(() => {
 
   const used = new Set<number>();
 
-  return normalGenreStats.value.map(g => {
+  return normalGenreStats.value.map((g) => {
     if (!g.covers.length) return g;
 
-    const featured =
-      g.covers.find(c => !used.has(c.id)) ?? g.covers[0];
+    const featured = g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
 
     used.add(featured.id);
 
     return {
       ...g,
-      covers: [
-        featured,
-        ...g.covers.filter(c => c.id !== featured.id),
-      ],
+      covers: [featured, ...g.covers.filter((c) => c.id !== featured.id)],
     };
   });
 });
@@ -225,13 +213,11 @@ const displayedGenres = computed(() => {
  * LIST VIEW
  * ----------------------------- */
 const listAnime = computed(() =>
-  filteredEntries.value.map(e => ({
+  filteredEntries.value.map((e) => ({
     id: e.id,
     title: e.title?.english ?? e.title?.romaji ?? "Unknown",
     cover:
-      typeof e.coverImage === "string"
-        ? e.coverImage
-        : e.coverImage?.medium,
+      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
   }))
 );
@@ -277,32 +263,47 @@ function anilistUrl(id: number) {
       <button
         @click="layoutMode = 'grid'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="layoutMode === 'grid'
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="
+          layoutMode === 'grid'
+            ? 'bg-indigo-600 text-white'
+            : 'bg-zinc-900 text-zinc-300'
+        "
       >
         Grid
       </button>
       <button
         @click="layoutMode = 'list'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="layoutMode === 'list'
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="
+          layoutMode === 'list'
+            ? 'bg-indigo-600 text-white'
+            : 'bg-zinc-900 text-zinc-300'
+        "
       >
         List
       </button>
     </div>
 
+    <!-- 🔑 States -->
+    <!-- 🔑 Loading -->
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div
+        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
+      />
+    </div>
+
+    <div v-else-if="error" class="text-red-400">{{ error }}</div>
+
     <!-- Genres -->
-    <div class="flex flex-wrap gap-2">
+    <div v-else class="flex flex-wrap gap-2">
       <button
         v-for="g in allGenres"
         :key="g"
         @click="toggleGenre(g)"
         class="px-3 py-2 sm:py-1.5 rounded-full text-xs border"
         :class="{
-          'bg-indigo-600 text-white border-indigo-600': genreStates[g] === 'include',
+          'bg-indigo-600 text-white border-indigo-600':
+            genreStates[g] === 'include',
           'bg-red-600 text-white border-red-600': genreStates[g] === 'exclude',
           'bg-zinc-900 text-zinc-300 border-zinc-800': !genreStates[g],
         }"
@@ -329,8 +330,7 @@ function anilistUrl(id: number) {
       <div
         v-for="a in listAnime"
         :key="a.id"
-        class="flex gap-3 items-center p-3 rounded-xl
-               border border-zinc-800 bg-zinc-900/30"
+        class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
       >
         <img
           v-if="a.cover"

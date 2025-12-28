@@ -145,6 +145,7 @@ function displayTitle(en?: string | null, ro?: string | null) {
 
     <!-- Search -->
     <input
+      v-if="!loading"
       v-model="search"
       placeholder="Anime suchen (English / Romaji)…"
       class="w-full bg-zinc-900 border border-zinc-800 px-4 py-3 md:py-2 rounded"
@@ -156,7 +157,11 @@ function displayTitle(en?: string | null, ro?: string | null) {
     </div>
 
     <!-- States -->
-    <div v-if="loading" class="text-zinc-400">Lade…</div>
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div
+        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
+      />
+    </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <!-- Groups -->
