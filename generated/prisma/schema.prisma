@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Anime {
+  id        Int      @id
+  titleEn   String?
+  titleRo   String?
+  cover     String?
+  format    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dataHash  String?
+
+  relationsTo   AnimeRelation[] @relation("ToAnime")
+  relationsFrom AnimeRelation[] @relation("FromAnime")
+
+  genres AnimeGenre[] // 👈 NEU
+  tags   AnimeTag[]
+}
+
+model AnimeGenre {
+  id      Int    @id @default(autoincrement())
+  animeId Int
+  name    String
+
+  anime Anime @relation(fields: [animeId], references: [id])
+
+  @@unique([animeId, name])
+}
+
+model AnimeTag {
+  id      Int     @id @default(autoincrement())
+  animeId Int
+  tagId   Int // AniList Tag ID
+  name    String
+  rank    Int?
+  isAdult Boolean
+
+  anime Anime @relation(fields: [animeId], references: [id])
+
+  @@unique([animeId, tagId])
+}
+
+model AnimeRelation {
+  id           Int    @id @default(autoincrement())
+  fromId       Int
+  toId         Int
+  relationType String
+
+  from Anime @relation("FromAnime", fields: [fromId], references: [id])
+  to   Anime @relation("ToAnime", fields: [toId], references: [id])
+
+  @@unique([fromId, toId, relationType])
+}

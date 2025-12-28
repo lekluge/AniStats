@@ -2,24 +2,19 @@
   "name": "anilist-stats",
   "type": "module",
   "private": true,
-  "engines": {
-    "node": "20.x"
-  },
   "scripts": {
     "dev": "nuxt dev",
-
     "build": "prisma generate && nuxt build",
     "preview": "nuxt preview",
     "generate": "nuxt generate",
-
-    "postinstall": "npm rebuild better-sqlite3 --build-from-source && prisma generate",
-
+    "postinstall": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.2.0",
+    "@libsql/client": "^0.15.15",
+    "@prisma/adapter-libsql": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "@tailwindcss/vite": "^4.1.18",
     "axios": "^1.13.2",
@@ -31,7 +26,6 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.3",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",
