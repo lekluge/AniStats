@@ -14,6 +14,7 @@ type GenreCover = {
 };
 
 type LayoutMode = "grid" | "list";
+type GenreState = "include" | "exclude";
 
 /* -----------------------------
  * State
@@ -35,7 +36,9 @@ async function loadAnime() {
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
-    entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
+    entries.value = normalizeAnilist(
+      res.data.data.MediaListCollection.lists
+    );
   } catch (e: any) {
     error.value = e?.message ?? "Unbekannter Fehler";
   } finally {
@@ -46,27 +49,43 @@ async function loadAnime() {
 onMounted(loadAnime);
 
 /* -----------------------------
- * Genre Filter
+ * GENRE STATE (3-WAY)
  * ----------------------------- */
-const selectedGenres = ref<string[]>([]);
+const genreStates = ref<Record<string, GenreState>>({});
 
 const allGenres = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
+  entries.value.forEach(e =>
+    e.genres?.forEach(g => set.add(g))
+  );
   return [...set].sort();
 });
 
+/* -----------------------------
+ * FILTERED ENTRIES
+ * ----------------------------- */
 const filteredEntries = computed(() => {
-  if (!selectedGenres.value.length) return entries.value;
-  return entries.value.filter((e) =>
-    selectedGenres.value.every((g) => e.genres?.includes(g))
-  );
+  return entries.value.filter(e => {
+    const genres = e.genres ?? [];
+
+    for (const [g, state] of Object.entries(genreStates.value)) {
+      if (state === "include" && !genres.includes(g)) return false;
+      if (state === "exclude" && genres.includes(g)) return false;
+    }
+    return true;
+  });
 });
 
-const isCombinedMode = computed(() => selectedGenres.value.length > 1);
+const includedGenres = computed(() =>
+  Object.entries(genreStates.value)
+    .filter(([, s]) => s === "include")
+    .map(([g]) => g)
+);
+
+const isCombinedMode = computed(() => includedGenres.value.length > 1);
 
 /* -----------------------------
- * GRID: Genre Ranking
+ * GRID: GENRE STATS
  * ----------------------------- */
 const normalGenreStats = computed(() => {
   const map: Record<
@@ -102,21 +121,19 @@ const normalGenreStats = computed(() => {
         map[genre].scoreCount++;
       }
 
-      if (e.id && e.coverImage) {
-        const cover =
-          typeof e.coverImage === "string"
-            ? e.coverImage
-            : e.coverImage.extraLarge ||
-              e.coverImage.large ||
-              e.coverImage.medium;
+      const cover =
+        typeof e.coverImage === "string"
+          ? e.coverImage
+          : e.coverImage?.extraLarge ||
+            e.coverImage?.large ||
+            e.coverImage?.medium;
 
-        if (cover && !map[genre].covers.find((c) => c.id === e.id)) {
-          map[genre].covers.push({
-            id: e.id,
-            title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
-            cover,
-          });
-        }
+      if (cover && !map[genre].covers.some(c => c.id === e.id)) {
+        map[genre].covers.push({
+          id: e.id,
+          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+          cover,
+        });
       }
     }
   }
@@ -124,12 +141,17 @@ const normalGenreStats = computed(() => {
   return Object.entries(map).map(([genre, g]) => ({
     genre,
     count: g.count,
-    meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
+    meanScore: g.scoreCount
+      ? Math.round(g.scoreSum / g.scoreCount)
+      : 0,
     minutesWatched: g.minutes,
     covers: g.covers,
   }));
 });
 
+/* -----------------------------
+ * COMBINED CARD
+ * ----------------------------- */
 const combinedStats = computed(() => {
   if (!isCombinedMode.value) return null;
 
@@ -146,65 +168,82 @@ const combinedStats = computed(() => {
       scoreCount++;
     }
 
-    if (e.id && e.coverImage) {
-      const cover =
-        typeof e.coverImage === "string"
-          ? e.coverImage
-          : e.coverImage.extraLarge ||
-            e.coverImage.large ||
-            e.coverImage.medium;
+    const cover =
+      typeof e.coverImage === "string"
+        ? e.coverImage
+        : e.coverImage?.extraLarge ||
+          e.coverImage?.large ||
+          e.coverImage?.medium;
 
-      if (cover && !covers.find((c) => c.id === e.id)) {
-        covers.push({
-          id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
-          cover,
-        });
-      }
+    if (cover && !covers.some(c => c.id === e.id)) {
+      covers.push({
+        id: e.id,
+        title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+        cover,
+      });
     }
   }
 
   return {
-    genre: selectedGenres.value.join(" + "),
+    genre: includedGenres.value.join(" + "),
     count: filteredEntries.value.length,
-    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
+    meanScore: scoreCount
+      ? Math.round(scoreSum / scoreCount)
+      : 0,
     minutesWatched: minutes,
     covers,
   };
 });
 
 /* -----------------------------
- * displayedGenres
- * ✅ FIX: unique featured cover per card
+ * FEATURED COVER FIX
  * ----------------------------- */
 const displayedGenres = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
 
   const used = new Set<number>();
 
-  return normalGenreStats.value.map((g) => {
+  return normalGenreStats.value.map(g => {
     if (!g.covers.length) return g;
 
     const featured =
-      g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
+      g.covers.find(c => !used.has(c.id)) ?? g.covers[0];
 
     used.add(featured.id);
 
-    const rest = g.covers.filter((c) => c.id !== featured.id);
-
     return {
       ...g,
-      covers: [featured, ...rest],
+      covers: [
+        featured,
+        ...g.covers.filter(c => c.id !== featured.id),
+      ],
     };
   });
 });
 
 /* -----------------------------
+ * LIST VIEW
+ * ----------------------------- */
+const listAnime = computed(() =>
+  filteredEntries.value.map(e => ({
+    id: e.id,
+    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
+    cover:
+      typeof e.coverImage === "string"
+        ? e.coverImage
+        : e.coverImage?.medium,
+    score: e.score,
+  }))
+);
+
+/* -----------------------------
  * Helpers
  * ----------------------------- */
 function toggleGenre(genre: string) {
-  const i = selectedGenres.value.indexOf(genre);
-  i === -1 ? selectedGenres.value.push(genre) : selectedGenres.value.splice(i, 1);
+  const current = genreStates.value[genre];
+  if (!current) genreStates.value[genre] = "include";
+  else if (current === "include") genreStates.value[genre] = "exclude";
+  else delete genreStates.value[genre];
 }
 
 function anilistUrl(id: number) {
@@ -215,18 +254,17 @@ function anilistUrl(id: number) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
       <h1 class="text-3xl font-bold">Genres</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-44"
-          placeholder="AniList Username"
+          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-48"
         />
         <button
           @click="loadAnime"
-          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto disabled:opacity-50"
+          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
           :disabled="loading"
         >
           Laden
@@ -234,74 +272,82 @@ function anilistUrl(id: number) {
       </div>
     </div>
 
-    <!-- States -->
-    <div v-if="loading" class="text-zinc-400">Lade AniList Daten…</div>
-    <div v-else-if="error" class="text-red-400">Fehler: {{ error }}</div>
-
-    <template v-else>
-      <!-- Layout Switch -->
-      <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
-        <button
-          @click="layoutMode = 'grid'"
-          class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-          :class="
-            layoutMode === 'grid'
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-          "
-        >
-          Grid
-        </button>
-        <button
-          @click="layoutMode = 'list'"
-          class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-          :class="
-            layoutMode === 'list'
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-          "
-        >
-          List
-        </button>
-      </div>
-
-      <!-- Genre Filter -->
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="g in allGenres"
-          :key="g"
-          @click="toggleGenre(g)"
-          class="px-3 py-1.5 rounded-full text-xs border"
-          :class="
-            selectedGenres.includes(g)
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-          "
-        >
-          {{ g }}
-        </button>
-
-        <button
-          v-if="selectedGenres.length"
-          @click="selectedGenres = []"
-          class="px-3 py-1.5 rounded-full text-xs bg-zinc-800 text-zinc-100"
-        >
-          Reset
-        </button>
-      </div>
-
-      <!-- GRID -->
-      <div
-        v-if="layoutMode === 'grid'"
-        class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    <!-- Layout Switch -->
+    <div class="flex gap-2 justify-end">
+      <button
+        @click="layoutMode = 'grid'"
+        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+        :class="layoutMode === 'grid'
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
       >
-        <GenreCard
-          v-for="(g, i) in displayedGenres"
-          :key="g.genre"
-          :rank="i + 1"
-          :data="g"
+        Grid
+      </button>
+      <button
+        @click="layoutMode = 'list'"
+        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+        :class="layoutMode === 'list'
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
+      >
+        List
+      </button>
+    </div>
+
+    <!-- Genres -->
+    <div class="flex flex-wrap gap-2">
+      <button
+        v-for="g in allGenres"
+        :key="g"
+        @click="toggleGenre(g)"
+        class="px-3 py-2 sm:py-1.5 rounded-full text-xs border"
+        :class="{
+          'bg-indigo-600 text-white border-indigo-600': genreStates[g] === 'include',
+          'bg-red-600 text-white border-red-600': genreStates[g] === 'exclude',
+          'bg-zinc-900 text-zinc-300 border-zinc-800': !genreStates[g],
+        }"
+      >
+        {{ g }}
+      </button>
+    </div>
+
+    <!-- GRID -->
+    <div
+      v-if="layoutMode === 'grid'"
+      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <GenreCard
+        v-for="(g, i) in displayedGenres"
+        :key="g.genre"
+        :rank="i + 1"
+        :data="g"
+      />
+    </div>
+
+    <!-- LIST -->
+    <div v-else class="space-y-2">
+      <div
+        v-for="a in listAnime"
+        :key="a.id"
+        class="flex gap-3 items-center p-3 rounded-xl
+               border border-zinc-800 bg-zinc-900/30"
+      >
+        <img
+          v-if="a.cover"
+          :src="a.cover"
+          class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
         />
+        <a
+          :href="anilistUrl(a.id)"
+          target="_blank"
+          class="flex-1 min-w-0 break-words hover:underline hover:text-indigo-400"
+        >
+          {{ a.title }}
+        </a>
+        <span class="text-xs text-zinc-400 whitespace-nowrap">
+          {{ a.score || "—" }}
+        </span>
       </div>
-    </template>
+    </div>
   </div>
 </template>

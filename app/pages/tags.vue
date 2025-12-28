@@ -14,6 +14,7 @@ type TagCover = {
 };
 
 type LayoutMode = "grid" | "list";
+type TagState = "include" | "exclude";
 
 /* -----------------------------
  * State
@@ -48,12 +49,15 @@ async function loadAnime() {
 onMounted(loadAnime);
 
 /* -----------------------------
- * Tag Filter
+ * TAG STATE (3-STATE)
  * ----------------------------- */
-const selectedTags = ref<string[]>([]);
+const tagStates = ref<Record<string, TagState>>({});
 const tagSearch = ref("");
 const showAllTags = ref(false);
 
+/* -----------------------------
+ * TAG LIST
+ * ----------------------------- */
 const allTags = computed(() => {
   const set = new Set<string>();
   entries.value.forEach((e) =>
@@ -75,20 +79,32 @@ const visibleTags = computed(() => {
   return filteredTags.value.slice(0, 40);
 });
 
+/* -----------------------------
+ * FILTERED ENTRIES
+ * ----------------------------- */
 const filteredEntries = computed(() => {
-  if (!selectedTags.value.length) return entries.value;
+  return entries.value.filter((e) => {
+    const tags = e.tags?.map((t) => t.name) ?? [];
 
-  return entries.value.filter((e) =>
-    selectedTags.value.every((t) =>
-      e.tags?.some((et) => et.name === t)
-    )
-  );
+    for (const [tag, state] of Object.entries(tagStates.value)) {
+      if (state === "include" && !tags.includes(tag)) return false;
+      if (state === "exclude" && tags.includes(tag)) return false;
+    }
+
+    return true;
+  });
 });
 
-const isCombinedMode = computed(() => selectedTags.value.length > 1);
+const includedTags = computed(() =>
+  Object.entries(tagStates.value)
+    .filter(([, s]) => s === "include")
+    .map(([t]) => t)
+);
+
+const isCombinedMode = computed(() => includedTags.value.length > 1);
 
 /* -----------------------------
- * GRID: Tag Ranking
+ * GRID STATS
  * ----------------------------- */
 const normalTagStats = computed(() => {
   const map: Record<
@@ -106,10 +122,10 @@ const normalTagStats = computed(() => {
     const minutes = (e.progress ?? 0) * (e.duration ?? 0);
 
     for (const tag of e.tags ?? []) {
-      const tagName = tag.name;
+      const name = tag.name;
 
-      if (!map[tagName]) {
-        map[tagName] = {
+      if (!map[name]) {
+        map[name] = {
           count: 0,
           scoreSum: 0,
           scoreCount: 0,
@@ -118,35 +134,30 @@ const normalTagStats = computed(() => {
         };
       }
 
-      map[tagName].count++;
-      map[tagName].minutes += minutes;
+      map[name].count++;
+      map[name].minutes += minutes;
 
       if (e.score && e.score > 0) {
-        map[tagName].scoreSum += e.score;
-        map[tagName].scoreCount++;
+        map[name].scoreSum += e.score;
+        map[name].scoreCount++;
       }
 
-      if (e.id && e.coverImage) {
-        const cover =
-          typeof e.coverImage === "string"
-            ? e.coverImage
-            : e.coverImage.extraLarge ||
-              e.coverImage.large ||
-              e.coverImage.medium;
+      const cover =
+        typeof e.coverImage === "string"
+          ? e.coverImage
+          : e.coverImage.extraLarge ||
+            e.coverImage.large ||
+            e.coverImage.medium;
 
-        if (
-          cover &&
-          !map[tagName].covers.some((c) => c.id === e.id)
-        ) {
-          map[tagName].covers.push({
-            id: e.id,
-            title:
-              e.title?.english ??
-              e.title?.romaji ??
-              "Unknown title",
-            cover,
-          });
-        }
+      if (cover && !map[name].covers.some((c) => c.id === e.id)) {
+        map[name].covers.push({
+          id: e.id,
+          title:
+            e.title?.english ??
+            e.title?.romaji ??
+            "Unknown title",
+          cover,
+        });
       }
     }
   }
@@ -163,7 +174,7 @@ const normalTagStats = computed(() => {
 });
 
 /* -----------------------------
- * COMBINED
+ * COMBINED CARD
  * ----------------------------- */
 const combinedStats = computed(() => {
   if (!isCombinedMode.value) return null;
@@ -181,32 +192,27 @@ const combinedStats = computed(() => {
       scoreCount++;
     }
 
-    if (e.id && e.coverImage) {
-      const cover =
-        typeof e.coverImage === "string"
-          ? e.coverImage
-          : e.coverImage.extraLarge ||
-            e.coverImage.large ||
-            e.coverImage.medium;
+    const cover =
+      typeof e.coverImage === "string"
+        ? e.coverImage
+        : e.coverImage.extraLarge ||
+          e.coverImage.large ||
+          e.coverImage.medium;
 
-      if (
-        cover &&
-        !covers.some((c) => c.id === e.id)
-      ) {
-        covers.push({
-          id: e.id,
-          title:
-            e.title?.english ??
-            e.title?.romaji ??
-            "Unknown title",
-          cover,
-        });
-      }
+    if (cover && !covers.some((c) => c.id === e.id)) {
+      covers.push({
+        id: e.id,
+        title:
+          e.title?.english ??
+          e.title?.romaji ??
+          "Unknown title",
+        cover,
+      });
     }
   }
 
   return {
-    genre: selectedTags.value.join(" + "),
+    genre: includedTags.value.join(" + "),
     count: filteredEntries.value.length,
     meanScore: scoreCount
       ? Math.round(scoreSum / scoreCount)
@@ -217,8 +223,7 @@ const combinedStats = computed(() => {
 });
 
 /* -----------------------------
- * displayedTags
- * ✅ FEATURED COVER FIX
+ * FEATURED COVER FIX
  * ----------------------------- */
 const displayedTags = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
@@ -230,42 +235,59 @@ const displayedTags = computed(() => {
 
     const featured =
       g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
-
     used.add(featured.id);
-
-    const rest = g.covers.filter((c) => c.id !== featured.id);
 
     return {
       ...g,
-      covers: [featured, ...rest],
+      covers: [featured, ...g.covers.filter((c) => c.id !== featured.id)],
     };
   });
 });
 
 /* -----------------------------
+ * LIST MODE
+ * ----------------------------- */
+const listAnime = computed(() =>
+  filteredEntries.value.map((e) => ({
+    id: e.id,
+    title:
+      e.title?.english ??
+      e.title?.romaji ??
+      "Unknown",
+    cover:
+      typeof e.coverImage === "string"
+        ? e.coverImage
+        : e.coverImage?.medium,
+    score: e.score,
+  }))
+);
+
+/* -----------------------------
  * Helpers
  * ----------------------------- */
 function toggleTag(tag: string) {
-  const i = selectedTags.value.indexOf(tag);
-  i === -1
-    ? selectedTags.value.push(tag)
-    : selectedTags.value.splice(i, 1);
+  const current = tagStates.value[tag];
+
+  if (!current) tagStates.value[tag] = "include";
+  else if (current === "include") tagStates.value[tag] = "exclude";
+  else delete tagStates.value[tag];
+}
+
+function anilistUrl(id: number) {
+  return `https://anilist.co/anime/${id}`;
 }
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div
-      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
       <h1 class="text-3xl font-bold">Tags</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-44"
-          placeholder="AniList Username"
+          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-48"
         />
         <button
           @click="loadAnime"
@@ -277,7 +299,7 @@ function toggleTag(tag: string) {
     </div>
 
     <!-- Layout Switch -->
-    <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+    <div class="flex gap-2 justify-end">
       <button
         @click="layoutMode = 'grid'"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
@@ -298,44 +320,27 @@ function toggleTag(tag: string) {
       </button>
     </div>
 
-    <!-- 🔍 TAG SEARCH -->
+    <!-- Tag Search -->
     <input
       v-model="tagSearch"
       placeholder="Tags suchen…"
       class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
     />
 
-    <!-- TAGS NUR BEI EINGABE -->
-    <div
-      v-if="tagSearch.trim()"
-      class="flex flex-wrap gap-2"
-    >
+    <!-- Tags -->
+    <div v-if="tagSearch.trim()" class="flex flex-wrap gap-2">
       <button
         v-for="t in visibleTags"
         :key="t"
         @click="toggleTag(t)"
         class="px-3 py-2 rounded-full text-xs border"
-        :class="selectedTags.includes(t)
-          ? 'bg-indigo-600 text-white'
-          : 'bg-zinc-900 text-zinc-300'"
+        :class="{
+          'bg-indigo-600 text-white': tagStates[t] === 'include',
+          'bg-red-600 text-white': tagStates[t] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !tagStates[t],
+        }"
       >
         {{ t }}
-      </button>
-
-      <button
-        v-if="filteredTags.length > 40"
-        @click="showAllTags = !showAllTags"
-        class="px-3 py-2 rounded-full text-xs bg-zinc-800 text-zinc-200"
-      >
-        {{ showAllTags ? "Weniger anzeigen" : "Mehr anzeigen" }}
-      </button>
-
-      <button
-        v-if="selectedTags.length"
-        @click="selectedTags = []"
-        class="px-3 py-2 rounded-full text-xs bg-zinc-800 text-zinc-100"
-      >
-        Reset
       </button>
     </div>
 
@@ -350,6 +355,32 @@ function toggleTag(tag: string) {
         :rank="i + 1"
         :data="g"
       />
+    </div>
+
+    <!-- LIST -->
+    <div v-else class="space-y-2">
+      <div
+        v-for="a in listAnime"
+        :key="a.id"
+        class="flex gap-3 items-center p-3 rounded-xl
+               border border-zinc-800 bg-zinc-900/30"
+      >
+        <img
+          v-if="a.cover"
+          :src="a.cover"
+          class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
+        />
+        <a
+          :href="anilistUrl(a.id)"
+          target="_blank"
+          class="flex-1 min-w-0 break-words hover:underline"
+        >
+          {{ a.title }}
+        </a>
+        <span class="text-xs text-zinc-400 whitespace-nowrap">
+          {{ a.score || "—" }}
+        </span>
+      </div>
     </div>
   </div>
 </template>

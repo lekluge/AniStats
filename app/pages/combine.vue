@@ -16,13 +16,13 @@ type Cover = {
 };
 
 type LayoutMode = "grid" | "list";
+type FilterState = "include" | "exclude";
 
 /* -----------------------------
  * State
  * ----------------------------- */
 const username = ref("Tiggy");
 const loading = ref(false);
-const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
 
@@ -31,305 +31,330 @@ const layoutMode = ref<LayoutMode>("grid");
  * ----------------------------- */
 async function loadAnime() {
   loading.value = true;
-  error.value = null;
-
   try {
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
-
-    entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
-  } catch (e: any) {
-    error.value = e?.message ?? "Unbekannter Fehler";
+    entries.value = normalizeAnilist(
+      res.data.data.MediaListCollection.lists
+    );
   } finally {
     loading.value = false;
   }
 }
-
 onMounted(loadAnime);
 
 /* -----------------------------
  * Filters
  * ----------------------------- */
-const selectedGenres = ref<string[]>([]);
-const selectedTags = ref<string[]>([]);
+const genreStates = ref<Record<string, FilterState>>({});
+const tagStates = ref<Record<string, FilterState>>({});
 const tagSearch = ref("");
 
 const allGenres = computed(() => {
-  const set = new Set<string>();
-  entries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
-  return [...set].sort();
+  const s = new Set<string>();
+  entries.value.forEach(e => e.genres?.forEach(g => s.add(g)));
+  return [...s].sort();
 });
 
 const allTags = computed(() => {
-  const set = new Set<string>();
-  entries.value.forEach((e) => e.tags?.forEach((t) => set.add(t.name)));
-  return [...set].sort();
+  const s = new Set<string>();
+  entries.value.forEach(e => e.tags?.forEach(t => s.add(t.name)));
+  return [...s].sort();
 });
 
-/* 🔍 TAG SEARCH FILTER */
 const filteredTags = computed(() => {
   if (!tagSearch.value.trim()) return [];
   const q = tagSearch.value.toLowerCase();
-  return allTags.value.filter((t) => t.toLowerCase().includes(q));
+  return allTags.value.filter(t => t.toLowerCase().includes(q));
 });
 
 /* -----------------------------
  * FILTERED ENTRIES
  * ----------------------------- */
 const filteredEntries = computed(() => {
-  return entries.value.filter((e) => {
-    const genreOk =
-      !selectedGenres.value.length ||
-      selectedGenres.value.every((g) => e.genres?.includes(g));
+  return entries.value.filter(e => {
+    const genres = e.genres ?? [];
+    const tags = e.tags?.map(t => t.name) ?? [];
 
-    const tagOk =
-      !selectedTags.value.length ||
-      selectedTags.value.every((t) => e.tags?.some((et) => et.name === t));
+    for (const [g, s] of Object.entries(genreStates.value)) {
+      if (s === "include" && !genres.includes(g)) return false;
+      if (s === "exclude" && genres.includes(g)) return false;
+    }
 
-    return genreOk && tagOk;
+    for (const [t, s] of Object.entries(tagStates.value)) {
+      if (s === "include" && !tags.includes(t)) return false;
+      if (s === "exclude" && tags.includes(t)) return false;
+    }
+
+    return true;
   });
 });
 
-const isCombinedMode = computed(
-  () => selectedGenres.value.length + selectedTags.value.length > 1
-);
+const includedFilters = computed(() => [
+  ...Object.entries(genreStates.value).filter(([,s])=>s==="include").map(([k])=>k),
+  ...Object.entries(tagStates.value).filter(([,s])=>s==="include").map(([k])=>k),
+]);
+
+const isCombinedMode = computed(() => includedFilters.value.length > 1);
 
 /* -----------------------------
- * GRID STATS (UNCHANGED)
+ * GRID STATS
  * ----------------------------- */
 const gridStats = computed(() => {
-  const map: Record<
-    string,
-    {
-      count: number;
-      scoreSum: number;
-      scoreCount: number;
-      minutes: number;
-      covers: Cover[];
-    }
-  > = {};
+  const map: Record<string, any> = {};
 
   for (const e of filteredEntries.value) {
     const minutes = (e.progress ?? 0) * (e.duration ?? 0);
-    const keys = [...(e.genres ?? []), ...(e.tags?.map((t) => t.name) ?? [])];
+    const keys = [...(e.genres ?? []), ...(e.tags?.map(t => t.name) ?? [])];
 
     for (const key of keys) {
       if (!map[key]) {
-        map[key] = {
-          count: 0,
-          scoreSum: 0,
-          scoreCount: 0,
-          minutes: 0,
-          covers: [],
-        };
+        map[key] = { count:0, scoreSum:0, scoreCount:0, minutes:0, covers:[] };
       }
 
       map[key].count++;
       map[key].minutes += minutes;
-
-      if (e.score && e.score > 0) {
+      if (e.score) {
         map[key].scoreSum += e.score;
         map[key].scoreCount++;
       }
 
-      if (e.id && e.coverImage) {
-        const cover =
-          typeof e.coverImage === "string"
-            ? e.coverImage
-            : e.coverImage.extraLarge ||
-              e.coverImage.large ||
-              e.coverImage.medium;
+      const cover =
+        typeof e.coverImage === "string"
+          ? e.coverImage
+          : e.coverImage?.extraLarge ||
+            e.coverImage?.large ||
+            e.coverImage?.medium;
 
-        if (cover && !map[key].covers.find((c) => c.id === e.id)) {
-          map[key].covers.push({
-            id: e.id,
-            title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
-            cover,
-            score: e.score ?? 0,
-            minutes,
-          });
-        }
+      if (cover && !map[key].covers.some((c:any)=>c.id===e.id)) {
+        map[key].covers.push({
+          id: e.id,
+          title: e.title?.english ?? e.title?.romaji ?? "Unknown",
+          cover,
+          score: e.score ?? 0,
+          minutes,
+        });
       }
     }
   }
 
-  return Object.entries(map).map(([key, g]) => {
-    const sortedCovers = [...g.covers].sort(
-      (a, b) => b.score - a.score || b.minutes - a.minutes
-    );
-
-    return {
-      genre: key,
-      count: g.count,
-      meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
-      minutesWatched: g.minutes,
-      covers: sortedCovers,
-    };
-  });
+  return Object.entries(map).map(([k,g]:any)=>({
+    genre: k,
+    count: g.count,
+    meanScore: g.scoreCount ? Math.round(g.scoreSum/g.scoreCount) : 0,
+    minutesWatched: g.minutes,
+    covers: g.covers.sort((a:any,b:any)=>b.score-a.score || b.minutes-a.minutes),
+  }));
 });
 
 /* -----------------------------
- * COMBINED GRID CARD (UNCHANGED)
+ * COMBINED CARD
  * ----------------------------- */
 const combinedGridCard = computed(() => {
   if (!isCombinedMode.value) return null;
 
-  let minutes = 0;
-  let scoreSum = 0;
-  let scoreCount = 0;
+  let minutes = 0, scoreSum = 0, scoreCount = 0;
   const covers: Cover[] = [];
 
   for (const e of filteredEntries.value) {
     const m = (e.progress ?? 0) * (e.duration ?? 0);
     minutes += m;
 
-    if (e.score && e.score > 0) {
-      scoreSum += e.score;
-      scoreCount++;
-    }
+    if (e.score) { scoreSum += e.score; scoreCount++; }
 
-    if (e.id && e.coverImage) {
-      const cover =
-        typeof e.coverImage === "string"
-          ? e.coverImage
-          : e.coverImage.extraLarge ||
-            e.coverImage.large ||
-            e.coverImage.medium;
+    const cover =
+      typeof e.coverImage === "string"
+        ? e.coverImage
+        : e.coverImage?.extraLarge ||
+          e.coverImage?.large ||
+          e.coverImage?.medium;
 
-      if (cover && !covers.find((c) => c.id === e.id)) {
-        covers.push({
-          id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
-          cover,
-          score: e.score ?? 0,
-          minutes: m,
-        });
-      }
+    if (cover && !covers.some(c=>c.id===e.id)) {
+      covers.push({
+        id: e.id,
+        title: e.title?.english ?? e.title?.romaji ?? "Unknown",
+        cover,
+        score: e.score ?? 0,
+        minutes: m,
+      });
     }
   }
 
-  covers.sort((a, b) => b.score - a.score || b.minutes - a.minutes);
-
   return {
-    genre: [...selectedGenres.value, ...selectedTags.value].join(" + "),
+    genre: includedFilters.value.join(" + "),
     count: filteredEntries.value.length,
-    meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
+    meanScore: scoreCount ? Math.round(scoreSum/scoreCount) : 0,
     minutesWatched: minutes,
     covers,
   };
 });
 
 /* -----------------------------
- * displayedGrid (UNCHANGED)
+ * FEATURED COVER FIX
  * ----------------------------- */
 const displayedGrid = computed(() => {
   if (combinedGridCard.value) return [combinedGridCard.value];
 
   const used = new Set<number>();
-
-  return gridStats.value.map((g) => {
-    if (!g.covers?.length) return g;
-
-    const featured = g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
+  return gridStats.value.map(g => {
+    if (!g.covers.length) return g;
+    const featured = g.covers.find((c:any)=>!used.has(c.id)) ?? g.covers[0];
     used.add(featured.id);
-
-    const rest = g.covers.filter((c) => c.id !== featured.id);
-
-    return { ...g, covers: [featured, ...rest] };
+    return { ...g, covers: [featured, ...g.covers.filter((c:any)=>c.id!==featured.id)] };
   });
 });
 
 /* -----------------------------
+ * LIST VIEW
+ * ----------------------------- */
+const listAnime = computed(() =>
+  filteredEntries.value.map(e => ({
+    id: e.id,
+    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
+    cover:
+      typeof e.coverImage === "string"
+        ? e.coverImage
+        : e.coverImage?.medium,
+    score: e.score,
+  }))
+);
+
+/* -----------------------------
  * Helpers
  * ----------------------------- */
-function toggleGenre(g: string) {
-  const i = selectedGenres.value.indexOf(g);
-  i === -1 ? selectedGenres.value.push(g) : selectedGenres.value.splice(i, 1);
+function cycleState(map: Record<string, FilterState>, key: string) {
+  if (!map[key]) map[key] = "include";
+  else if (map[key] === "include") map[key] = "exclude";
+  else delete map[key];
 }
 
-function toggleTag(t: string) {
-  const i = selectedTags.value.indexOf(t);
-  i === -1 ? selectedTags.value.push(t) : selectedTags.value.splice(i, 1);
+function anilistUrl(id:number){
+  return `https://anilist.co/anime/${id}`;
 }
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h1 class="text-3xl font-bold">Combined</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-44"
-          placeholder="AniList Username"
+          class="bg-zinc-900 border px-3 py-2 rounded w-full sm:w-48"
         />
         <button
           @click="loadAnime"
           class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
-          :disabled="loading"
         >
           Laden
         </button>
       </div>
     </div>
 
-    <!-- Genre Filter -->
+    <!-- Layout Switch -->
+    <div class="flex gap-2 justify-end">
+      <button
+        @click="layoutMode = 'grid'"
+        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+        :class="layoutMode === 'grid'
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
+      >
+        Grid
+      </button>
+      <button
+        @click="layoutMode = 'list'"
+        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
+        :class="layoutMode === 'list'
+          ? 'bg-indigo-600 text-white'
+          : 'bg-zinc-900 text-zinc-300'"
+      >
+        List
+      </button>
+    </div>
+
+    <!-- Genres -->
     <div class="flex flex-wrap gap-2">
       <h2 class="w-full font-semibold">Genres</h2>
       <button
         v-for="g in allGenres"
         :key="g"
-        @click="toggleGenre(g)"
-        class="px-3 py-1.5 rounded-full text-xs border"
-        :class="
-          selectedGenres.includes(g)
-            ? 'bg-indigo-600 text-white border-indigo-600'
-            : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-        "
+        @click="cycleState(genreStates, g)"
+        class="px-3 py-2 sm:py-1.5 text-xs rounded-full border"
+        :class="{
+          'bg-indigo-600 text-white': genreStates[g]==='include',
+          'bg-red-600 text-white': genreStates[g]==='exclude',
+          'bg-zinc-900 text-zinc-300': !genreStates[g],
+        }"
       >
         {{ g }}
       </button>
     </div>
 
-    <!-- TAG SEARCH -->
-    <div class="space-y-2">
-      <h2 class="font-semibold">Tags</h2>
+    <!-- Tag Search -->
+    <input
+      v-model="tagSearch"
+      placeholder="Tags suchen…"
+      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+    />
 
-      <input
-        v-model="tagSearch"
-        placeholder="Tag suchen…"
-        class="w-full bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
-      />
-
-      <!-- Tags only visible when searching -->
-      <div v-if="tagSearch.length" class="flex flex-wrap gap-2">
-        <button
-          v-for="t in filteredTags"
-          :key="t"
-          @click="toggleTag(t)"
-          class="px-3 py-1.5 rounded-full text-xs border"
-          :class="
-            selectedTags.includes(t)
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-          "
-        >
-          {{ t }}
-        </button>
-      </div>
+    <!-- Tags -->
+    <div v-if="tagSearch.trim()" class="flex flex-wrap gap-2">
+      <button
+        v-for="t in filteredTags"
+        :key="t"
+        @click="cycleState(tagStates, t)"
+        class="px-3 py-2 rounded-full text-xs border"
+        :class="{
+          'bg-indigo-600 text-white': tagStates[t] === 'include',
+          'bg-red-600 text-white': tagStates[t] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !tagStates[t],
+        }"
+      >
+        {{ t }}
+      </button>
     </div>
 
     <!-- GRID -->
-    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      v-if="layoutMode==='grid'"
+      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
       <GenreCard
-        v-for="(g, i) in displayedGrid"
+        v-for="(g,i) in displayedGrid"
         :key="g.genre"
-        :rank="i + 1"
+        :rank="i+1"
         :data="g"
       />
+    </div>
+
+    <!-- LIST -->
+    <div v-else class="space-y-2">
+      <div
+        v-for="a in listAnime"
+        :key="a.id"
+        class="flex gap-3 items-center p-3 rounded-xl
+               border border-zinc-800 bg-zinc-900/30"
+      >
+        <img
+          v-if="a.cover"
+          :src="a.cover"
+          class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
+        />
+        <a
+          :href="anilistUrl(a.id)"
+          target="_blank"
+          class="flex-1 min-w-0 break-words hover:underline hover:text-indigo-400"
+        >
+          {{ a.title }}
+        </a>
+        <span class="text-xs text-zinc-400 whitespace-nowrap">
+          {{ a.score ?? "—" }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
