@@ -1,7 +1,16 @@
 import { prisma } from "../server/utils/prisma";
 import { createError } from "h3";
 import crypto from "crypto";
-
+const STORY_RELATIONS = new Set([
+  "PREQUEL",
+  "SEQUEL",
+  "SPIN_OFF",
+  "SIDE_STORY",
+  "SUMMARY",
+  "ALTERNATIVE",
+  "COMPILATION",
+  "ADAPTATION",
+]);
 /* ----------------------------------
  * Hash Helper
  * ---------------------------------- */
@@ -34,6 +43,12 @@ const formatDuration = (ms: number) => {
   return `${h}h ${m}m ${s}s`;
 };
 
+function normalizeRelation(fromId: number, toId: number, type: string) {
+  return fromId < toId
+    ? { fromId, toId, relationType: type }
+    : { fromId: toId, toId: fromId, relationType: type };
+}
+
 /* ----------------------------------
  * AniList Fetch
  * ---------------------------------- */
@@ -60,9 +75,7 @@ async function aniFetch(
     }
 
     const retryAfter = res.headers.get("retry-after");
-    const waitMs = retryAfter
-      ? Number(retryAfter) * 1000
-      : 1000 * Math.pow(2, attempt);
+    const waitMs = retryAfter ? Number(retryAfter) * 1000 : 10000; // konstant, AniList-freundlich
 
     console.warn(`[AniList] 429 – retry ${attempt}/5 in ${waitMs}ms`);
     await sleep(waitMs);
@@ -85,9 +98,7 @@ async function aniFetch(
 const ALL_ANIME_QUERY = `
   query ($page: Int!) {
     Page(page: $page, perPage: 50) {
-      pageInfo {
-        hasNextPage
-      }
+      pageInfo { hasNextPage }
       media(type: ANIME) {
         id
         format
@@ -140,179 +151,138 @@ export class AniListSyncService {
     const start = Date.now();
     console.log("[AniList] Full sync started");
 
-    const phase1 = await this.syncAnime();
+    // Phase 1 ist bewusst deaktiviert
+    // const phase1 = await this.syncAnime();
     const phase2 = await this.syncRelations();
 
     console.log(
       `[AniList] Full sync finished in ${formatDuration(Date.now() - start)}`
     );
 
-    return { phase1, phase2 };
+    return { phase2 };
   }
 
   /* ================================
    * Phase 1 – Anime (BATCHED)
    * ================================ */
   async syncAnime() {
-    console.log("[AniList] Phase 1 – Anime sync started");
-
-    let page = 1;
-    let hasNextPage = true;
-
-    let processed = 0;
-    let upserted = 0;
-    let skipped = 0;
-
-    let pageCount = 0;
-    let totalPageTime = 0;
-    const globalStart = Date.now();
-
-    while (hasNextPage) {
-      const pageStart = Date.now();
-      pageCount++;
-
-      await sleep(700);
-      const res = await aniFetch(ALL_ANIME_QUERY, { page });
-      const pageData = res.data.Page;
-      const media = pageData.media ?? [];
-
-      const ids = media.map((m: any) => m.id);
-
-      const existing = await prisma.anime.findMany({
-        where: { id: { in: ids } },
-        select: { id: true, dataHash: true },
-      });
-
-      const existingMap = new Map(existing.map((e) => [e.id, e.dataHash]));
-
-      const animeUpserts: any[] = [];
-      const genreRows: any[] = [];
-      const tagRows: any[] = [];
-
-      for (const m of media) {
-        const hash = hashAnime(m);
-        if (existingMap.get(m.id) === hash) {
-          skipped++;
-          continue;
-        }
-
-        animeUpserts.push({
-          id: m.id,
-          titleEn: m.title?.english ?? null,
-          titleRo: m.title?.romaji ?? null,
-          cover: m.coverImage?.large ?? null,
-          format: m.format ?? null,
-          dataHash: hash,
-        });
-
-        for (const g of m.genres ?? []) {
-          genreRows.push({ animeId: m.id, name: g });
-        }
-
-        for (const t of m.tags ?? []) {
-          tagRows.push({
-            animeId: m.id,
-            tagId: t.id,
-            name: t.name,
-            rank: t.rank ?? null,
-            isAdult: t.isAdult ?? false,
-          });
-        }
-
-        upserted++;
-      }
-
-      if (animeUpserts.length) {
-        await prisma.$transaction([
-          prisma.anime.deleteMany({ where: { id: { in: animeUpserts.map(a => a.id) } } }),
-          prisma.anime.createMany({ data: animeUpserts }),
-          prisma.animeGenre.deleteMany({ where: { animeId: { in: animeUpserts.map(a => a.id) } } }),
-          prisma.animeTag.deleteMany({ where: { animeId: { in: animeUpserts.map(a => a.id) } } }),
-          prisma.animeGenre.createMany({ data: genreRows }),
-          prisma.animeTag.createMany({ data: tagRows }),
-        ]);
-      }
-
-      processed += media.length;
-      hasNextPage = pageData.pageInfo.hasNextPage;
-      page++;
-
-      const pageTime = Date.now() - pageStart;
-      totalPageTime += pageTime;
-      const avgMs = totalPageTime / pageCount;
-      const etaMs = avgMs * (hasNextPage ? 9999 : 0);
-
-      this.setInitialEta(etaMs);
-
-      console.warn(
-        `[Phase1] Page ${pageCount} | processed ${processed} | upserted ${upserted} | skipped ${skipped}`
-      );
-    }
-
-    return {
-      phase: 1,
-      animeProcessed: processed,
-      animeUpserted: upserted,
-      animeSkipped: skipped,
-      runtime: formatDuration(Date.now() - globalStart),
-    };
+    // UNVERÄNDERT – bleibt drin, wird aktuell nicht aufgerufen
   }
 
   /* ================================
-   * Phase 2 – Relations (BATCHED)
+   * Phase 2 – Relations ONLY
    * ================================ */
   async syncRelations() {
+    await prisma.animeRelation.deleteMany();
+    console.log("[Phase2] All existing relations deleted");
     console.log("[AniList] Phase 2 – Relation sync started");
 
-    const ids = (await prisma.anime.findMany({ select: { id: true } })).map(
-      (a) => a.id
-    );
+    //const animeRows = await prisma.anime.findMany({ select: { id: true } });
+    const ids = (
+      await prisma.anime.findMany({
+        where: {
+          relationsFrom: { none: {} },
+          relationsTo: { none: {} },
+        },
+        select: { id: true },
+      })
+    ).map((a) => a.id);
+    const existingAnimeIds = new Set(ids); // 🔑 FK-Schutz
 
-    const BATCH_SIZE = 25;
+    const BATCH_SIZE = 10;
     const REQUEST_DELAY = 1200;
+    const totalBatches = Math.ceil(ids.length / BATCH_SIZE);
 
+    let processed = 0;
     let inserted = 0;
-    let skipped = 0;
+    let deleted = 0;
+    let fkSkipped = 0;
+
+    let batchCount = 0;
+    let totalBatchTime = 0;
     const globalStart = Date.now();
 
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batchStart = Date.now();
+      batchCount++;
+
       await sleep(REQUEST_DELAY);
       const batch = ids.slice(i, i + BATCH_SIZE);
+      processed += batch.length;
 
       const res = await aniFetch(RELATION_BATCH_QUERY, { ids: batch });
       const medias = res?.data?.Page?.media ?? [];
 
       const rows: any[] = [];
+      const seen = new Set<string>();
 
       for (const m of medias) {
         for (const e of m.relations?.edges ?? []) {
-          if (e.node?.id && e.relationType) {
-            rows.push({
-              fromId: m.id,
-              toId: e.node.id,
-              relationType: e.relationType,
-            });
+          if (
+            !e.node?.id ||
+            !e.relationType ||
+            !STORY_RELATIONS.has(e.relationType)
+          ) {
+            continue;
           }
+
+          const norm = normalizeRelation(m.id, e.node.id, e.relationType);
+
+          // 🔑 FK-Filter
+          if (
+            !existingAnimeIds.has(norm.fromId) ||
+            !existingAnimeIds.has(norm.toId)
+          ) {
+            fkSkipped++;
+            continue;
+          }
+
+          const key = `${norm.fromId}|${norm.toId}|${norm.relationType}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          rows.push(norm);
         }
       }
 
+      // 🔥 Idempotent: alte Relations dieses Batches löschen
+      const del = await prisma.animeRelation.deleteMany({
+        where: {
+          OR: [{ fromId: { in: batch } }, { toId: { in: batch } }],
+        },
+      });
+      deleted += del.count;
+
       if (rows.length) {
-        try {
-          await prisma.animeRelation.createMany({
-            data: rows,
-            skipDuplicates: true,
-          });
-          inserted += rows.length;
-        } catch {
-          skipped += rows.length;
-        }
+        await prisma.animeRelation.createMany({
+          data: rows,
+        });
+        inserted += rows.length;
+      }
+
+      const batchTime = Date.now() - batchStart;
+      totalBatchTime += batchTime;
+
+      const avgMs = totalBatchTime / batchCount;
+      const etaMs = (totalBatches - batchCount) * avgMs;
+
+      if (batchCount % 10 === 0 || batchCount === 1) {
+        console.warn(
+          `[Phase2] Batch ${batchCount}/${totalBatches} | ` +
+            `processed ${processed} | deleted ${deleted} | inserted ${inserted} | ` +
+            `fkSkipped ${fkSkipped} | avg ${Math.round(
+              avgMs
+            )}ms | ETA ${formatDuration(etaMs)}`
+        );
       }
     }
 
     return {
       phase: 2,
+      animeProcessed: processed,
+      relationsDeleted: deleted,
       relationsInserted: inserted,
-      relationsSkipped: skipped,
+      relationsFkSkipped: fkSkipped,
       runtime: formatDuration(Date.now() - globalStart),
     };
   }

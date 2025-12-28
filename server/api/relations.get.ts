@@ -1,5 +1,12 @@
-import { defineEventHandler } from "h3"
+import { defineEventHandler, setHeader } from "h3"
 import { prisma } from "../utils/prisma"
+
+/* ----------------------------------
+ * Cache (Server Memory)
+ * ---------------------------------- */
+let cachedResult: any | null = null
+let cachedAt = 0
+const CACHE_TTL = 1000 * 60 * 5 // 5 Minuten
 
 /* ----------------------------------
  * Config
@@ -38,17 +45,13 @@ function pickRoot(cluster: any[]) {
   return [...cluster].sort((a, b) => {
     const scoreA =
       (TYPE_SCORE[a.format] ?? 0) -
-      ((a.relationsTo ?? []).some(
-        (r) => r.relationType === "PREQUEL"
-      )
+      ((a.relationsTo ?? []).some((r) => r.relationType === "PREQUEL")
         ? 20
         : 0)
 
     const scoreB =
       (TYPE_SCORE[b.format] ?? 0) -
-      ((b.relationsTo ?? []).some(
-        (r) => r.relationType === "PREQUEL"
-      )
+      ((b.relationsTo ?? []).some((r) => r.relationType === "PREQUEL")
         ? 20
         : 0)
 
@@ -59,7 +62,17 @@ function pickRoot(cluster: any[]) {
 /* ----------------------------------
  * Handler
  * ---------------------------------- */
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  // 🌍 CDN / Browser Cache
+  setHeader(event, "Cache-Control", "public, max-age=300, s-maxage=300")
+  setHeader(event, "CDN-Cache-Control", "public, max-age=300")
+
+  // 🧠 In-Memory Cache
+  const now = Date.now()
+  if (cachedResult && now - cachedAt < CACHE_TTL) {
+    return cachedResult
+  }
+
   const anime = await prisma.anime.findMany({
     include: {
       relationsFrom: { include: { to: true } },
@@ -73,9 +86,6 @@ export default defineEventHandler(async () => {
   for (const start of anime) {
     if (visited.has(start.id)) continue
 
-    /* ----------------------------------
-     * BFS → Franchise-Cluster
-     * ---------------------------------- */
     const queue = [start]
     const cluster: any[] = []
 
@@ -102,42 +112,26 @@ export default defineEventHandler(async () => {
       }
     }
 
-    /* ----------------------------------
-     * Root bestimmen (TV > OVA > Movie)
-     * ---------------------------------- */
     const root = pickRoot(cluster)
 
-    /* ----------------------------------
-     * Chain = PREQUEL / SEQUEL
-     * ---------------------------------- */
     const chain = cluster
       .filter((a) =>
         [...(a.relationsFrom ?? []), ...(a.relationsTo ?? [])].some(
-          (r) =>
-            r.relationType === "PREQUEL" ||
-            r.relationType === "SEQUEL"
+          (r) => r.relationType === "PREQUEL" || r.relationType === "SEQUEL"
         )
       )
       .sort((a, b) => {
-        // Hauptserie zuerst, dann grob stabil
         const sa = TYPE_SCORE[a.format] ?? 0
         const sb = TYPE_SCORE[b.format] ?? 0
         return sb - sa || a.id - b.id
       })
 
-    /* ----------------------------------
-     * Related = alles andere
-     * ---------------------------------- */
     const related = cluster
       .filter((a) => a.id !== root.id && !chain.includes(a))
       .map((a) => {
         const rel =
-          a.relationsFrom?.find((r) =>
-            STORY_RELATIONS.has(r.relationType)
-          ) ??
-          a.relationsTo?.find((r) =>
-            STORY_RELATIONS.has(r.relationType)
-          )
+          a.relationsFrom?.find((r) => STORY_RELATIONS.has(r.relationType)) ??
+          a.relationsTo?.find((r) => STORY_RELATIONS.has(r.relationType))
 
         return {
           id: a.id,
@@ -155,21 +149,24 @@ export default defineEventHandler(async () => {
       rootTitleEn: root.titleEn,
       rootTitleRo: root.titleRo,
       rootCover: root.cover,
-
       chain: chain.map((a) => ({
         id: a.id,
         titleEn: a.titleEn,
         titleRo: a.titleRo,
         cover: a.cover,
       })),
-
       related,
     })
   }
 
-  return {
+  const result = {
     ok: true,
     count: groups.length,
     groups,
   }
+
+  cachedResult = result
+  cachedAt = Date.now()
+
+  return result
 })
