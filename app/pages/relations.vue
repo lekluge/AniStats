@@ -1,29 +1,28 @@
 <script setup lang="ts">
-import { api } from "~/composables/useApi"
-import type { RelationGroup } from "~/types/animeRelation"
+import { api } from "~/composables/useApi";
+import type { RelationGroup } from "~/types/animeRelation";
 
-const username = ref("Tiggy")
-const loading = ref(false)
-const error = ref<string | null>(null)
-const groups = ref<RelationGroup[]>([])
+const username = ref("Tiggy");
+const loading = ref(false);
+const error = ref<string | null>(null);
+const groups = ref<RelationGroup[]>([]);
 function filterGroupsByUserList(
   groups: RelationGroup[],
   statusMap: Record<number, string>
 ): RelationGroup[] {
   return groups.filter((g) => {
     // Root in Liste?
-    if (statusMap[g.rootId]) return true
+    if (statusMap[g.rootId]) return true;
 
     // Chain in Liste?
-    if (g.chain.some((c) => statusMap[c.id])) return true
+    if (g.chain.some((c) => statusMap[c.id])) return true;
 
     // Related in Liste?
-    if (g.related.some((r) => statusMap[r.id])) return true
+    if (g.related.some((r) => statusMap[r.id])) return true;
 
-    return false
-  })
+    return false;
+  });
 }
-
 
 /* ----------------------------------
  * Merge User Status into Relations
@@ -45,15 +44,15 @@ function applyUserStatus(
       ...r,
       status: statusMap[r.id],
     })),
-  }))
+  }));
 }
 
 /* ----------------------------------
  * Load Relations (DB) + User Status
  * ---------------------------------- */
 async function loadRelations() {
-  loading.value = true
-  error.value = null
+  loading.value = true;
+  error.value = null;
 
   try {
     const [userRes, relRes] = await Promise.all([
@@ -61,21 +60,21 @@ async function loadRelations() {
         params: { user: username.value },
       }),
       api.get("/api/relations"),
-    ])
+    ]);
 
-    const statusMap = userRes.data?.statusMap ?? {}
-    const relationGroups = relRes.data?.groups ?? []
+    const statusMap = userRes.data?.statusMap ?? {};
+    const relationGroups = relRes.data?.groups ?? [];
 
-    const filtered = filterGroupsByUserList(relationGroups, statusMap)
-groups.value = applyUserStatus(filtered, statusMap)
+    const filtered = filterGroupsByUserList(relationGroups, statusMap);
+    groups.value = applyUserStatus(filtered, statusMap);
   } catch (e: any) {
-    error.value = e?.message ?? "Fehler beim Laden"
+    error.value = e?.message ?? "Fehler beim Laden";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-onMounted(loadRelations)
+onMounted(loadRelations);
 
 /* ----------------------------------
  * UI Helpers
@@ -83,22 +82,29 @@ onMounted(loadRelations)
 function statusColor(status?: string) {
   switch (status) {
     case "COMPLETED":
-      return "text-green-400"
+      return "text-green-400";
     case "CURRENT":
-      return "text-blue-400"
+      return "text-blue-400";
     case "PLANNING":
-      return "text-yellow-400"
+      return "text-yellow-400";
     case "PAUSED":
-      return "text-orange-400"
+      return "text-orange-400";
     case "DROPPED":
-      return "text-red-400"
+      return "text-red-400";
     default:
-      return "text-zinc-500"
+      return "text-zinc-500";
   }
 }
 
 function anilistUrl(id: number) {
-  return `https://anilist.co/anime/${id}`
+  return `https://anilist.co/anime/${id}`;
+}
+function displayTitle(en?: string | null, ro?: string | null) {
+  return en || ro || "—";
+}
+
+function showRomaji(en?: string | null, ro?: string | null) {
+  return !!en && !!ro && en !== ro;
 }
 </script>
 
@@ -112,10 +118,7 @@ function anilistUrl(id: number) {
           v-model="username"
           class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
         />
-        <button
-          @click="loadRelations"
-          class="bg-indigo-600 px-4 py-2 rounded"
-        >
+        <button @click="loadRelations" class="bg-indigo-600 px-4 py-2 rounded">
           Laden
         </button>
       </div>
@@ -149,11 +152,11 @@ function anilistUrl(id: number) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {{ group.rootTitleEn }}
+                    {{ displayTitle(group.rootTitleEn, group.rootTitleRo) }}
                   </a>
                 </div>
                 <div
-                  v-if="group.rootTitleRo !== group.rootTitleEn"
+                  v-if="showRomaji(group.rootTitleEn, group.rootTitleRo)"
                   class="text-sm text-zinc-500"
                 >
                   {{ group.rootTitleRo }}
@@ -193,21 +196,18 @@ function anilistUrl(id: number) {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {{ item.titleEn }}
+                  {{ displayTitle(item.titleEn, item.titleRo) }}
                 </a>
               </div>
               <div
-                v-if="item.titleRo !== item.titleEn"
+                v-if="showRomaji(item.titleEn, item.titleRo)"
                 class="text-xs text-zinc-500"
               >
                 {{ item.titleRo }}
               </div>
             </div>
 
-            <div
-              class="text-xs font-medium"
-              :class="statusColor(item.status)"
-            >
+            <div class="text-xs font-medium" :class="statusColor(item.status)">
               {{ item.status ?? "—" }}
             </div>
           </div>
