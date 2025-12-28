@@ -35,6 +35,7 @@ const currentPage = ref(1);
  * ----------------------------- */
 const genreStates = ref<Record<string, FilterState>>({});
 const tagStates = ref<Record<string, FilterState>>({});
+const tagMinRank = ref<Record<string, number>>({});
 const tagSearch = ref("");
 
 /* -----------------------------
@@ -95,6 +96,12 @@ async function loadUsers() {
   } finally {
     loading.value = false;
   }
+}
+function tagBackground(tag: string) {
+  if (tagStates.value[tag] !== "include") return "";
+
+  const percent = tagMinRank.value[tag] ?? 0;
+  return `linear-gradient(90deg, rgb(99 102 241) ${percent}%, rgb(24 24 27) ${percent}%)`;
 }
 
 /* -----------------------------
@@ -188,12 +195,13 @@ const visibleTags = computed(() => {
 });
 
 /* -----------------------------
- * Filtered Anime
+ * Filtered Anime (inkl. Rank)
  * ----------------------------- */
 const filteredAnime = computed(() => {
   const q = search.value.toLowerCase();
 
   return activeBase.value.filter((a: any) => {
+    // 🔍 Suche
     if (
       q &&
       !a.titleEn.toLowerCase().includes(q) &&
@@ -201,6 +209,7 @@ const filteredAnime = computed(() => {
     )
       return false;
 
+    // 👀 Seen Filter
     if (seenFilter.value === "allUsers") {
       if (!users.value.every((u) => a.users[u]?.status === "COMPLETED"))
         return false;
@@ -211,34 +220,45 @@ const filteredAnime = computed(() => {
         return false;
     }
 
-    let genres = new Set<string>();
-    let tags = new Set<string>();
+    // 🎭 Genres
+    const genres = new Set<string>();
+
+    // 🏷 Tags mit Rank
+    const tagObjects: { name: string; rank?: number }[] = [];
 
     if (seenFilter.value === "noneUsers") {
       // 🌍 Basis: /api/relations
       a.genres?.forEach((g: string) => genres.add(g));
-      a.tags?.forEach((t: any) => tags.add(t.name));
+      a.tags?.forEach((t: any) => tagObjects.push(t));
 
       a.related?.forEach((r: any) => {
         r.genres?.forEach((g: string) => genres.add(g));
-        r.tags?.forEach((t: any) => tags.add(t.name));
+        r.tags?.forEach((t: any) => tagObjects.push(t));
       });
     } else {
-      // 👤 Basis: Userliste (AniList)
+      // 👤 Basis: Userliste
       Object.values(a.users).forEach((e: any) => {
         e.genres?.forEach((g: string) => genres.add(g));
-        e.tags?.forEach((t: any) => tags.add(t.name));
+        e.tags?.forEach((t: any) => tagObjects.push(t));
       });
     }
 
+    // 🎭 Genre Filter
     for (const [g, s] of Object.entries(genreStates.value)) {
       if (s === "include" && !genres.has(g)) return false;
       if (s === "exclude" && genres.has(g)) return false;
     }
 
+    // 🏷 Tag + Rank Filter
     for (const [t, s] of Object.entries(tagStates.value)) {
-      if (s === "include" && !tags.has(t)) return false;
-      if (s === "exclude" && tags.has(t)) return false;
+      const minRank = tagMinRank.value[t] ?? 0;
+
+      const matching = tagObjects.find(
+        (tag) => tag.name === t && (tag.rank ?? 0) >= minRank
+      );
+
+      if (s === "include" && !matching) return false;
+      if (s === "exclude" && matching) return false;
     }
 
     return true;
@@ -272,6 +292,8 @@ function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
 </script>
+
+<!-- TEMPLATE BLEIBT 1:1 UNVERÄNDERT -->
 
 <!-- TEMPLATE BLEIBT 1:1 UNVERÄNDERT -->
 
@@ -378,19 +400,43 @@ function anilistUrl(id: number) {
       v-if="tagSearch.trim() || selectedTags.length"
       class="flex flex-wrap gap-2"
     >
-      <button
-        v-for="t in visibleTags"
-        :key="t"
-        @click="cycleState(tagStates, t)"
-        class="px-3 py-2 rounded-full text-xs border"
-        :class="{
-          'bg-indigo-600 text-white': tagStates[t] === 'include',
-          'bg-red-600 text-white': tagStates[t] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !tagStates[t],
-        }"
-      >
-        {{ t }}
-      </button>
+      <div v-for="t in visibleTags" :key="t" class="relative">
+        <!-- SLIDER BUTTON -->
+        <input
+          v-if="tagStates[t] === 'include'"
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          :value="tagMinRank[t] ?? 0"
+          @input="
+            tagMinRank[t] = Number(($event.target as HTMLInputElement).value)
+          "
+          @mousedown.stop
+          @pointerdown.stop
+          @click.stop
+          class="absolute inset-0 opacity-0 cursor-ew-resize"
+        />
+
+        <button
+          @click="cycleState(tagStates, t)"
+          class="px-3 py-2 text-xs rounded-full border transition select-none"
+          :style="{ background: tagBackground(t) }"
+          :class="{
+            'text-white border-indigo-500': tagStates[t] === 'include',
+            'bg-red-600 text-white border-red-600': tagStates[t] === 'exclude',
+            'bg-zinc-900 text-zinc-300 border-zinc-700': !tagStates[t],
+          }"
+        >
+          {{ t }}
+          <span
+            v-if="tagStates[t] === 'include'"
+            class="ml-1 text-[10px] opacity-80"
+          >
+            {{ tagMinRank[t] ?? 0 }}%
+          </span>
+        </button>
+      </div>
     </div>
 
     <!-- Summary -->
