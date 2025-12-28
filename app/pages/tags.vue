@@ -74,9 +74,29 @@ const filteredTags = computed(() => {
   );
 });
 
+/* 🔑 NEU: ausgewählte Tags (include + exclude) */
+const selectedTags = computed(() =>
+  Object.keys(tagStates.value)
+);
+
+/* 🔑 FIX: sichtbare Tags */
 const visibleTags = computed(() => {
-  if (showAllTags.value) return filteredTags.value;
-  return filteredTags.value.slice(0, 40);
+  const set = new Set<string>();
+
+  // Immer anzeigen: ausgewählte Tags
+  selectedTags.value.forEach((t) => set.add(t));
+
+  // Zusätzlich: Suchergebnisse
+  filteredTags.value.forEach((t) => set.add(t));
+
+  const all = [...set].sort((a, b) => a.localeCompare(b));
+
+  if (showAllTags.value) return all;
+
+  const pinned = selectedTags.value;
+  const rest = all.filter((t) => !pinned.includes(t));
+
+  return [...pinned, ...rest.slice(0, 40)];
 });
 
 /* -----------------------------
@@ -328,7 +348,7 @@ function anilistUrl(id: number) {
     />
 
     <!-- Tags -->
-    <div v-if="tagSearch.trim()" class="flex flex-wrap gap-2">
+    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
       <button
         v-for="t in visibleTags"
         :key="t"
