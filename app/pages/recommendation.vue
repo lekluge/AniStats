@@ -36,9 +36,11 @@ const items = ref<{ TV: Recommendation[]; MOVIE: Recommendation[] }>({
 /* -----------------------------
  * BASIC FILTERS
  * ----------------------------- */
+const CURRENT_YEAR = new Date().getFullYear();
+
 const filterSeason = ref<string | null>(null);
 const seasonYearMin = ref<number | null>(null);
-const seasonYearMax = ref<number | null>(null);
+const seasonYearMax = ref<number | null>(CURRENT_YEAR);
 const episodesMin = ref<number | null>(null);
 const averageScoreMin = ref<number | null>(null);
 
@@ -98,8 +100,7 @@ async function loadRecommendations() {
     if (seasonYearMin.value) params.seasonYearMin = seasonYearMin.value;
     if (seasonYearMax.value) params.seasonYearMax = seasonYearMax.value;
     if (episodesMin.value) params.episodesMin = episodesMin.value;
-    if (averageScoreMin.value)
-      params.averageScoreMin = averageScoreMin.value;
+    if (averageScoreMin.value) params.averageScoreMin = averageScoreMin.value;
 
     const includeGenres = Object.entries(genreStates.value)
       .filter(([, s]) => s === "include")
@@ -118,8 +119,7 @@ async function loadRecommendations() {
       .map(([t]) => t);
 
     if (includeGenres.length) params.genres = includeGenres.join(",");
-    if (excludeGenres.length)
-      params.excludeGenres = excludeGenres.join(",");
+    if (excludeGenres.length) params.excludeGenres = excludeGenres.join(",");
     if (includeTags.length) params.tags = includeTags.join(",");
     if (excludeTags.length) params.excludeTags = excludeTags.join(",");
 
@@ -202,7 +202,7 @@ function anilistUrl(id: number) {
       <input
         v-model.number="seasonYearMax"
         type="number"
-        placeholder="Season Year Max"
+        :placeholder="`Season Year Max (${new Date().getFullYear()})`"
         class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
       />
 
@@ -288,14 +288,18 @@ function anilistUrl(id: number) {
       <button
         @click="layoutMode = 'grid'"
         class="px-3 py-2 text-xs rounded border"
-        :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'"
+        :class="
+          layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'
+        "
       >
         Grid
       </button>
       <button
         @click="layoutMode = 'list'"
         class="px-3 py-2 text-xs rounded border"
-        :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'"
+        :class="
+          layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'
+        "
       >
         List
       </button>
@@ -351,9 +355,7 @@ function anilistUrl(id: number) {
             </span>
           </div>
 
-          <div class="text-xs text-zinc-400">
-            Match-Score: {{ a.score }}
-          </div>
+          <div class="text-xs text-zinc-400">Match-Score: {{ a.score }}</div>
         </div>
       </div>
     </div>
