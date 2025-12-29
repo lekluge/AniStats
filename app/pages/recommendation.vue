@@ -39,10 +39,10 @@ const items = ref<{ TV: Recommendation[]; MOVIE: Recommendation[] }>({
 const CURRENT_YEAR = new Date().getFullYear();
 
 const filterSeason = ref<string | null>(null);
-const seasonYearMin = ref<number | null>(null);
+const seasonYearMin = ref<number | null>(2000);
 const seasonYearMax = ref<number | null>(CURRENT_YEAR);
-const episodesMin = ref<number | null>(null);
-const averageScoreMin = ref<number | null>(null);
+const episodesMin = ref<number | null>(12);
+const averageScoreMin = ref<number | null>(50);
 
 /* -----------------------------
  * GENRE / TAG FILTER STATE
