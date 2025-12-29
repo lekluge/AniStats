@@ -11,6 +11,10 @@ query FullAnime($id: Int!) {
       english
     }
     format
+    averageScore
+    season
+    seasonYear
+    episodes
     updatedAt
     coverImage {
       large
@@ -42,6 +46,10 @@ type FullAnimeResponse = {
       english: string | null;
     };
     format: string | null;
+    averageScore: number | null;
+    season: string | null;
+    seasonYear: number | null;
+    episodes: number | null;
     updatedAt: number;
     coverImage: { large: string | null };
     genres: string[];
@@ -69,6 +77,10 @@ function hashAnime(m: FullAnimeResponse["Media"]) {
         ro: m.title.romaji,
         cover: m.coverImage.large,
         format: m.format,
+        averageScore: m.averageScore,
+        season: m.season,
+        seasonYear: m.seasonYear,
+        episodes: m.episodes,
         genres: m.genres,
         tags: m.tags.map((t) => t.id),
       })
@@ -104,6 +116,10 @@ export async function syncAnime(anilistId: number) {
       titleRo: Media.title.romaji,
       cover: Media.coverImage.large,
       format: Media.format,
+      averageScore: Media.averageScore,
+      season: Media.season,
+      seasonYear: Media.seasonYear,
+      episodes: Media.episodes,
       dataHash,
     },
     create: {
@@ -112,6 +128,10 @@ export async function syncAnime(anilistId: number) {
       titleRo: Media.title.romaji,
       cover: Media.coverImage.large,
       format: Media.format,
+      averageScore: Media.averageScore,
+      season: Media.season,
+      seasonYear: Media.seasonYear,
+      episodes: Media.episodes,
       dataHash,
     },
   });
