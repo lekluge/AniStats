@@ -18,11 +18,14 @@ model Anime {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   dataHash      String?
-
+  averageScore  Int?
+  season        String?         
+  seasonYear    Int?
+  episodes      Int?        
   relationsTo   AnimeRelation[] @relation("ToAnime")
   relationsFrom AnimeRelation[] @relation("FromAnime")
 
-  genres        AnimeGenre[]    // 👈 NEU
+  genres        AnimeGenre[]    
   tags          AnimeTag[]
 }
 
