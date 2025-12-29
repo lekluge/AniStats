@@ -7,40 +7,47 @@ import { anilistRequest } from "../../services/anilist/anilistClient";
  * ---------------------------------- */
 const EXCLUDED_STATUSES = new Set(["COMPLETED", "WATCHING"]);
 
-// Cache TTLs
-const CACHE_TTL_ANIME_DB = 1000 * 60 * 30; // 30 min
-const CACHE_TTL_ANILIST = 1000 * 60 * 5; // 5 min (pro user)
+const CACHE_TTL_ANIME_DB = 1000 * 60 * 30;
+const CACHE_TTL_ANILIST = 1000 * 60 * 5;
 
 /* ----------------------------------
- * Scoring Configuration (TWEAK HERE)
+ * Scoring Configuration
  * ---------------------------------- */
-
-// Taste weights
 const GENRE_WEIGHT = 1.5;
 const TAG_WEIGHT = 1.0;
 
 const NORMALIZATION_MODE: "sqrt" | "linear" = "sqrt";
 
-// Match penalties / bonuses
-const SINGLE_MATCH_PENALTY = 0.4; // < 2 Matches
-const MULTI_GENRE_BONUS = 1.2; // >= 2 Genre-Matches
+const SINGLE_MATCH_PENALTY = 0.4;
+const MULTI_GENRE_BONUS = 1.2;
 
-// Tag dominance cap (e.g. Male Protagonist)
 const MAX_SINGLE_TAG_CONTRIBUTION: number | null = 300;
 
 /* ----------------------------------
- * Quality Scoring (AniList AverageScore)
+ * Quality Scoring
  * ---------------------------------- */
 const USE_AVERAGE_SCORE = true;
-
-// harte Untergrenze (alles darunter komplett raus)
-// null = deaktiviert
 const MIN_AVERAGE_SCORE: number | null = 60;
 
-// Mapping averageScore → multiplier
-const AVG_SCORE_BASELINE = 75; // neutral
+const AVG_SCORE_BASELINE = 75;
 const AVG_SCORE_MIN_MULTIPLIER = 0.7;
 const AVG_SCORE_MAX_MULTIPLIER = 1.3;
+
+/* ----------------------------------
+ * Helpers (Query Parsing)
+ * ---------------------------------- */
+function parseNumber(v: any): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseList(v: any): string[] | null {
+  if (!v || typeof v !== "string") return null;
+  return v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 /* ----------------------------------
  * In-memory caches
@@ -53,6 +60,9 @@ let cachedAnimeDb: Array<{
   cover: string | null;
   format: string | null;
   averageScore: number | null;
+  season: string | null;
+  seasonYear: number | null;
+  episodes: number | null;
   genres: { name: string }[];
   tags: {
     tagId: number;
@@ -80,9 +90,7 @@ query ($userName: String!) {
       entries {
         status
         score(format: POINT_10)
-        media {
-          id
-        }
+        media { id }
       }
     }
   }
@@ -98,17 +106,14 @@ async function loadUserAnilistEntries(user: string) {
     userName: user,
   });
 
-  const lists = res?.MediaListCollection?.lists ?? [];
   const out: { mediaId: number; status: string; score: number | null }[] = [];
 
-  for (const l of lists) {
+  for (const l of res?.MediaListCollection?.lists ?? []) {
     for (const e of l.entries ?? []) {
-      const mediaId = e?.media?.id;
-      if (!mediaId) continue;
-
+      if (!e?.media?.id) continue;
       out.push({
-        mediaId,
-        status: String(e.status ?? ""),
+        mediaId: e.media.id,
+        status: String(e.status),
         score: typeof e.score === "number" ? e.score : null,
       });
     }
@@ -154,14 +159,13 @@ function buildTasteProfile(
 }
 
 /* ----------------------------------
- * Final Scoring
+ * Scoring
  * ---------------------------------- */
 function scoreAnime(anime: any, taste: TasteProfile) {
   let rawScore = 0;
   const matchedGenres: string[] = [];
   const matchedTags: string[] = [];
 
-  // Genres
   for (const g of anime.genres) {
     const w = taste.genres.get(g.name);
     if (w) {
@@ -170,7 +174,6 @@ function scoreAnime(anime: any, taste: TasteProfile) {
     }
   }
 
-  // Tags
   for (const t of anime.tags) {
     let w = taste.tags.get(t.tagId);
     if (!w) continue;
@@ -184,25 +187,17 @@ function scoreAnime(anime: any, taste: TasteProfile) {
   }
 
   const matchCount = matchedGenres.length + matchedTags.length;
-  if (matchCount === 0) {
-    return { score: 0, matchedGenres, matchedTags };
-  }
+  if (matchCount === 0) return { score: 0, matchedGenres, matchedTags };
 
-  // Normalisierung
   let score =
     NORMALIZATION_MODE === "sqrt"
       ? rawScore / Math.sqrt(matchCount)
       : rawScore / matchCount;
 
-  // Match-Logik
   if (matchCount < 2) score *= SINGLE_MATCH_PENALTY;
   if (matchedGenres.length >= 2) score *= MULTI_GENRE_BONUS;
 
-  // Quality Boost (AniList averageScore)
-  if (
-    USE_AVERAGE_SCORE &&
-    typeof anime.averageScore === "number"
-  ) {
+  if (USE_AVERAGE_SCORE && typeof anime.averageScore === "number") {
     if (
       MIN_AVERAGE_SCORE !== null &&
       anime.averageScore < MIN_AVERAGE_SCORE
@@ -210,22 +205,14 @@ function scoreAnime(anime: any, taste: TasteProfile) {
       return { score: 0, matchedGenres, matchedTags };
     }
 
-    const q =
-      anime.averageScore / AVG_SCORE_BASELINE;
-
-    const qualityMultiplier = Math.min(
+    const q = anime.averageScore / AVG_SCORE_BASELINE;
+    score *= Math.min(
       AVG_SCORE_MAX_MULTIPLIER,
       Math.max(AVG_SCORE_MIN_MULTIPLIER, q)
     );
-
-    score *= qualityMultiplier;
   }
 
-  return {
-    score,
-    matchedGenres,
-    matchedTags,
-  };
+  return { score, matchedGenres, matchedTags };
 }
 
 /* ----------------------------------
@@ -234,12 +221,32 @@ function scoreAnime(anime: any, taste: TasteProfile) {
 export default defineEventHandler(async (event) => {
   setHeader(event, "Cache-Control", "public, max-age=60");
 
-  const { user } = getQuery(event);
+  const q = getQuery(event);
+  const user = q.user;
+
   if (!user || typeof user !== "string") {
     throw createError({ statusCode: 400, statusMessage: "Missing user" });
   }
 
-  /* 1) AniList user list */
+  const filterSeason =
+    typeof q.season === "string" ? q.season.toUpperCase() : null;
+
+  const seasonYearMin = parseNumber(q.seasonYearMin);
+  const seasonYearMax = parseNumber(q.seasonYearMax);
+
+  const episodesMin = parseNumber(q.episodesMin);
+  const episodesMax = parseNumber(q.episodesMax);
+
+  const avgScoreMin = parseNumber(q.averageScoreMin);
+  const avgScoreMax = parseNumber(q.averageScoreMax);
+
+  const includeGenres = parseList(q.genres);
+  const excludeGenres = parseList(q.excludeGenres);
+
+  const includeTags = parseList(q.tags);
+  const excludeTags = parseList(q.excludeTags);
+
+  /* 1) User list */
   const userEntries = await loadUserAnilistEntries(user);
 
   const excludedIds = new Set<number>();
@@ -252,17 +259,12 @@ export default defineEventHandler(async (event) => {
     if (e.status === "COMPLETED") completedIds.push(e.mediaId);
   }
 
-  /* 2) DB Anime (cached) */
+  /* 2) Anime DB */
   const now = Date.now();
   if (!cachedAnimeDb || now - cachedAnimeDbAt > CACHE_TTL_ANIME_DB) {
     cachedAnimeDb = await prisma.anime.findMany({
-      where: {
-        format: { in: ["TV", "MOVIE"] },
-      },
-      include: {
-        genres: true,
-        tags: true,
-      },
+      where: { format: { in: ["TV", "MOVIE"] } },
+      include: { genres: true, tags: true },
     });
     cachedAnimeDbAt = now;
   }
@@ -270,22 +272,67 @@ export default defineEventHandler(async (event) => {
   const animeById = new Map<number, any>();
   for (const a of cachedAnimeDb) animeById.set(a.id, a);
 
-  /* 3) Taste profile */
+  /* 3) Taste */
   const taste = buildTasteProfile(completedIds, scoreById, animeById);
 
-  /* 4) Score candidates */
+  /* 4) Build recommendations */
   const recs: any[] = [];
 
   for (const anime of cachedAnimeDb) {
     if (excludedIds.has(anime.id)) continue;
 
+    if (filterSeason && anime.season !== filterSeason) continue;
+    if (seasonYearMin !== null && (anime.seasonYear ?? 0) < seasonYearMin)
+      continue;
+    if (seasonYearMax !== null && (anime.seasonYear ?? 9999) > seasonYearMax)
+      continue;
+    if (episodesMin !== null && (anime.episodes ?? 0) < episodesMin)
+      continue;
+    if (
+      episodesMax !== null &&
+      (anime.episodes ?? Infinity) > episodesMax
+    )
+      continue;
+    if (
+      avgScoreMin !== null &&
+      (anime.averageScore ?? 0) < avgScoreMin
+    )
+      continue;
+    if (
+      avgScoreMax !== null &&
+      (anime.averageScore ?? Infinity) > avgScoreMax
+    )
+      continue;
+
     const { score, matchedGenres, matchedTags } =
       scoreAnime(anime, taste);
 
-    // ❌ keine reinen Genre-Treffer
+    if (score <= 0) continue;
     if (matchedTags.length === 0) continue;
 
-    if (score <= 0) continue;
+    if (
+      includeGenres &&
+      !matchedGenres.some((g) => includeGenres.includes(g))
+    )
+      continue;
+
+    if (
+      excludeGenres &&
+      matchedGenres.some((g) => excludeGenres.includes(g))
+    )
+      continue;
+
+    if (
+      includeTags &&
+      !matchedTags.some((t) => includeTags.includes(t))
+    )
+      continue;
+
+    if (
+      excludeTags &&
+      matchedTags.some((t) => excludeTags.includes(t))
+    )
+      continue;
 
     recs.push({
       id: anime.id,
@@ -293,20 +340,18 @@ export default defineEventHandler(async (event) => {
       cover: anime.cover,
       format: anime.format,
       score: Number(score.toFixed(3)),
+      averageScore: anime.averageScore,
+      season: anime.season,
+      seasonYear: anime.seasonYear,
+      episodes: anime.episodes,
       matchedGenres,
       matchedTags,
-      averageScore: anime.averageScore,
     });
   }
 
   recs.sort((a, b) => b.score - a.score);
 
-  /* 5) Group by format */
-  const itemsByFormat = {
-    TV: [] as typeof recs,
-    MOVIE: [] as typeof recs,
-  };
-
+  const itemsByFormat = { TV: [] as any[], MOVIE: [] as any[] };
   for (const r of recs) {
     if (r.format === "TV") itemsByFormat.TV.push(r);
     else if (r.format === "MOVIE") itemsByFormat.MOVIE.push(r);

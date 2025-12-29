@@ -63,7 +63,20 @@ model AnimeRelation {
 
   @@unique([fromId, toId, relationType])
 }
+model Genre {
+  name String @id
+}
 
+model Tag {
+  id          Int     @id
+  name        String
+  description String
+  category    String
+  rank        Int?
+  isAdult     Boolean
+
+  updatedAt  DateTime @updatedAt
+}
 model SyncState {
   key   String @id
   value String
