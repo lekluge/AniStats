@@ -49,27 +49,26 @@ const genreStates = ref<Record<string, FilterState>>({});
 const tagStates = ref<Record<string, FilterState>>({});
 const tagSearch = ref("");
 
+/* -----------------------------
+ * FILTER OPTIONS (DB)
+ * ----------------------------- */
+const allGenres = ref<string[]>([]);
+const allTags = ref<string[]>([]);
+
 definePageMeta({ title: "Recommendations" });
 
 /* -----------------------------
- * AVAILABLE FILTER OPTIONS
+ * LOAD FILTER OPTIONS
  * ----------------------------- */
-const allGenres = computed(() => {
-  const s = new Set<string>();
-  [...items.value.TV, ...items.value.MOVIE].forEach((a) =>
-    a.matchedGenres.forEach((g) => s.add(g))
-  );
-  return [...s].sort();
-});
+async function loadGenreTags() {
+  const res = await api.get("/api/genreTags");
+  allGenres.value = res.data.genres;
+  allTags.value = res.data.tags.map((t: any) => t.name);
+}
 
-const allTags = computed(() => {
-  const s = new Set<string>();
-  [...items.value.TV, ...items.value.MOVIE].forEach((a) =>
-    a.matchedTags.forEach((t) => s.add(t))
-  );
-  return [...s].sort();
-});
-
+/* -----------------------------
+ * TAG SEARCH (UI)
+ * ----------------------------- */
 const filteredTags = computed(() => {
   if (!tagSearch.value.trim()) return [];
   const q = tagSearch.value.toLowerCase();
@@ -133,7 +132,10 @@ async function loadRecommendations() {
   }
 }
 
-onMounted(loadRecommendations);
+onMounted(async () => {
+  await loadGenreTags();
+  await loadRecommendations();
+});
 
 /* -----------------------------
  * Computed
