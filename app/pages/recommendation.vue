@@ -166,7 +166,10 @@ function toggleTitleMode() {
  * Liefert 1 oder 2 Zeilen Titel (je nach Verfügbarkeit),
  * und respektiert den globalen titleMode.
  */
-function getTitleLines(a: Recommendation): { primary: string; secondary: string | null } {
+function getTitleLines(a: Recommendation): {
+  primary: string;
+  secondary: string | null;
+} {
   const en = a.titleEn?.trim() || null;
   const ro = a.titleRo?.trim() || null;
 
@@ -189,7 +192,9 @@ function anilistUrl(id: number) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+    <div
+      class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
+    >
       <h1 class="text-3xl font-bold">Recommendations</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -367,15 +372,19 @@ function anilistUrl(id: number) {
       class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
     >
       <div
-        v-for="a in currentItems"
+        v-for="(a, i) in currentItems"
         :key="a.id"
-        class="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+        class="relative rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
       >
         <img
           v-if="a.cover"
           :src="a.cover"
           class="w-full aspect-[2/3] object-cover"
-        />
+        /><span
+          class="absolute top-2 right-2 z-10 text-xs font-medium bg-indigo-800 text-indigo-300 px-2 py-1 rounded-full backdrop-blur-sm"
+        >
+          #{{ i + 1 }}
+        </span>
         <div class="p-4 space-y-2">
           <a
             :href="anilistUrl(a.id)"
@@ -443,6 +452,7 @@ function anilistUrl(id: number) {
             >
               {{ getTitleLines(a).secondary }}
             </div>
+            i
           </a>
 
           <div class="flex flex-wrap gap-1 mt-1">
