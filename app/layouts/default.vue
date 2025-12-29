@@ -20,6 +20,7 @@
           <NuxtLink to="/combine" class="nav-link">Combine</NuxtLink>
           <NuxtLink to="/relations" class="nav-link">Relations</NuxtLink>
           <NuxtLink to="/compare" class="nav-link">Compare</NuxtLink>
+          <NuxtLink to="/recommendation" class="nav-link">Recommendation</NuxtLink>
         </nav>
 
         <!-- Mobile Burger -->
