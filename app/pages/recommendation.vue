@@ -39,10 +39,11 @@ const items = ref<{ TV: Recommendation[]; MOVIE: Recommendation[] }>({
 const CURRENT_YEAR = new Date().getFullYear();
 
 const filterSeason = ref<string | null>(null);
-const seasonYearMin = ref<number | null>(2000);
+const seasonYearMin = ref<number | null>(null);
 const seasonYearMax = ref<number | null>(CURRENT_YEAR);
 const episodesMin = ref<number | null>(null);
-const averageScoreMin = ref<number | null>(50);
+const episodesMax = ref<number | null>(null);
+const averageScoreMin = ref<number | null>(null);
 
 /* -----------------------------
  * GENRE / TAG FILTER STATE
@@ -100,6 +101,7 @@ async function loadRecommendations() {
     if (seasonYearMin.value) params.seasonYearMin = seasonYearMin.value;
     if (seasonYearMax.value) params.seasonYearMax = seasonYearMax.value;
     if (episodesMin.value) params.episodesMin = episodesMin.value;
+    if (episodesMax.value) params.episodesMax = episodesMax.value;
     if (averageScoreMin.value) params.averageScoreMin = averageScoreMin.value;
 
     const includeGenres = Object.entries(genreStates.value)
@@ -210,6 +212,12 @@ function anilistUrl(id: number) {
         v-model.number="episodesMin"
         type="number"
         placeholder="Min Episodes"
+        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+      />
+      <input
+        v-model.number="episodesMax"
+        type="number"
+        placeholder="Max Episodes"
         class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
       />
 
