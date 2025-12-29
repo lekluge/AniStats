@@ -37,7 +37,7 @@ const username = ref("Tiggy");
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
-definePageMeta({ title: '' })
+definePageMeta({ title: "" });
 
 /* -----------------------------
  * API Call
@@ -121,7 +121,24 @@ watchEffect(() => {
   statusChartOption.value = {
     tooltip: {
       trigger: "item",
-      formatter: (v: number) => `${new Date(v).getFullYear()}`,
+      formatter: (params: any) => {
+        return `
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="
+          width:8px;
+          height:8px;
+          border-radius:999px;
+          background:${params.color};
+        "></span>
+        <div>
+          <div style="opacity:.7">${params.name}</div>
+          <div style="font-weight:600">
+            ${params.value} (${params.percent}%)
+          </div>
+        </div>
+      </div>
+    `;
+      },
     },
     legend: {
       bottom: 0,
