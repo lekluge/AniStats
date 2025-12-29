@@ -3,7 +3,9 @@ import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 import GenreCard from "../components/GenreCard.vue";
-definePageMeta({ title: 'Combine' })
+
+definePageMeta({ title: "Combine" });
+
 /* -----------------------------
  * Types
  * ----------------------------- */
@@ -17,6 +19,7 @@ type Cover = {
 
 type LayoutMode = "grid" | "list";
 type FilterState = "include" | "exclude";
+type CombineSortMode = "count" | "minutes";
 
 /* -----------------------------
  * State
@@ -25,6 +28,7 @@ const username = ref("Tiggy");
 const loading = ref(false);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
+const sortMode = ref<CombineSortMode>("count");
 
 /* -----------------------------
  * API
@@ -67,15 +71,13 @@ const filteredTags = computed(() => {
   return allTags.value.filter((t) => t.toLowerCase().includes(q));
 });
 
-/* 🔑 ausgewählte Tags */
 const selectedTags = computed(() => Object.keys(tagStates.value));
 
-/* 🔑 sichtbare Tags */
 const visibleTags = computed(() => {
   const set = new Set<string>();
   selectedTags.value.forEach((t) => set.add(t));
   filteredTags.value.forEach((t) => set.add(t));
-  return [...set].sort((a, b) => a.localeCompare(b));
+  return [...set].sort();
 });
 
 /* -----------------------------
@@ -127,13 +129,14 @@ const gridStats = computed(() => {
           count: 0,
           scoreSum: 0,
           scoreCount: 0,
-          minutes: 0,
+          minutesWatched: 0,
           covers: [],
         };
       }
 
       map[key].count++;
-      map[key].minutes += minutes;
+      map[key].minutesWatched += minutes;
+
       if (e.score) {
         map[key].scoreSum += e.score;
         map[key].scoreCount++;
@@ -162,7 +165,7 @@ const gridStats = computed(() => {
     genre: k,
     count: g.count,
     meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
-    minutesWatched: g.minutes,
+    minutesWatched: g.minutesWatched,
     covers: g.covers.sort(
       (a: any, b: any) => b.score - a.score || b.minutes - a.minutes
     ),
@@ -217,16 +220,34 @@ const combinedGridCard = computed(() => {
 });
 
 /* -----------------------------
- * FEATURED COVER FIX
+ * SORTING
+ * ----------------------------- */
+function sortGrid<T extends { count: number; minutesWatched: number }>(
+  list: T[]
+) {
+  return [...list].sort((a, b) => {
+    if (sortMode.value === "count") {
+      return b.count - a.count;
+    }
+    return b.minutesWatched - a.minutesWatched;
+  });
+}
+
+/* -----------------------------
+ * FEATURED COVER FIX + SORT
  * ----------------------------- */
 const displayedGrid = computed(() => {
   if (combinedGridCard.value) return [combinedGridCard.value];
 
+  const sorted = sortGrid(gridStats.value);
   const used = new Set<number>();
-  return gridStats.value.map((g) => {
+
+  return sorted.map((g) => {
     if (!g.covers.length) return g;
+
     const featured = g.covers.find((c: any) => !used.has(c.id)) ?? g.covers[0];
     used.add(featured.id);
+
     return {
       ...g,
       covers: [featured, ...g.covers.filter((c: any) => c.id !== featured.id)],
@@ -264,19 +285,17 @@ function anilistUrl(id: number) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div
-      class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-    >
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
       <h1 class="text-3xl font-bold">Combined</h1>
 
-      <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+      <div class="flex gap-2">
         <input
           v-model="username"
-          class="bg-zinc-900 border px-3 py-2 rounded w-full sm:w-48"
+          class="bg-zinc-900 border px-3 py-2 rounded"
         />
         <button
           @click="loadAnime"
-          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
+          class="bg-indigo-600 px-4 py-2 rounded"
           :disabled="loading"
         >
           Laden
@@ -284,122 +303,140 @@ function anilistUrl(id: number) {
       </div>
     </div>
 
-    <!-- Layout Switch -->
-    <div class="flex gap-2 justify-end">
-      <button
-        @click="layoutMode = 'grid'"
-        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="
-          layoutMode === 'grid'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        Grid
-      </button>
-      <button
-        @click="layoutMode = 'list'"
-        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="
-          layoutMode === 'list'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        List
-      </button>
-    </div>
-
-    <!-- 🔑 Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-12">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
-      />
-    </div>
-
-    <template v-else>
-      <!-- Genres -->
-      <div class="flex flex-wrap gap-2">
-        <h2 class="w-full font-semibold">Genres</h2>
+    <!-- Sort + Layout -->
+    <div class="flex flex-wrap gap-2 justify-between items-center">
+      <div class="flex gap-2">
         <button
-          v-for="g in allGenres"
-          :key="g"
-          @click="cycleState(genreStates, g)"
-          class="px-3 py-2 sm:py-1.5 text-xs rounded-full border"
-          :class="{
-            'bg-indigo-600 text-white': genreStates[g] === 'include',
-            'bg-red-600 text-white': genreStates[g] === 'exclude',
-            'bg-zinc-900 text-zinc-300': !genreStates[g],
-          }"
+          @click="sortMode = 'count'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            sortMode === 'count'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
         >
-          {{ g }}
+          Anzahl
+        </button>
+        <button
+          @click="sortMode = 'minutes'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            sortMode === 'minutes'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          Stunden
         </button>
       </div>
 
-      <!-- Tag Search -->
-      <input
-        v-model="tagSearch"
-        placeholder="Tags suchen…"
-        class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
-      />
-
-      <!-- Tags -->
-      <div
-        v-if="tagSearch.trim() || selectedTags.length"
-        class="flex flex-wrap gap-2"
-      >
+      <div class="flex gap-2">
         <button
-          v-for="t in visibleTags"
-          :key="t"
-          @click="cycleState(tagStates, t)"
-          class="px-3 py-2 rounded-full text-xs border"
-          :class="{
-            'bg-indigo-600 text-white': tagStates[t] === 'include',
-            'bg-red-600 text-white': tagStates[t] === 'exclude',
-            'bg-zinc-900 text-zinc-300': !tagStates[t],
-          }"
+          @click="layoutMode = 'grid'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            layoutMode === 'grid'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
         >
-          {{ t }}
+          Grid
+        </button>
+        <button
+          @click="layoutMode = 'list'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            layoutMode === 'list'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          List
         </button>
       </div>
+    </div>
 
-      <!-- GRID -->
-      <div
-        v-if="layoutMode === 'grid'"
-        class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    <!-- Genres -->
+    <div class="flex flex-wrap gap-2">
+      <h2 class="w-full font-semibold">Genres</h2>
+      <button
+        v-for="g in allGenres"
+        :key="g"
+        @click="cycleState(genreStates, g)"
+        class="px-3 py-2 text-xs rounded-full border"
+        :class="{
+          'bg-indigo-600 text-white': genreStates[g] === 'include',
+          'bg-red-600 text-white': genreStates[g] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !genreStates[g],
+        }"
       >
-        <GenreCard
-          v-for="(g, i) in displayedGrid"
-          :key="g.genre"
-          :rank="i + 1"
-          :data="g"
+        {{ g }}
+      </button>
+    </div>
+
+    <!-- Tag Search -->
+    <input
+      v-model="tagSearch"
+      placeholder="Tags suchen…"
+      class="w-full bg-zinc-900 border px-4 py-2 rounded"
+    />
+
+    <!-- Tags -->
+    <div
+      v-if="tagSearch.trim() || selectedTags.length"
+      class="flex flex-wrap gap-2"
+    >
+      <button
+        v-for="t in visibleTags"
+        :key="t"
+        @click="cycleState(tagStates, t)"
+        class="px-3 py-2 rounded-full text-xs border"
+        :class="{
+          'bg-indigo-600 text-white': tagStates[t] === 'include',
+          'bg-red-600 text-white': tagStates[t] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !tagStates[t],
+        }"
+      >
+        {{ t }}
+      </button>
+    </div>
+
+    <!-- GRID -->
+    <div
+      v-if="layoutMode === 'grid'"
+      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <GenreCard
+        v-for="(g, i) in displayedGrid"
+        :key="g.genre"
+        :rank="i + 1"
+        :data="g"
+      />
+    </div>
+
+    <!-- LIST -->
+    <div v-else class="space-y-2">
+      <div
+        v-for="a in listAnime"
+        :key="a.id"
+        class="flex gap-3 items-center p-3 rounded-xl border bg-zinc-900/30"
+      >
+        <img
+          v-if="a.cover"
+          :src="a.cover"
+          class="h-14 aspect-[2/3] rounded object-cover"
         />
-      </div>
-
-      <!-- LIST -->
-      <div v-else class="space-y-2">
-        <div
-          v-for="a in listAnime"
-          :key="a.id"
-          class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
+        <a
+          :href="anilistUrl(a.id)"
+          target="_blank"
+          class="flex-1 hover:underline"
         >
-          <img
-            v-if="a.cover"
-            :src="a.cover"
-            class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
-          />
-          <a
-            :href="anilistUrl(a.id)"
-            target="_blank"
-            class="flex-1 min-w-0 break-words hover:underline hover:text-indigo-400"
-          >
-            {{ a.title }}
-          </a>
-          <span class="text-xs text-zinc-400 whitespace-nowrap">
-            {{ a.score ?? "—" }}
-          </span>
-        </div>
+          {{ a.title }}
+        </a>
+        <span class="text-xs text-zinc-400">
+          {{ a.score ?? "—" }}
+        </span>
       </div>
-    </template>
+    </div>
   </div>
 </template>
