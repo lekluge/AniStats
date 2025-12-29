@@ -3,7 +3,6 @@
 
 generator client {
   provider        = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -62,5 +61,8 @@ model AnimeRelation {
   @@unique([fromId, toId, relationType])
 }
 
-
+model SyncState {
+  key   String @id
+  value String
+}
 

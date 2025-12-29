@@ -1,6 +1,7 @@
-import { prisma } from "../utils/prisma";
+import { prisma } from "../../utils/prisma";
 import { createError } from "h3";
 import crypto from "crypto";
+import { anilistRequest } from "../../services/anilist/anilistClient";
 
 export default defineEventHandler(async (event) => {
   const { user } = getQuery(event);
@@ -36,14 +37,11 @@ export default defineEventHandler(async (event) => {
     }
   `;
 
-  const res: any = await $fetch("https://graphql.anilist.co", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: { query, variables: { userName } },
-  });
+  const res: any = await anilistRequest<any>(query, {
+  userName,
+});
 
-  const lists = res?.data?.MediaListCollection?.lists ?? [];
-
+  const lists = res?.MediaListCollection?.lists ?? [];
   /* -----------------------------
    * 2. IDs sammeln
    * ----------------------------- */
