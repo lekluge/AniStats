@@ -6,7 +6,8 @@ import { api } from "~/composables/useApi";
  * ----------------------------- */
 type Recommendation = {
   id: number;
-  title: string;
+  titleEn: string | null;
+  titleRo: string | null;
   cover: string | null;
   format: "TV" | "MOVIE";
   score: number;
@@ -17,6 +18,7 @@ type Recommendation = {
 type LayoutMode = "grid" | "list";
 type Tab = "TV" | "MOVIE";
 type FilterState = "include" | "exclude";
+type TitleMode = "EN_FIRST" | "RO_FIRST";
 
 /* -----------------------------
  * State
@@ -27,6 +29,7 @@ const error = ref<string | null>(null);
 
 const layoutMode = ref<LayoutMode>("grid");
 const activeTab = ref<Tab>("TV");
+const titleMode = ref<TitleMode>("EN_FIRST");
 
 const items = ref<{ TV: Recommendation[]; MOVIE: Recommendation[] }>({
   TV: [],
@@ -155,6 +158,29 @@ function cycleState(map: Record<string, FilterState>, key: string) {
   loadRecommendations();
 }
 
+function toggleTitleMode() {
+  titleMode.value = titleMode.value === "EN_FIRST" ? "RO_FIRST" : "EN_FIRST";
+}
+
+/**
+ * Liefert 1 oder 2 Zeilen Titel (je nach Verfügbarkeit),
+ * und respektiert den globalen titleMode.
+ */
+function getTitleLines(a: Recommendation): { primary: string; secondary: string | null } {
+  const en = a.titleEn?.trim() || null;
+  const ro = a.titleRo?.trim() || null;
+
+  // nur einer vorhanden
+  if (en && !ro) return { primary: en, secondary: null };
+  if (ro && !en) return { primary: ro, secondary: null };
+
+  // beide vorhanden
+  if (titleMode.value === "EN_FIRST") {
+    return { primary: en as string, secondary: ro as string };
+  }
+  return { primary: ro as string, secondary: en as string };
+}
+
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
@@ -163,20 +189,32 @@ function anilistUrl(id: number) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
       <h1 class="text-3xl font-bold">Recommendations</h1>
 
-      <div class="flex gap-2">
-        <input
-          v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
-        />
+      <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div class="flex gap-2">
+          <input
+            v-model="username"
+            class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+          />
+          <button
+            @click="loadRecommendations"
+            class="bg-indigo-600 px-4 py-2 rounded"
+            :disabled="loading"
+          >
+            Laden
+          </button>
+        </div>
+
+        <!-- Title toggle -->
         <button
-          @click="loadRecommendations"
-          class="bg-indigo-600 px-4 py-2 rounded"
+          @click="toggleTitleMode"
+          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm text-zinc-200 hover:border-zinc-700"
           :disabled="loading"
+          title="Titel-Reihenfolge umschalten"
         >
-          Laden
+          {{ titleMode === "EN_FIRST" ? "EN → RO" : "RO → EN" }}
         </button>
       </div>
     </div>
@@ -204,7 +242,7 @@ function anilistUrl(id: number) {
       <input
         v-model.number="seasonYearMax"
         type="number"
-        :placeholder="`Season Year Max (${new Date().getFullYear()})`"
+        :placeholder="`Season Year Max (${CURRENT_YEAR})`"
         class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
       />
 
@@ -214,6 +252,7 @@ function anilistUrl(id: number) {
         placeholder="Min Episodes"
         class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
       />
+
       <input
         v-model.number="episodesMax"
         type="number"
@@ -341,9 +380,17 @@ function anilistUrl(id: number) {
           <a
             :href="anilistUrl(a.id)"
             target="_blank"
-            class="font-semibold hover:underline hover:text-indigo-400"
+            class="block hover:underline hover:text-indigo-400"
           >
-            {{ a.title }}
+            <div class="font-semibold leading-snug">
+              {{ getTitleLines(a).primary }}
+            </div>
+            <div
+              v-if="getTitleLines(a).secondary"
+              class="text-sm text-zinc-400 leading-snug"
+            >
+              {{ getTitleLines(a).secondary }}
+            </div>
           </a>
 
           <div class="flex flex-wrap gap-1">
@@ -380,14 +427,24 @@ function anilistUrl(id: number) {
           :src="a.cover"
           class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
         />
+
         <div class="flex-1 min-w-0">
           <a
             :href="anilistUrl(a.id)"
             target="_blank"
-            class="font-medium hover:underline hover:text-indigo-400"
+            class="block hover:underline hover:text-indigo-400"
           >
-            {{ a.title }}
+            <div class="font-medium leading-snug">
+              {{ getTitleLines(a).primary }}
+            </div>
+            <div
+              v-if="getTitleLines(a).secondary"
+              class="text-xs text-zinc-400 leading-snug"
+            >
+              {{ getTitleLines(a).secondary }}
+            </div>
           </a>
+
           <div class="flex flex-wrap gap-1 mt-1">
             <span
               v-for="g in a.matchedGenres"
@@ -398,6 +455,7 @@ function anilistUrl(id: number) {
             </span>
           </div>
         </div>
+
         <span class="text-xs text-zinc-400 whitespace-nowrap">
           {{ a.score }}
         </span>

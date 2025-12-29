@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery, createError, setHeader } from "h3";
 import { prisma } from "../../utils/prisma";
 import { anilistRequest } from "../../services/anilist/anilistClient";
+import { title } from "node:process";
 
 /* ----------------------------------
  * Config
@@ -336,7 +337,8 @@ export default defineEventHandler(async (event) => {
 
     recs.push({
       id: anime.id,
-      title: anime.titleRo ?? anime.titleEn ?? "Unknown",
+      titleEn: anime.titleEn,
+      titleRo: anime.titleRo,
       cover: anime.cover,
       format: anime.format,
       score: Number(score.toFixed(3)),
