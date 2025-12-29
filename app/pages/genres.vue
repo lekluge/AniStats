@@ -15,7 +15,7 @@ type GenreCover = {
 
 type LayoutMode = "grid" | "list";
 type GenreState = "include" | "exclude";
-
+type GenreSortMode = "count" | "minutes";
 
 /* -----------------------------
  * State
@@ -25,7 +25,9 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
-  definePageMeta({ title: 'Genres' })
+const genreSortMode = ref<GenreSortMode>("count");
+
+definePageMeta({ title: "Genres" });
 
 /* -----------------------------
  * API
@@ -92,7 +94,7 @@ const normalGenreStats = computed(() => {
       count: number;
       scoreSum: number;
       scoreCount: number;
-      minutes: number;
+      minutesWatched: number;
       covers: GenreCover[];
     }
   > = {};
@@ -106,13 +108,13 @@ const normalGenreStats = computed(() => {
           count: 0,
           scoreSum: 0,
           scoreCount: 0,
-          minutes: 0,
+          minutesWatched: 0,
           covers: [],
         };
       }
 
       map[genre].count++;
-      map[genre].minutes += minutes;
+      map[genre].minutesWatched += minutes;
 
       if (e.score && e.score > 0) {
         map[genre].scoreSum += e.score;
@@ -140,7 +142,7 @@ const normalGenreStats = computed(() => {
     genre,
     count: g.count,
     meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
-    minutesWatched: g.minutes,
+    minutesWatched: g.minutesWatched,
     covers: g.covers,
   }));
 });
@@ -190,18 +192,32 @@ const combinedStats = computed(() => {
 });
 
 /* -----------------------------
- * FEATURED COVER FIX
+ * SORTING
+ * ----------------------------- */
+function sortGenres<T extends { count: number; minutesWatched: number }>(
+  list: T[]
+) {
+  return [...list].sort((a, b) => {
+    if (genreSortMode.value === "count") {
+      return b.count - a.count;
+    }
+    return b.minutesWatched - a.minutesWatched;
+  });
+}
+
+/* -----------------------------
+ * FEATURED COVER FIX + SORT
  * ----------------------------- */
 const displayedGenres = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
 
+  const sorted = sortGenres(normalGenreStats.value);
   const used = new Set<number>();
 
-  return normalGenreStats.value.map((g) => {
+  return sorted.map((g) => {
     if (!g.covers.length) return g;
 
     const featured = g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
-
     used.add(featured.id);
 
     return {
@@ -260,54 +276,78 @@ function anilistUrl(id: number) {
       </div>
     </div>
 
-    <!-- Layout Switch -->
-    <div class="flex gap-2 justify-end">
-      <button
-        @click="layoutMode = 'grid'"
-        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="
-          layoutMode === 'grid'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        Grid
-      </button>
-      <button
-        @click="layoutMode = 'list'"
-        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto"
-        :class="
-          layoutMode === 'list'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-zinc-900 text-zinc-300'
-        "
-      >
-        List
-      </button>
+    <!-- Sort + Layout -->
+    <div class="flex flex-wrap gap-2 justify-between items-center">
+      <div class="flex gap-2">
+        <button
+          @click="genreSortMode = 'count'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            genreSortMode === 'count'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          Anzahl
+        </button>
+        <button
+          @click="genreSortMode = 'minutes'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            genreSortMode === 'minutes'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          Stunden
+        </button>
+      </div>
+
+      <div class="flex gap-2">
+        <button
+          @click="layoutMode = 'grid'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            layoutMode === 'grid'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          Grid
+        </button>
+        <button
+          @click="layoutMode = 'list'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            layoutMode === 'list'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          List
+        </button>
+      </div>
     </div>
 
-    <!-- 🔑 States -->
-    <!-- 🔑 Loading -->
+    <!-- Loading / Error -->
     <div v-if="loading" class="flex items-center justify-center py-12">
       <div
         class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
       />
     </div>
-
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <!-- Genres -->
+    <!-- Genre Filter -->
     <div v-else class="flex flex-wrap gap-2">
       <button
         v-for="g in allGenres"
         :key="g"
         @click="toggleGenre(g)"
-        class="px-3 py-2 sm:py-1.5 rounded-full text-xs border"
+        class="px-3 py-2 rounded-full text-xs border"
         :class="{
-          'bg-indigo-600 text-white border-indigo-600':
-            genreStates[g] === 'include',
-          'bg-red-600 text-white border-red-600': genreStates[g] === 'exclude',
-          'bg-zinc-900 text-zinc-300 border-zinc-800': !genreStates[g],
+          'bg-indigo-600 text-white': genreStates[g] === 'include',
+          'bg-red-600 text-white': genreStates[g] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !genreStates[g],
         }"
       >
         {{ g }}
@@ -337,16 +377,16 @@ function anilistUrl(id: number) {
         <img
           v-if="a.cover"
           :src="a.cover"
-          class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
+          class="h-14 aspect-[2/3] rounded object-cover"
         />
         <a
           :href="anilistUrl(a.id)"
           target="_blank"
-          class="flex-1 min-w-0 break-words hover:underline hover:text-indigo-400"
+          class="flex-1 hover:underline hover:text-indigo-400"
         >
           {{ a.title }}
         </a>
-        <span class="text-xs text-zinc-400 whitespace-nowrap">
+        <span class="text-xs text-zinc-400">
           {{ a.score || "—" }}
         </span>
       </div>
