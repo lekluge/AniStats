@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
+
+// Pagination für Listenansicht
+const pageSize = 50;
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
+const paginatedListAnime = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return listAnime.value.slice(start, start + pageSize);
+});
 import type { AnimeEntry } from "~/types/anime";
 import GenreCard from "../components/GenreCard.vue";
 
@@ -368,27 +377,49 @@ function anilistUrl(id: number) {
     </div>
 
     <!-- LIST -->
-    <div v-else class="space-y-2">
-      <div
-        v-for="a in listAnime"
-        :key="a.id"
-        class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
-      >
-        <img
-          v-if="a.cover"
-          :src="a.cover"
-          class="h-14 aspect-[2/3] rounded object-cover"
-        />
-        <a
-          :href="anilistUrl(a.id)"
-          target="_blank"
-          class="flex-1 hover:underline hover:text-indigo-400"
+    <div v-else>
+      <!-- Pagination -->
+      <div class="flex items-center justify-between text-sm mb-2">
+        <button
+          class="px-3 py-1 rounded border"
+          :disabled="currentPage === 1"
+          @click="currentPage--"
         >
-          {{ a.title }}
-        </a>
-        <span class="text-xs text-zinc-400">
-          {{ a.score || "—" }}
-        </span>
+          ← Zurück
+        </button>
+
+        <span>Seite {{ currentPage }} / {{ totalPages }}</span>
+
+        <button
+          class="px-3 py-1 rounded border"
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          Weiter →
+        </button>
+      </div>
+      <div class="space-y-2">
+        <div
+          v-for="a in paginatedListAnime"
+          :key="a.id"
+          class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
+        >
+          <img
+            v-if="a.cover"
+            :src="a.cover"
+            class="h-14 aspect-2/3 rounded object-cover"
+          />
+          <a
+            :href="anilistUrl(a.id)"
+            target="_blank"
+            class="flex-1 hover:underline hover:text-indigo-400"
+          >
+            {{ a.title }}
+          </a>
+          <span class="text-xs text-zinc-400">
+            {{ a.score || "—" }}
+          </span>
+        </div>
       </div>
     </div>
   </div>
