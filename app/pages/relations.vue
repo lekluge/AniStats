@@ -76,9 +76,12 @@ onMounted(loadRelations);
 /* -----------------------------
  * Computed
  * ----------------------------- */
+
+const pageSize = 20;
+const currentPage = ref(1);
+
 const filteredGroups = computed(() => {
   if (!search.value) return groups.value;
-
   return groups.value.filter((g: any) => {
     for (const c of g.chain) {
       if (matchesQuery(search.value, c.titleEn, c.titleRo)) return true;
@@ -91,6 +94,11 @@ const filteredGroups = computed(() => {
 });
 
 const groupCount = computed(() => filteredGroups.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredGroups.value.length / pageSize)));
+const paginatedGroups = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredGroups.value.slice(start, start + pageSize);
+});
 
 /* -----------------------------
  * UI Helpers
@@ -164,81 +172,103 @@ function displayTitle(en?: string | null, ro?: string | null) {
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <!-- Groups -->
-    <div v-else class="space-y-4">
-      <div
-        v-for="group in filteredGroups"
-        :key="group.rootId"
-        class="p-3 md:p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4"
-      >
-        <div class="pl-2 md:pl-4 space-y-4 text-sm">
-          <div v-for="item in group.chain" :key="item.id" class="space-y-2">
-            <!-- Main -->
-            <div class="flex items-start gap-3">
-              <img
-                v-if="item.cover"
-                :src="item.cover"
-                class="h-14 sm:h-12 aspect-[2/3] rounded object-cover flex-shrink-0"
-              />
+    <template v-if="!loading && !error">
+      <!-- Pagination -->
+      <div class="flex items-center justify-between text-sm mb-2">
+        <button
+          class="px-3 py-1 rounded border"
+          :disabled="currentPage === 1"
+          @click="currentPage--"
+        >
+          ← Zurück
+        </button>
 
-              <a
-                :href="anilistUrl(item.id)"
-                target="_blank"
-                class="flex-1 break-words leading-tight hover:text-indigo-400"
-              >
-                {{ displayTitle(item.titleEn, item.titleRo) }}
-              </a>
+        <span>Seite {{ currentPage }} / {{ totalPages }}</span>
 
-              <span
-                class="text-xs whitespace-nowrap"
-                :class="statusColor(item.status)"
-              >
-                {{ item.status ?? "—" }}
-              </span>
-            </div>
+        <button
+          class="px-3 py-1 rounded border"
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          Weiter →
+        </button>
+      </div>
 
-            <!-- Related -->
-            <div
-              v-if="item.related?.length"
-              class="pl-4 sm:pl-8 space-y-2 text-xs text-zinc-400"
-            >
-              <div
-                v-for="r in item.related"
-                :key="r.id"
-                class="flex items-start gap-2"
-              >
+      <!-- Groups -->
+      <div v-if="paginatedGroups.length" class="space-y-4">
+        <div
+          v-for="group in paginatedGroups"
+          :key="group.rootId"
+          class="p-3 md:p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4"
+        >
+          <div class="pl-2 md:pl-4 space-y-4 text-sm">
+            <div v-for="item in group.chain" :key="item.id" class="space-y-2">
+              <!-- Main -->
+              <div class="flex items-start gap-3">
                 <img
-                  v-if="r.cover"
-                  :src="r.cover"
-                  class="h-10 sm:h-8 aspect-[2/3] rounded object-cover opacity-80 flex-shrink-0"
+                  v-if="item.cover"
+                  :src="item.cover"
+                  class="h-14 sm:h-12 aspect-2/3 rounded object-cover shrink-0"
                 />
 
                 <a
-                  :href="anilistUrl(r.id)"
+                  :href="anilistUrl(item.id)"
                   target="_blank"
-                  class="flex-1 break-words hover:text-indigo-400"
+                  class="flex-1 wrap-break-word leading-tight hover:text-indigo-400"
                 >
-                  {{ displayTitle(r.titleEn, r.titleRo) }}
-                  <span class="ml-1 text-zinc-500">
-                    ({{ r.relationType }})
-                  </span>
+                  {{ displayTitle(item.titleEn, item.titleRo) }}
                 </a>
 
                 <span
                   class="text-xs whitespace-nowrap"
-                  :class="statusColor(r.status)"
+                  :class="statusColor(item.status)"
                 >
-                  {{ r.status ?? "—" }}
+                  {{ item.status ?? "—" }}
                 </span>
+              </div>
+
+              <!-- Related -->
+              <div
+                v-if="item.related?.length"
+                class="pl-4 sm:pl-8 space-y-2 text-xs text-zinc-400"
+              >
+                <div
+                  v-for="r in item.related"
+                  :key="r.id"
+                  class="flex items-start gap-2"
+                >
+                  <img
+                    v-if="r.cover"
+                    :src="r.cover"
+                    class="h-10 sm:h-8 aspect-2/3 rounded object-cover opacity-80 shrink-0"
+                  />
+
+                  <a
+                    :href="anilistUrl(r.id)"
+                    target="_blank"
+                    class="flex-1 wrap-break-word hover:text-indigo-400"
+                  >
+                    {{ displayTitle(r.titleEn, r.titleRo) }}
+                    <span class="ml-1 text-zinc-500">
+                      ({{ r.relationType }})
+                    </span>
+                  </a>
+
+                  <span
+                    class="text-xs whitespace-nowrap"
+                    :class="statusColor(r.status)"
+                  >
+                    {{ r.status ?? "—" }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      <div v-if="!filteredGroups.length" class="text-zinc-500">
+      <div v-else class="text-zinc-500">
         Keine Relations gefunden
       </div>
-    </div>
+    </template>
   </div>
 </template>
