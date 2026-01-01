@@ -180,7 +180,7 @@ const normalTagStats = computed(() => {
   return Object.entries(map).map(([tag, t]) => ({
     genre: tag,
     count: t.count,
-    meanScore: t.scoreCount ? Math.round(t.scoreSum / t.scoreCount) : 0,
+    meanScore: t.scoreCount ? Math.round((t.scoreSum / t.scoreCount) * 10) / 10 : 0,
     minutesWatched: t.minutesWatched,
     covers: t.covers,
   }));

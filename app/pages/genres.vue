@@ -150,7 +150,8 @@ const normalGenreStats = computed(() => {
   return Object.entries(map).map(([genre, g]) => ({
     genre,
     count: g.count,
-    meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
+    // Math round soll 1 nachkommastelle haben
+    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
     minutesWatched: g.minutesWatched,
     covers: g.covers,
   }));

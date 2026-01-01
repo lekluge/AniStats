@@ -172,7 +172,7 @@ const gridStats = computed(() => {
   return Object.entries(map).map(([k, g]: any) => ({
     genre: k,
     count: g.count,
-    meanScore: g.scoreCount ? Math.round(g.scoreSum / g.scoreCount) : 0,
+    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
     minutesWatched: g.minutesWatched,
     covers: g.covers.sort(
       (a: any, b: any) => b.score - a.score || b.minutes - a.minutes
