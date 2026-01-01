@@ -379,7 +379,7 @@ function anilistUrl(id: number) {
         <img
           v-if="a.cover"
           :src="a.cover"
-          class="w-full aspect-[2/3] object-cover"
+          class="w-full aspect-2/3 object-cover"
         /><span
           class="absolute top-2 right-2 z-10 text-xs font-medium bg-indigo-800 text-indigo-300 px-2 py-1 rounded-full backdrop-blur-sm"
         >
@@ -434,7 +434,7 @@ function anilistUrl(id: number) {
         <img
           v-if="a.cover"
           :src="a.cover"
-          class="h-14 aspect-[2/3] rounded object-cover flex-shrink-0"
+          class="h-14 aspect-2/3 rounded object-cover shrink-0"
         />
 
         <div class="flex-1 min-w-0">
@@ -452,7 +452,7 @@ function anilistUrl(id: number) {
             >
               {{ getTitleLines(a).secondary }}
             </div>
-            i
+            
           </a>
 
           <div class="flex flex-wrap gap-1 mt-1">
