@@ -367,6 +367,8 @@ function anilistUrl(id: number) {
           v-model="username"
           class="bg-zinc-900 border px-3 py-2 rounded"
           placeholder="AniList Username"
+          @keydown.enter.prevent="loadAnime"
+          @keydown.space.prevent="loadAnime"
         />
         <button
           @click="loadAnime"

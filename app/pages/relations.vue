@@ -8,7 +8,7 @@ const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const groups = ref<any[]>([]);
-definePageMeta({ title: 'Relations' })
+definePageMeta({ title: "Relations" });
 /* -----------------------------
  * Search
  * ----------------------------- */
@@ -18,8 +18,7 @@ function matchesQuery(query: string, en?: string | null, ro?: string | null) {
   if (!query) return true;
   const q = query.toLowerCase();
   return (
-    (en && en.toLowerCase().includes(q)) ||
-    (ro && ro.toLowerCase().includes(q))
+    (en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q))
   );
 }
 
@@ -39,8 +38,7 @@ async function loadRelations() {
     const userRes = await api.get("/api/anilist-user-list", {
       params: { user: username.value },
     });
-    const statusMap: Record<number, string> =
-      userRes.data?.statusMap ?? {};
+    const statusMap: Record<number, string> = userRes.data?.statusMap ?? {};
 
     const relRes = await api.get("/api/relations");
     const allGroups = relRes.data?.groups ?? [];
@@ -99,7 +97,9 @@ const filteredGroups = computed(() => {
 });
 
 const groupCount = computed(() => filteredGroups.value.length);
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredGroups.value.length / pageSize)));
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredGroups.value.length / pageSize))
+);
 const paginatedGroups = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return filteredGroups.value.slice(start, start + pageSize);
@@ -137,7 +137,9 @@ function displayTitle(en?: string | null, ro?: string | null) {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+    <div
+      class="flex flex-col md:flex-row md:justify-between md:items-center gap-4"
+    >
       <h1 class="text-3xl font-bold">Anime Relations</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
@@ -145,6 +147,8 @@ function displayTitle(en?: string | null, ro?: string | null) {
           v-model="username"
           class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm w-full sm:w-40"
           placeholder="AniList Username"
+          @keydown.enter.prevent="loadRelations"
+          @keydown.space.prevent="loadRelations"
         />
 
         <button
@@ -271,9 +275,7 @@ function displayTitle(en?: string | null, ro?: string | null) {
           </div>
         </div>
       </div>
-      <div v-else class="text-zinc-500">
-        Keine Relations gefunden
-      </div>
+      <div v-else class="text-zinc-500">Keine Relations gefunden</div>
     </template>
   </div>
 </template>

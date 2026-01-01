@@ -294,6 +294,9 @@ watchEffect(() => {
           v-model="username"
           class="rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm"
           placeholder="AniList Username"
+          @keydown.enter.prevent="loadAnime"
+          @keydown.space.prevent="loadAnime"
+
         />
         <button
           @click="loadAnime"

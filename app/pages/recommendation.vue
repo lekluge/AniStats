@@ -210,6 +210,8 @@ function anilistUrl(id: number) {
             v-model="username"
             class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
             placeholder="AniList Username"
+            @keydown.enter.prevent="loadRecommendations"
+            @keydown.space.prevent="loadRecommendations"
           />
           <button
             @click="loadRecommendations"
@@ -460,7 +462,6 @@ function anilistUrl(id: number) {
             >
               {{ getTitleLines(a).secondary }}
             </div>
-            
           </a>
 
           <div class="flex flex-wrap gap-1 mt-1">
