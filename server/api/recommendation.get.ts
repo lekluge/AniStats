@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery, createError, setHeader } from "h3";
 import { prisma } from "../../utils/prisma";
 import { anilistRequest } from "../../services/anilist/anilistClient";
 import { title } from "node:process";
+import crypto from "crypto";
 
 /* ----------------------------------
  * Config
@@ -259,13 +260,22 @@ export default defineEventHandler(async (event) => {
     if (EXCLUDED_STATUSES.has(e.status)) excludedIds.add(e.mediaId);
     if (e.status === "COMPLETED") completedIds.push(e.mediaId);
   }
-
+  const storage = useStorage("cache");
+    const cacheKey =
+      "anime-recommendation:" +
+      crypto
+        .createHash("sha1")
+        .digest("hex");
+  cachedAnimeDb = await storage.getItem<any[]>(cacheKey);
   /* 2) Anime DB */
   const now = Date.now();
-  if (!cachedAnimeDb || now - cachedAnimeDbAt > CACHE_TTL_ANIME_DB) {
+  if (!cachedAnimeDb) {
     cachedAnimeDb = await prisma.anime.findMany({
       where: { format: { in: ["TV", "MOVIE"] } },
       include: { genres: true, tags: true },
+    });
+    await storage.setItem(cacheKey, cachedAnimeDb, {
+      ttl: 60 * 60 * 8,
     });
     cachedAnimeDbAt = now;
   }
