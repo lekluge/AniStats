@@ -4,7 +4,7 @@ import { api } from "~/composables/useApi";
 /* -----------------------------
  * State
  * ----------------------------- */
-const username = ref("Lichtgott");
+const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const groups = ref<any[]>([]);
@@ -31,6 +31,11 @@ async function loadRelations() {
   error.value = null;
 
   try {
+    if (!username.value) {
+      loading.value = false;
+      return;
+    }
+
     const userRes = await api.get("/api/anilist-user-list", {
       params: { user: username.value },
     });
@@ -139,7 +144,7 @@ function displayTitle(en?: string | null, ro?: string | null) {
         <input
           v-model="username"
           class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm w-full sm:w-40"
-          placeholder="AniList User"
+          placeholder="AniList Username"
         />
 
         <button

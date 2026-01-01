@@ -36,7 +36,7 @@ type CombineSortMode = "count" | "minutes";
 /* -----------------------------
  * State
  * ----------------------------- */
-const username = ref("Tiggy");
+const username = useAnilistUser();
 const loading = ref(false);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
@@ -48,6 +48,11 @@ const sortMode = ref<CombineSortMode>("count");
 async function loadAnime() {
   loading.value = true;
   try {
+    if (!username.value) {
+      loading.value = false;
+      return;
+    }
+
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
@@ -58,7 +63,9 @@ async function loadAnime() {
 }
 
 onMounted(async () => {
-  await loadAnime();
+  if (username.value) {
+    await loadAnime();
+  }
   applyQueryFilters();
 });
 
@@ -66,7 +73,7 @@ function applyQueryFilters() {
   const qLayout = route.query.layout;
   const qGenre = route.query.genre;
   const qTag = route.query.tag;
-  
+
   genreStates.value = {};
   tagStates.value = {};
 
@@ -289,7 +296,9 @@ const combinedGridCard = computed(() => {
 /* -----------------------------
  * SORTING
  * ----------------------------- */
-function sortGrid<T extends { count: number; minutesWatched: number }>(list: T[]) {
+function sortGrid<T extends { count: number; minutesWatched: number }>(
+  list: T[]
+) {
   return [...list].sort((a, b) => {
     if (sortMode.value === "count") {
       return b.count - a.count;
@@ -354,7 +363,11 @@ function anilistUrl(id: number) {
       <h1 class="text-3xl font-bold">Combined</h1>
 
       <div class="flex gap-2">
-        <input v-model="username" class="bg-zinc-900 border px-3 py-2 rounded" />
+        <input
+          v-model="username"
+          class="bg-zinc-900 border px-3 py-2 rounded"
+          placeholder="AniList Username"
+        />
         <button
           @click="loadAnime"
           class="bg-indigo-600 px-4 py-2 rounded"
@@ -444,7 +457,10 @@ function anilistUrl(id: number) {
     />
 
     <!-- Tags -->
-    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
+    <div
+      v-if="tagSearch.trim() || selectedTags.length"
+      class="flex flex-wrap gap-2"
+    >
       <button
         v-for="t in visibleTags"
         :key="t"
@@ -461,7 +477,10 @@ function anilistUrl(id: number) {
     </div>
 
     <!-- GRID -->
-    <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      v-if="layoutMode === 'grid'"
+      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
       <GameCard
         v-for="(g, i) in displayedGrid"
         :key="g.genre"

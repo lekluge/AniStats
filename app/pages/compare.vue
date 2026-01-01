@@ -2,7 +2,9 @@
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
-
+const anilistUser = useCookie<string>("anilist-user", {
+  default: () => "",
+});
 /* -----------------------------
  * Types
  * ----------------------------- */
@@ -14,7 +16,11 @@ type FilterState = "include" | "exclude";
  * ----------------------------- */
 definePageMeta({ title: 'Compare' })
 const userInput = ref("");
-const users = ref<string[]>(["Tiggy", "Lichtgott"]);
+const compareUsersCookie = useCookie<string[]>("compare-users", {
+  default: () => [],
+});
+
+const users = ref<string[]>([]);
 
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -305,6 +311,36 @@ function cycleState(map: Record<string, FilterState>, key: string) {
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
+
+onMounted(() => {
+  // 1️⃣ bestehende Compare-Users laden
+  if (compareUsersCookie.value.length) {
+    users.value = [...compareUsersCookie.value];
+  }
+  // 2️⃣ Fallback: globaler User
+  else if (anilistUser.value) {
+    users.value = [anilistUser.value];
+  }
+});
+watch(
+  users,
+  async (list) => {
+    for (const u of list) {
+      if (!entriesByUser.value[u]) {
+        await loadSingleUser(u);
+      }
+    }
+  },
+  { immediate: true }
+);
+watch(
+  users,
+  (list) => {
+    compareUsersCookie.value = list;
+  },
+  { deep: true }
+);
+
 </script>
 
 <!-- TEMPLATE BLEIBT 1:1 UNVERÄNDERT -->
@@ -319,12 +355,12 @@ function anilistUrl(id: number) {
     >
       <h1 class="text-3xl font-bold">Compare Users</h1>
 
-      <button
+      <!-- <button
         @click="loadUsers"
         class="bg-indigo-600 px-4 py-2 rounded text-sm w-full sm:w-auto"
       >
         Compare
-      </button>
+      </button> -->
     </div>
 
     <!-- User Input -->

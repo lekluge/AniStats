@@ -2,7 +2,6 @@
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
-import GameCard from "../components/GameCard.vue";
 
 /* -----------------------------
  * ECharts setup (WICHTIG)
@@ -25,15 +24,20 @@ use([
   LegendComponent,
   GridComponent,
 ]);
-type GenreCover = {
-  id: number;
-  title: string;
-  cover: string;
-};
+
 /* -----------------------------
  * State
  * ----------------------------- */
-const username = ref("Tiggy");
+const usernameCookie = useCookie<string>("anilist-user", {
+  default: () => "",
+});
+
+const username = computed({
+  get: () => usernameCookie.value ?? "",
+  set: (val: string) => {
+    usernameCookie.value = val.trim();
+  },
+});
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
@@ -47,6 +51,11 @@ async function loadAnime() {
   error.value = null;
 
   try {
+    if (!username.value) {
+      loading.value = false;
+      return;
+    }
+
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
@@ -59,8 +68,11 @@ async function loadAnime() {
   }
 }
 
-onMounted(loadAnime);
-
+onMounted(() => {
+  if (username.value) {
+    loadAnime();
+  }
+});
 /* -----------------------------
  * KPIs
  * ----------------------------- */

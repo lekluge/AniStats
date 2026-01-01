@@ -30,7 +30,7 @@ type TagSortMode = "count" | "minutes";
 /* -----------------------------
  * State
  * ----------------------------- */
-const username = ref("Tiggy");
+const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
@@ -47,6 +47,11 @@ async function loadAnime() {
   error.value = null;
 
   try {
+    if (!username.value) {
+      loading.value = false;
+      return;
+    }
+
     const res = await api.post("/api/anilist", null, {
       params: { user: username.value },
     });
@@ -59,7 +64,9 @@ async function loadAnime() {
 }
 
 onMounted(async () => {
-  await loadAnime();
+  if (username.value) {
+    await loadAnime();
+  }
   applyQueryFilters();
 });
 watch(
@@ -334,6 +341,7 @@ function anilistUrl(id: number) {
         <input
           v-model="username"
           class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-48"
+          placeholder="AniList Username"
         />
         <button
           @click="loadAnime"

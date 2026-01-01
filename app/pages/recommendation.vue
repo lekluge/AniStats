@@ -23,7 +23,7 @@ type TitleMode = "EN_FIRST" | "RO_FIRST";
 /* -----------------------------
  * State
  * ----------------------------- */
-const username = ref("Tiggy");
+const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -67,6 +67,9 @@ definePageMeta({ title: "Recommendations" });
  * LOAD FILTER OPTIONS
  * ----------------------------- */
 async function loadGenreTags() {
+  if (!username.value) {
+    return;
+  }
   const res = await api.get("/api/genreTags");
   allGenres.value = res.data.genres;
   allTags.value = res.data.tags.map((t: any) => t.name);
@@ -98,6 +101,10 @@ async function loadRecommendations() {
   error.value = null;
 
   try {
+    if (!username.value) {
+      loading.value = false;
+      return;
+    }
     const params: any = { user: username.value };
 
     if (filterSeason.value) params.season = filterSeason.value;
@@ -202,6 +209,7 @@ function anilistUrl(id: number) {
           <input
             v-model="username"
             class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+            placeholder="AniList Username"
           />
           <button
             @click="loadRecommendations"
