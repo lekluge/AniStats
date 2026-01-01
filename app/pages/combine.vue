@@ -66,6 +66,9 @@ function applyQueryFilters() {
   const qLayout = route.query.layout;
   const qGenre = route.query.genre;
   const qTag = route.query.tag;
+  
+  genreStates.value = {};
+  tagStates.value = {};
 
   if (qLayout === "list") {
     layoutMode.value = "list";
