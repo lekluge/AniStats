@@ -497,7 +497,7 @@ function anilistUrl(id: number) {
           <img
             v-if="a.cover"
             :src="a.cover"
-            class="h-16 aspect-[2/3] rounded object-cover flex-shrink-0"
+            class="h-16 aspect-2/3 rounded object-cover shrink-0"
           />
 
           <div class="flex-1 min-w-0">
@@ -505,7 +505,7 @@ function anilistUrl(id: number) {
               :href="anilistUrl(a.id)"
               target="_blank"
               rel="noopener noreferrer"
-              class="font-medium break-words hover:underline hover:text-indigo-400"
+              class="font-medium wrap-break-word hover:underline hover:text-indigo-400"
             >
               {{ a.title }}
             </a>
