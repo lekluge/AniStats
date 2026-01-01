@@ -1,17 +1,21 @@
-// Pagination für Listenansicht
-
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
-import GenreCard from "../components/GenreCard.vue";
+import GameCard from "../components/GameCard.vue";
+import { useRoute } from "vue-router";
+const route = useRoute();
+
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(listAnime.value.length / pageSize))
+);
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
 });
+
 definePageMeta({ title: "Combine" });
 
 /* -----------------------------
@@ -52,7 +56,39 @@ async function loadAnime() {
     loading.value = false;
   }
 }
-onMounted(loadAnime);
+
+onMounted(async () => {
+  await loadAnime();
+  applyQueryFilters();
+});
+
+function applyQueryFilters() {
+  const qLayout = route.query.layout;
+  const qGenre = route.query.genre;
+  const qTag = route.query.tag;
+
+  if (qLayout === "list") {
+    layoutMode.value = "list";
+  }
+
+  if (typeof qGenre === "string") {
+    genreStates.value = {
+      [qGenre]: "include",
+    };
+  }
+
+  if (typeof qTag === "string") {
+    tagStates.value = {
+      [qTag]: "include",
+    };
+  }
+}
+
+watch(
+  () => route.query,
+  () => applyQueryFilters(),
+  { deep: true }
+);
 
 /* -----------------------------
  * Filters
@@ -125,15 +161,31 @@ const isCombinedMode = computed(() => includedFilters.value.length > 1);
  * GRID STATS
  * ----------------------------- */
 const gridStats = computed(() => {
-  const map: Record<string, any> = {};
+  const map: Record<
+    string,
+    {
+      type: "genre" | "tag"; // ✅ FIX: speichert, ob Key Genre oder Tag ist
+      count: number;
+      scoreSum: number;
+      scoreCount: number;
+      minutesWatched: number;
+      covers: any[];
+    }
+  > = {};
 
   for (const e of filteredEntries.value) {
     const minutes = (e.progress ?? 0) * (e.duration ?? 0);
-    const keys = [...(e.genres ?? []), ...(e.tags?.map((t) => t.name) ?? [])];
 
-    for (const key of keys) {
+    // ✅ FIX: Keys bekommen einen Typ
+    const keys = [
+      ...(e.genres ?? []).map((g) => ({ key: g, type: "genre" as const })),
+      ...(e.tags?.map((t) => ({ key: t.name, type: "tag" as const })) ?? []),
+    ];
+
+    for (const { key, type } of keys) {
       if (!map[key]) {
         map[key] = {
+          type,
           count: 0,
           scoreSum: 0,
           scoreCount: 0,
@@ -169,10 +221,13 @@ const gridStats = computed(() => {
     }
   }
 
-  return Object.entries(map).map(([k, g]: any) => ({
+  return Object.entries(map).map(([k, g]) => ({
     genre: k,
+    filterType: g.type, // ✅ FIX: wird an GameCard übergeben
     count: g.count,
-    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
+    meanScore: g.scoreCount
+      ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10
+      : 0,
     minutesWatched: g.minutesWatched,
     covers: g.covers.sort(
       (a: any, b: any) => b.score - a.score || b.minutes - a.minutes
@@ -220,6 +275,7 @@ const combinedGridCard = computed(() => {
 
   return {
     genre: includedFilters.value.join(" + "),
+    // ✅ FIX: Combined Card hat keinen eindeutigen Typ → kein filterType
     count: filteredEntries.value.length,
     meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
@@ -230,9 +286,7 @@ const combinedGridCard = computed(() => {
 /* -----------------------------
  * SORTING
  * ----------------------------- */
-function sortGrid<T extends { count: number; minutesWatched: number }>(
-  list: T[]
-) {
+function sortGrid<T extends { count: number; minutesWatched: number }>(list: T[]) {
   return [...list].sort((a, b) => {
     if (sortMode.value === "count") {
       return b.count - a.count;
@@ -297,10 +351,7 @@ function anilistUrl(id: number) {
       <h1 class="text-3xl font-bold">Combined</h1>
 
       <div class="flex gap-2">
-        <input
-          v-model="username"
-          class="bg-zinc-900 border px-3 py-2 rounded"
-        />
+        <input v-model="username" class="bg-zinc-900 border px-3 py-2 rounded" />
         <button
           @click="loadAnime"
           class="bg-indigo-600 px-4 py-2 rounded"
@@ -390,10 +441,7 @@ function anilistUrl(id: number) {
     />
 
     <!-- Tags -->
-    <div
-      v-if="tagSearch.trim() || selectedTags.length"
-      class="flex flex-wrap gap-2"
-    >
+    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
       <button
         v-for="t in visibleTags"
         :key="t"
@@ -410,15 +458,14 @@ function anilistUrl(id: number) {
     </div>
 
     <!-- GRID -->
-    <div
-      v-if="layoutMode === 'grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <GenreCard
+    <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <GameCard
         v-for="(g, i) in displayedGrid"
         :key="g.genre"
         :rank="i + 1"
         :data="g"
+        target="/combine"
+        :filter="(g as any).filterType ? { key: (g as any).filterType } : undefined"
       />
     </div>
 
@@ -444,6 +491,7 @@ function anilistUrl(id: number) {
           Weiter →
         </button>
       </div>
+
       <div class="space-y-2">
         <div
           v-for="a in paginatedListAnime"

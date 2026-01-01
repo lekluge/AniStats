@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
-
+import { useRoute } from "vue-router";
+const route = useRoute();
 // Pagination für Listenansicht
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(listAnime.value.length / pageSize))
+);
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
 });
 import type { AnimeEntry } from "~/types/anime";
-import GenreCard from "../components/GenreCard.vue";
+import GameCard from "../components/GameCard.vue";
 
 /* -----------------------------
  * Types
@@ -57,11 +60,36 @@ async function loadAnime() {
   }
 }
 
-onMounted(loadAnime);
+onMounted(async () => {
+  await loadAnime();
+  applyQueryFilters();
+});
+
+watch(
+  () => route.query,
+  () => applyQueryFilters(),
+  { deep: true }
+);
 
 /* -----------------------------
  * GENRE STATE (3-WAY)
  * ----------------------------- */
+
+function applyQueryFilters() {
+  const qGenre = route.query.genre;
+  const qLayout = route.query.layout;
+  const qMode = route.query.genreMode as GenreState | undefined;
+
+  if (qLayout === "list") {
+    layoutMode.value = "list";
+  }
+
+  if (typeof qGenre === "string") {
+    genreStates.value = {
+      [qGenre]: qMode ?? "include",
+    };
+  }
+}
 const genreStates = ref<Record<string, GenreState>>({});
 
 const allGenres = computed(() => {
@@ -151,7 +179,9 @@ const normalGenreStats = computed(() => {
     genre,
     count: g.count,
     // Math round soll 1 nachkommastelle haben
-    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
+    meanScore: g.scoreCount
+      ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10
+      : 0,
     minutesWatched: g.minutesWatched,
     covers: g.covers,
   }));
@@ -369,11 +399,17 @@ function anilistUrl(id: number) {
       v-if="layoutMode === 'grid'"
       class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
     >
-      <GenreCard
+      <GameCard
         v-for="(g, i) in displayedGenres"
         :key="g.genre"
         :rank="i + 1"
         :data="g"
+        target="/genres"
+        :filter="{
+          key: 'genre',
+          modeKey: 'genreMode',
+          modeValue: 'include',
+        }"
       />
     </div>
 

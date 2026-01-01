@@ -1,13 +1,15 @@
-
-
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
-import GenreCard from "../components/GenreCard.vue";
+import GameCard from "../components/GameCard.vue";
+import { useRoute } from "vue-router";
+const route = useRoute();
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(listAnime.value.length / pageSize))
+);
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
@@ -56,11 +58,36 @@ async function loadAnime() {
   }
 }
 
-onMounted(loadAnime);
-
+onMounted(async () => {
+  await loadAnime();
+  applyQueryFilters();
+});
+watch(
+  () => route.query,
+  () => applyQueryFilters(),
+  { deep: true }
+);
 /* -----------------------------
  * TAG STATE
  * ----------------------------- */
+function applyQueryFilters() {
+  const qLayout = route.query.layout;
+  const qFilter = route.query.filter;
+  const qType = route.query.filterType;
+  const qMode = route.query.filterMode as TagState | undefined;
+
+  if (qLayout === "list") {
+    layoutMode.value = "list";
+  }
+
+  // Nur reagieren, wenn es wirklich ein Tag-Filter ist
+  if (qType === "tag" && typeof qFilter === "string") {
+    tagStates.value = {
+      [qFilter]: qMode ?? "include",
+    };
+  }
+}
+
 const tagStates = ref<Record<string, TagState>>({});
 const tagSearch = ref("");
 const showAllTags = ref(false);
@@ -180,7 +207,9 @@ const normalTagStats = computed(() => {
   return Object.entries(map).map(([tag, t]) => ({
     genre: tag,
     count: t.count,
-    meanScore: t.scoreCount ? Math.round((t.scoreSum / t.scoreCount) * 10) / 10 : 0,
+    meanScore: t.scoreCount
+      ? Math.round((t.scoreSum / t.scoreCount) * 10) / 10
+      : 0,
     minutesWatched: t.minutesWatched,
     covers: t.covers,
   }));
@@ -409,11 +438,19 @@ function anilistUrl(id: number) {
       v-if="!loading && !error && layoutMode === 'grid'"
       class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
     >
-      <GenreCard
+      <GameCard
         v-for="(g, i) in displayedTags"
         :key="g.genre"
         :rank="i + 1"
         :data="g"
+        target="/tags"
+        :filter="{
+          key: 'filter',
+          typeKey: 'filterType',
+          typeValue: 'tag',
+          modeKey: 'filterMode',
+          modeValue: 'include',
+        }"
       />
     </div>
 

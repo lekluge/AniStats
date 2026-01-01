@@ -7,8 +7,10 @@ type GenreCover = {
   cover: string;
 };
 
+import { useRouter } from 'vue-router';
 const props = defineProps<{
   rank: number;
+  target: string;
   data: {
     genre: string;
     count: number;
@@ -16,7 +18,15 @@ const props = defineProps<{
     minutesWatched: number;
     covers: GenreCover[];
   };
+  filter?: {
+    key: string;        // z. B. "genre" | "filter"
+    modeKey?: string;   // z. B. "genreMode" | "filterMode"
+    typeKey?: string;   // optional (nur für Tags)
+    typeValue?: string; // "tag"
+    modeValue?: string; // "include"
+  };
 }>();
+const router = useRouter();
 
 const hours = computed(() =>
   Math.round(props.data.minutesWatched / 60)
@@ -33,6 +43,29 @@ const previewCovers = computed(() =>
 const remainingCount = computed(() =>
   Math.max(props.data.covers.length - 5, 0)
 );
+
+function goToList() {
+  const query: Record<string, string> = {
+    layout: "list",
+  };
+
+  if (props.filter) {
+    query[props.filter.key] = props.data.genre;
+
+    if (props.filter.modeKey) {
+      query[props.filter.modeKey] = props.filter.modeValue ?? "include";
+    }
+
+    if (props.filter.typeKey && props.filter.typeValue) {
+      query[props.filter.typeKey] = props.filter.typeValue;
+    }
+  }
+
+  router.push({
+    path: props.target,
+    query,
+  });
+}
 </script>
 
 <template>
@@ -42,7 +75,11 @@ const remainingCount = computed(() =>
   >
     <!-- Header -->
     <div class="flex items-start justify-between gap-2">
-      <h3 class="text-base font-semibold leading-tight break-words">
+      <h3
+        class="text-base font-semibold leading-tight break-words cursor-pointer hover:text-indigo-400"
+        @click="goToList"
+        title="Genre filtern und Listenansicht anzeigen"
+      >
         {{ data.genre }}
       </h3>
       <span
@@ -109,9 +146,9 @@ const remainingCount = computed(() =>
       <!-- +X Badge -->
       <div
         v-if="remainingCount"
-        class="h-16 aspect-[2/3] rounded-md
-               flex items-center justify-center
-               bg-zinc-800/70 text-xs text-zinc-300"
+        class="h-16 aspect-[2/3] rounded-md flex items-center justify-center bg-zinc-800/70 text-xs text-zinc-300 cursor-pointer hover:text-indigo-400"
+        @click="goToList"
+        title="Genre filtern und Listenansicht anzeigen"
       >
         +{{ remainingCount }}
       </div>
