@@ -1,5 +1,6 @@
 import { defineEventHandler, setHeader } from "h3";
 import { prisma } from "../../utils/prisma";
+import crypto from "crypto";
 
 const CHAIN_REL = new Set(["PREQUEL", "SEQUEL"] as const);
 
@@ -21,11 +22,18 @@ export default defineEventHandler(async (event) => {
   if (cachedResult && now - cachedAt < CACHE_TTL) {
     return cachedResult;
   }
-
+  const storage = useStorage("cache");
+  const cacheKey =
+    "anime-relation:" +
+    crypto
+      .createHash("sha1")
+      .digest("hex");
+  let anime = await storage.getItem<any[]>(cacheKey);
   /* ----------------------------------
    * 1) ALLE Anime inkl. Relations + Genres + Tags
    * ---------------------------------- */
-  const anime = await prisma.anime.findMany({
+  if (!anime) {
+    anime = await prisma.anime.findMany({
     include: {
       relationsFrom: true,
       relationsTo: true,
@@ -33,6 +41,12 @@ export default defineEventHandler(async (event) => {
       tags: true,
     },
   });
+    // Cache für 8 Stunden (kannst du erhöhen)
+    await storage.setItem(cacheKey, anime, {
+      ttl: 60 * 60 * 8,
+    });
+  }
+  
 
   const byId = new Map(anime.map((a) => [a.id, a]));
   const ROOT_REL = new Set(["PREQUEL", "PARENT"] as const);
