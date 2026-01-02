@@ -13,8 +13,6 @@ import {
   parseList,
   hasStartDate,
   isReleased,
-
-  
 } from "../recommend/filters";
 
 /* ----------------------------------
@@ -133,26 +131,54 @@ export default defineEventHandler(async (event) => {
     if (!isFirstUnseenInChain(a.id, chainMap, excludedIds)) continue;
 
     // 🚫 HARD BLOCK: uninteressantes (unseen) Genre
-    if (a.genres.some((g: { name: string }) => taste.unseenGenres?.has(g.name))) {
+    if (
+      a.genres.some((g: { name: string }) => taste.unseenGenres?.has(g.name))
+    ) {
       continue;
     }
 
     const { score, matchedGenres, matchedTags } = scoreAnime(a, taste);
     if (score <= 0 || matchedTags.length === 0) continue;
 
-    // 🔹 Genre Include / Exclude
-    if (includeGenres && !a.genres.some((g: { name: string }) => includeGenres.includes(g.name)))
+    // 🔹 Genre Include (ALLE ausgewählten Genres müssen enthalten sein)
+    if (
+      includeGenres &&
+      !includeGenres.every((g) =>
+        a.genres.some((ag: { name: string }) => ag.name === g)
+      )
+    ) {
       continue;
+    }
 
-    if (excludeGenres && a.genres.some((g: { name: string }) => excludeGenres.includes(g.name)))
+    // 🔹 Genre Exclude (KEINES der ausgeschlossenen Genres darf enthalten sein)
+    if (
+      excludeGenres &&
+      excludeGenres.some((g) =>
+        a.genres.some((ag: { name: string }) => ag.name === g)
+      )
+    ) {
       continue;
+    }
 
-    // 🔹 Tag Include / Exclude
-    if (includeTags && !a.tags.some((t: { name: string }) => includeTags.includes(t.name)))
+    // 🔹 Tag Include (ALLE ausgewählten Tags müssen enthalten sein)
+    if (
+      includeTags &&
+      !includeTags.every((t) =>
+        a.tags.some((at: { name: string }) => at.name === t)
+      )
+    ) {
       continue;
+    }
 
-    if (excludeTags && a.tags.some((t: { name: string }) => excludeTags.includes(t.name)))
+    // 🔹 Tag Exclude (KEINER der ausgeschlossenen Tags darf enthalten sein)
+    if (
+      excludeTags &&
+      excludeTags.some((t) =>
+        a.tags.some((at: { name: string }) => at.name === t)
+      )
+    ) {
       continue;
+    }
 
     recs.push({
       id: a.id,
