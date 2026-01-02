@@ -13,6 +13,8 @@ import {
   parseList,
   hasStartDate,
   isReleased,
+
+  
 } from "../recommend/filters";
 
 /* ----------------------------------
@@ -131,7 +133,7 @@ export default defineEventHandler(async (event) => {
     if (!isFirstUnseenInChain(a.id, chainMap, excludedIds)) continue;
 
     // 🚫 HARD BLOCK: uninteressantes (unseen) Genre
-    if (a.genres.some((g) => taste.unseenGenres?.has(g.name))) {
+    if (a.genres.some((g: { name: string }) => taste.unseenGenres?.has(g.name))) {
       continue;
     }
 
