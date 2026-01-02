@@ -1,292 +1,19 @@
 import { defineEventHandler, getQuery, createError, setHeader } from "h3";
 import { prisma } from "../../utils/prisma";
-import { anilistRequest } from "../../services/anilist/anilistClient";
 import crypto from "crypto";
 
-/* ----------------------------------
- * Config
- * ---------------------------------- */
-const EXCLUDED_STATUSES = new Set(["COMPLETED", "WATCHING"]);
-
-const CACHE_TTL_ANILIST = 1000 * 60 * 5;
-
-/* ----------------------------------
- * Scoring Configuration
- * ---------------------------------- */
-const GENRE_WEIGHT = 1.5;
-const TAG_WEIGHT = 1.0;
-const NORMALIZATION_MODE: "sqrt" | "linear" = "sqrt";
-const SINGLE_MATCH_PENALTY = 0.4;
-const MULTI_GENRE_BONUS = 1.2;
-const MAX_SINGLE_TAG_CONTRIBUTION: number | null = 300;
-
-/* ----------------------------------
- * Quality Scoring
- * ---------------------------------- */
-const USE_AVERAGE_SCORE = true;
-const MIN_AVERAGE_SCORE: number | null = 60;
-const AVG_SCORE_BASELINE = 75;
-const AVG_SCORE_MIN_MULTIPLIER = 0.7;
-const AVG_SCORE_MAX_MULTIPLIER = 1.3;
-
-const NOW = new Date();
-/* ----------------------------------
- * Helpers (Query Parsing)
- * ---------------------------------- */
-function parseNumber(v: any): number | null {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseList(v: any): string[] | null {
-  if (!v || typeof v !== "string") return null;
-  return v
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function hasStartDate(a: any) {
-  return a.startYear !== null;
-}
-
-function isReleased(a: any) {
-  // ❌ kein Jahr → niemals released
-  if (typeof a.startYear !== "number") return false;
-
-  // ❌ nur Jahr bekannt → zu ungenau → schlechte Recommendation
-  if (typeof a.startMonth !== "number") return false;
-
-  // Vergleichsdatum bauen
-  const y = a.startYear;
-  const m = a.startMonth;
-  const d = typeof a.startDay === "number" ? a.startDay : 1;
-
-  // 👉 Anime gilt ab dem *ersten möglichen Tag* als released
-  const releaseDate = new Date(y, m - 1, d);
-
-  return releaseDate <= NOW;
-}
-
-/* ----------------------------------
- * AniList Cache
- * ---------------------------------- */
-const anilistCache = new Map<
-  string,
-  {
-    at: number;
-    data: { mediaId: number; status: string; score: number | null }[];
-  }
->();
-
-/* ----------------------------------
- * AniList Query
- * ---------------------------------- */
-const ANILIST_LIST_QUERY = `
-query ($userName: String!) {
-  MediaListCollection(userName: $userName, type: ANIME) {
-    lists {
-      entries {
-        status
-        score(format: POINT_10)
-        media { id }
-      }
-    }
-  }
-}
-`;
-
-async function loadUserAnilistEntries(user: string) {
-  const hit = anilistCache.get(user);
-  const now = Date.now();
-  if (hit && now - hit.at < CACHE_TTL_ANILIST) return hit.data;
-
-  const res: any = await anilistRequest(ANILIST_LIST_QUERY, { userName: user });
-  const out: any[] = [];
-
-  for (const l of res?.MediaListCollection?.lists ?? []) {
-    for (const e of l.entries ?? []) {
-      if (!e?.media?.id) continue;
-      out.push({
-        mediaId: e.media.id,
-        status: String(e.status),
-        score: typeof e.score === "number" ? e.score : null,
-      });
-    }
-  }
-
-  anilistCache.set(user, { at: now, data: out });
-  return out;
-}
-
-/* ----------------------------------
- * Taste Profile
- * ---------------------------------- */
-type TasteProfile = {
-  genres: Map<string, number>;
-  tags: Map<number, number>;
-};
-
-function buildTasteProfile(
-  completedIds: number[],
-  scoreById: Map<number, number | null>,
-  animeById: Map<number, any>
-): TasteProfile {
-  const genres = new Map<string, number>();
-  const tags = new Map<number, number>();
-
-  for (const id of completedIds) {
-    const a = animeById.get(id);
-    if (!a) continue;
-
-    const s = scoreById.get(id);
-    const weight = s ? s / 10 : 1;
-
-    for (const g of a.genres) {
-      genres.set(g.name, (genres.get(g.name) ?? 0) + weight);
-    }
-    for (const t of a.tags) {
-      tags.set(t.tagId, (tags.get(t.tagId) ?? 0) + weight);
-    }
-  }
-
-  return { genres, tags };
-}
-
-/* ----------------------------------
- * Scoring
- * ---------------------------------- */
-function scoreAnime(anime: any, taste: any) {
-  let rawScore = 0;
-  const matchedGenres: string[] = [];
-  const matchedTags: string[] = [];
-
-  for (const g of anime.genres) {
-    const w = taste.genres.get(g.name);
-    if (w) {
-      rawScore += w * GENRE_WEIGHT;
-      matchedGenres.push(g.name);
-    }
-  }
-
-  for (const t of anime.tags) {
-    let w = taste.tags.get(t.tagId);
-    if (!w) continue;
-    if (MAX_SINGLE_TAG_CONTRIBUTION !== null) {
-      w = Math.min(w, MAX_SINGLE_TAG_CONTRIBUTION);
-    }
-    rawScore += w * TAG_WEIGHT;
-    matchedTags.push(t.name);
-  }
-
-  const matchCount = matchedGenres.length + matchedTags.length;
-  if (!matchCount) return { score: 0, matchedGenres, matchedTags };
-
-  let score =
-    NORMALIZATION_MODE === "sqrt"
-      ? rawScore / Math.sqrt(matchCount)
-      : rawScore / matchCount;
-
-  if (matchCount < 2) score *= SINGLE_MATCH_PENALTY;
-  if (matchedGenres.length >= 2) score *= MULTI_GENRE_BONUS;
-
-  if (USE_AVERAGE_SCORE && typeof anime.averageScore === "number") {
-    if (MIN_AVERAGE_SCORE !== null && anime.averageScore < MIN_AVERAGE_SCORE) {
-      return { score: 0, matchedGenres, matchedTags };
-    }
-    const q = anime.averageScore / AVG_SCORE_BASELINE;
-    score *= Math.min(
-      AVG_SCORE_MAX_MULTIPLIER,
-      Math.max(AVG_SCORE_MIN_MULTIPLIER, q)
-    );
-  }
-
-  return { score, matchedGenres, matchedTags };
-}
-
-/* ----------------------------------
- * Chain Logic
- * ---------------------------------- */
-const ROOT_REL = new Set(["PREQUEL", "PARENT"]);
-const SEQUEL_REL = "SEQUEL";
-
-function pickDeterministic<T extends { toId: number }>(edges: T[]) {
-  return [...edges].sort((a, b) => a.toId - b.toId)[0] ?? null;
-}
-
-function buildChainMap(relations: any[]) {
-  const byId = new Map<number, any>();
-  relations.forEach((a) => byId.set(a.id, a));
-
-  function findRoot(start: any) {
-    let current = start;
-    const visited = new Set<number>();
-    while (true) {
-      if (visited.has(current.id)) break;
-      visited.add(current.id);
-
-      const prequels = (current.relationsFrom ?? [])
-        .filter((r: any) => ROOT_REL.has(r.relationType))
-        .filter((r: any) => r.toId !== current.id);
-
-      const next = pickDeterministic(prequels);
-      if (!next) break;
-
-      const node = byId.get(next.toId);
-      if (!node) break;
-      current = node;
-    }
-    return current;
-  }
-
-  const chainByAnimeId = new Map<number, number[]>();
-
-  for (const a of relations) {
-    const root = findRoot(a);
-    let current = root;
-    const chain: number[] = [];
-    const visited = new Set<number>();
-
-    while (true) {
-      if (visited.has(current.id)) break;
-      visited.add(current.id);
-      chain.push(current.id);
-
-      const sequels = (current.relationsFrom ?? [])
-        .filter((r: any) => r.relationType === SEQUEL_REL)
-        .filter((r: any) => r.toId !== current.id);
-
-      const next = pickDeterministic(sequels);
-      if (!next) break;
-
-      const node = byId.get(next.toId);
-      if (!node) break;
-      current = node;
-    }
-
-    for (const id of chain) {
-      chainByAnimeId.set(id, chain);
-    }
-  }
-
-  return chainByAnimeId;
-}
-
-function isFirstUnseenInChain(
-  animeId: number,
-  chainMap: Map<number, number[]>,
-  excludedIds: Set<number>
-) {
-  const chain = chainMap.get(animeId);
-  if (!chain) return true;
-
-  for (const id of chain) {
-    if (!excludedIds.has(id)) {
-      return id === animeId;
-    }
-  }
-  return false;
-}
+import { EXCLUDED_STATUSES } from "../recommend/config";
+import { loadUserAnilistEntries } from "../recommend/anilist";
+import { loadGlobalStats } from "../recommend/globalStats";
+import { buildTasteProfile } from "../recommend/tasteProfile";
+import { scoreAnime } from "../recommend/scoring";
+import { buildChainMap, isFirstUnseenInChain } from "../recommend/chain";
+import {
+  parseNumber,
+  parseList,
+  hasStartDate,
+  isReleased,
+} from "../recommend/filters";
 
 /* ----------------------------------
  * Handler
@@ -361,7 +88,15 @@ export default defineEventHandler(async (event) => {
   const chainMap = buildChainMap(relations);
 
   const animeById = new Map(anime.map((a) => [a.id, a]));
-  const taste = buildTasteProfile(completedIds, scoreById, animeById);
+  const globalStats = await loadGlobalStats(anime);
+
+  const taste = buildTasteProfile(
+    completedIds,
+    scoreById,
+    animeById,
+    globalStats,
+    { user, topN: 30, log: true }
+  );
 
   const recs: any[] = [];
 
