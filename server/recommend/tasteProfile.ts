@@ -13,6 +13,8 @@ import {
   POSITIVE_GENRE_MIN,
   WEAK_GENRE_NEGATIVE_FACTOR,
   CORE_GENRE_EXPOSURE_BOOST,
+  CORE_TAG_MIN_SHARE,
+  CORE_TAG_EXPOSURE_BOOST,
 } from "./tasteConfig";
 
 export function buildTasteProfile(
@@ -111,13 +113,18 @@ export function buildTasteProfile(
    * Tags
    * ---------------------------------- */
   for (const [id, v] of tagScore) {
+    const exposure = tagExposure.get(id) ?? 0;
+    const share = exposure / TOTAL;
+    const isCoreTag = share >= CORE_TAG_MIN_SHARE;
+
     if (v > TAG_THRESHOLD) {
-      tags.set(id, v);
-    } else if (v < -TAG_THRESHOLD) {
-      const exp = tagExposure.get(id) ?? 1;
+      const boostedValue = isCoreTag ? v * CORE_TAG_EXPOSURE_BOOST : v;
+
+      tags.set(id, boostedValue);
+    } else if (v < -TAG_THRESHOLD && !isCoreTag) {
       negativeTags.set(
         id,
-        Math.abs(v) * scarcityBoost(exp, NEG_SCARCITY_ALPHA_TAG)
+        Math.abs(v) * scarcityBoost(exposure, NEG_SCARCITY_ALPHA_TAG)
       );
     }
   }
@@ -175,47 +182,59 @@ export function buildTasteProfile(
    * Debug Logs (NAMES ONLY)
    * ---------------------------------- */
   if (debug?.log) {
-    console.log(`\n[TasteProfile+Net+Scarcity+Unseen] user=${debug.user}`);
+    const topN = debug.topN ?? 15;
 
-    console.log(
-      "Top Positive Genres",
-      mapToSortedArray(genres, debug.topN ?? 15)
-    );
-    console.log(
-      "Top Negative Genres",
-      mapToSortedArray(negativeGenres, debug.topN ?? 15)
-    );
-    console.log(
-      "Top Unseen Genres",
-      mapToSortedArray(unseenGenres, debug.topN ?? 15)
+    const printBlock = (title: string, entries: [string, number][]) => {
+      console.log(`\n==== ${title} ======`);
+      for (const [k, v] of entries) {
+        console.log(`${k}: ${v.toFixed(2)}`);
+      }
+    };
+
+    printBlock(
+      "Positive Genres",
+      mapToSortedArray(genres, topN).map(({ key, value }) => [key, value])
     );
 
-    console.log(
-      "Top Positive Tags",
+    printBlock(
+      "Negative Genres",
+      mapToSortedArray(negativeGenres, topN).map(({ key, value }) => [
+        key,
+        value,
+      ])
+    );
+
+    printBlock(
+      "Unseen Genres",
+      mapToSortedArray(unseenGenres, topN).map(({ key, value }) => [key, value])
+    );
+
+    printBlock(
+      "Positive Tags",
       mapToSortedArray(
         new Map([...tags].map(([id, v]) => [tagNames.get(id) ?? `#${id}`, v])),
-        debug.topN ?? 15
-      )
+        topN
+      ).map(({ key, value }) => [key, value])
     );
 
-    console.log(
-      "Top Negative Tags",
+    printBlock(
+      "Negative Tags",
       mapToSortedArray(
         new Map(
           [...negativeTags].map(([id, v]) => [tagNames.get(id) ?? `#${id}`, v])
         ),
-        debug.topN ?? 15
-      )
+        topN
+      ).map(({ key, value }) => [key, value])
     );
 
-    console.log(
-      "Top Unseen Tags",
+    printBlock(
+      "Unseen Tags",
       mapToSortedArray(
         new Map(
           [...unseenTags].map(([id, v]) => [tagNames.get(id) ?? `#${id}`, v])
         ),
-        debug.topN ?? 15
-      )
+        topN
+      ).map(({ key, value }) => [key, value])
     );
   }
 

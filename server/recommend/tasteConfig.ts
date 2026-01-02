@@ -36,3 +36,6 @@ export const WEAK_GENRE_NEGATIVE_FACTOR = 0.6;
 
 
 export const CORE_GENRE_EXPOSURE_BOOST = 1.5 * 100;
+
+export const CORE_TAG_MIN_SHARE = 0.15;
+export const CORE_TAG_EXPOSURE_BOOST = 1.5 * 100;
