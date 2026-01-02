@@ -141,17 +141,17 @@ export default defineEventHandler(async (event) => {
     if (score <= 0 || matchedTags.length === 0) continue;
 
     // 🔹 Genre Include / Exclude
-    if (includeGenres && !matchedGenres.some((g) => includeGenres.includes(g)))
+    if (includeGenres && !a.genres.some((g: { name: string }) => includeGenres.includes(g.name)))
       continue;
 
-    if (excludeGenres && matchedGenres.some((g) => excludeGenres.includes(g)))
+    if (excludeGenres && a.genres.some((g: { name: string }) => excludeGenres.includes(g.name)))
       continue;
 
     // 🔹 Tag Include / Exclude
-    if (includeTags && !matchedTags.some((t) => includeTags.includes(t)))
+    if (includeTags && !a.tags.some((t: { name: string }) => includeTags.includes(t.name)))
       continue;
 
-    if (excludeTags && matchedTags.some((t) => excludeTags.includes(t)))
+    if (excludeTags && a.tags.some((t: { name: string }) => excludeTags.includes(t.name)))
       continue;
 
     recs.push({
