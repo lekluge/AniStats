@@ -19,18 +19,43 @@ export function scoreAnime(anime: any, taste: any) {
   const matchedGenres: string[] = [];
   const matchedTags: string[] = [];
 
-  // Genre-Matches addieren
+  /* ----------------------------------
+   * 🚫 HARD BLOCK: UNSEEN GENRE
+   * ---------------------------------- */
+  let hasUnseenGenre = false;
+
   for (const g of anime.genres) {
-    const w = taste.genres.get(g.name);
-    if (w) {
-      rawScore += w * GENRE_WEIGHT;
-      matchedGenres.push(g.name);
+    if (taste.unseenGenres?.has(g.name)) {
+      hasUnseenGenre = true;
+      break;
     }
   }
 
-  // Tag-Matches addieren (mit Cap)
+  /* ----------------------------------
+   * GENRES
+   * ---------------------------------- */
+  for (const g of anime.genres) {
+    const name = g.name;
+
+    const w = taste.genres?.get(name);
+    if (w) {
+      rawScore += w * GENRE_WEIGHT;
+      matchedGenres.push(name);
+    }
+  }
+
+  // 🚫 Wenn Genre unseen UND kein positives Genre → sofort raus
+  if (hasUnseenGenre && matchedGenres.length === 0) {
+    return { score: 0, matchedGenres, matchedTags };
+  }
+
+  /* ----------------------------------
+   * TAGS
+   * ---------------------------------- */
   for (const t of anime.tags) {
-    let w = taste.tags.get(t.tagId);
+    const id = t.tagId;
+
+    let w = taste.tags?.get(id);
     if (!w) continue;
 
     if (MAX_SINGLE_TAG_CONTRIBUTION !== null) {
@@ -43,52 +68,41 @@ export function scoreAnime(anime: any, taste: any) {
 
   const matchCount = matchedGenres.length + matchedTags.length;
 
-  // Keine oder zu wenige Matches → direkt raus
   if (!matchCount) return { score: 0, matchedGenres, matchedTags };
   if (matchCount < MIN_MATCH_COUNT)
     return { score: 0, matchedGenres, matchedTags };
 
-  // Normalisierung gegen Anzahl der Treffer
+  /* ----------------------------------
+   * Normalisierung
+   * ---------------------------------- */
   let score =
     NORMALIZATION_MODE === "sqrt"
       ? rawScore / Math.sqrt(matchCount)
       : rawScore / matchCount;
 
-  // Progressive Strafe für geringe Match-Breite
   score *= MATCH_PENALTY_CURVE[matchCount] ?? 1;
-  // 🔻 Negativ-Taste anwenden
-  for (const g of matchedGenres) {
-    const neg = taste.negativeGenres?.get(g);
-if (neg) score -= neg * 0.15;
-  }
-
-  for (const t of anime.tags) {
-    if (!taste.tags?.has(t.tagId)) continue; // 🔥 WICHTIG
-    const neg = taste.negativeTags?.get(t.tagId);
-   if (neg) score -= neg * 0.08;
-  }
 
   const hasGenre = matchedGenres.length > 0;
   const hasTag = matchedTags.length > 0;
 
-  // Reiner Einzel-Tag ohne Genre → extrem abwerten
   if (matchedTags.length === 1 && matchedGenres.length === 0) {
     score *= 0.2;
   }
 
-  // Fehlt entweder Genre oder Tag → starke Abwertung
   if (!(hasGenre && hasTag)) {
     score *= 0.3;
   }
 
-  // Bonus für Breite (mehr unabhängige Treffer)
-  const breadthBonus = Math.log2(1 + matchedGenres.length + matchedTags.length);
+  const breadthBonus = Math.log2(1 + matchCount);
   score *= breadthBonus;
 
-  // Extra-Bonus für mehrere Genres
-  if (matchedGenres.length >= 2) score *= MULTI_GENRE_BONUS;
+  if (matchedGenres.length >= 2) {
+    score *= MULTI_GENRE_BONUS;
+  }
 
-  // Qualitätsgewichtung über AverageScore
+  /* ----------------------------------
+   * Qualitätsgewichtung
+   * ---------------------------------- */
   if (USE_AVERAGE_SCORE && typeof anime.averageScore === "number") {
     if (MIN_AVERAGE_SCORE !== null && anime.averageScore < MIN_AVERAGE_SCORE) {
       return { score: 0, matchedGenres, matchedTags };
@@ -101,5 +115,9 @@ if (neg) score -= neg * 0.15;
     );
   }
 
-  return { score, matchedGenres, matchedTags };
+  return {
+    score,
+    matchedGenres,
+    matchedTags,
+  };
 }

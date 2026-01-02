@@ -3,4 +3,6 @@ export type TasteProfile = {
   tags: Map<number, number>;
   negativeGenres: Map<string, number>;
   negativeTags: Map<number, number>;
+  unseenGenres: Map<string, number>;
+  unseenTags: Map<number, number>;
 };

@@ -112,7 +112,7 @@ export default defineEventHandler(async (event) => {
     // 🔹 Season-Filter
     if (filterSeason && a.season !== filterSeason) continue;
 
-    // 🔹 Year-Filter (JETZT korrekt auf startYear)
+    // 🔹 Year-Filter
     if (seasonYearMin !== null && (a.startYear ?? 0) < seasonYearMin) continue;
     if (seasonYearMax !== null && (a.startYear ?? 9999) > seasonYearMax)
       continue;
@@ -129,6 +129,11 @@ export default defineEventHandler(async (event) => {
 
     // 🔹 Chain-Logik
     if (!isFirstUnseenInChain(a.id, chainMap, excludedIds)) continue;
+
+    // 🚫 HARD BLOCK: uninteressantes (unseen) Genre
+    if (a.genres.some((g) => taste.unseenGenres?.has(g.name))) {
+      continue;
+    }
 
     const { score, matchedGenres, matchedTags } = scoreAnime(a, taste);
     if (score <= 0 || matchedTags.length === 0) continue;
@@ -156,7 +161,7 @@ export default defineEventHandler(async (event) => {
       score: Number(score.toFixed(3)),
       averageScore: a.averageScore,
       season: a.season,
-      seasonYear: a.startYear, // ← bewusst!
+      seasonYear: a.startYear,
       episodes: a.episodes,
       matchedGenres,
       matchedTags,
