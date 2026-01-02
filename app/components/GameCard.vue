@@ -76,7 +76,7 @@ function goToList() {
     <!-- Header -->
     <div class="flex items-start justify-between gap-2">
       <h3
-        class="text-base font-semibold leading-tight break-words cursor-pointer hover:text-indigo-400"
+        class="text-base font-semibold leading-tight wrap-break-word cursor-pointer hover:text-indigo-400"
         @click="goToList"
         title="Genre filtern und Listenansicht anzeigen"
       >
@@ -102,7 +102,7 @@ function goToList() {
       >
         <img
           :src="data.covers[0].cover"
-          class="h-32 aspect-[2/3] rounded-lg object-cover"
+          class="h-32 aspect-2/3 rounded-lg object-cover"
         />
       </a>
 
@@ -138,7 +138,7 @@ function goToList() {
       >
         <img
           :src="anime.cover"
-          class="h-16 aspect-[2/3] rounded-md object-cover
+          class="h-16 aspect-2/3 rounded-md object-cover
                  transition hover:scale-105"
         />
       </a>
@@ -146,7 +146,7 @@ function goToList() {
       <!-- +X Badge -->
       <div
         v-if="remainingCount"
-        class="h-16 aspect-[2/3] rounded-md flex items-center justify-center bg-zinc-800/70 text-xs text-zinc-300 cursor-pointer hover:text-indigo-400"
+        class="h-16 aspect-2/3 rounded-md flex items-center justify-center bg-zinc-800/70 text-xs text-zinc-300 cursor-pointer hover:text-indigo-400"
         @click="goToList"
         title="Genre filtern und Listenansicht anzeigen"
       >
