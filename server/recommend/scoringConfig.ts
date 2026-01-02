@@ -1,5 +1,5 @@
 export const GENRE_WEIGHT = 1.5;
-export const TAG_WEIGHT = 1.5;
+export const TAG_WEIGHT = 1.0;
 export const NORMALIZATION_MODE: "sqrt" | "linear" = "sqrt";
 export const MATCH_PENALTY_CURVE: Record<number, number> = {
   1: 0.15,
