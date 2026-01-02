@@ -26,6 +26,7 @@ type TitleMode = "EN_FIRST" | "RO_FIRST";
 const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
+const includeUpcoming = ref(true);
 
 const layoutMode = ref<LayoutMode>("grid");
 const activeTab = ref<Tab>("TV");
@@ -106,7 +107,7 @@ async function loadRecommendations() {
       return;
     }
     const params: any = { user: username.value };
-
+    if (includeUpcoming.value) params.includeUpcoming = "true";
     if (filterSeason.value) params.season = filterSeason.value;
     if (seasonYearMin.value) params.seasonYearMin = seasonYearMin.value;
     if (seasonYearMax.value) params.seasonYearMax = seasonYearMax.value;
@@ -282,7 +283,27 @@ function anilistUrl(id: number) {
         class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
       />
     </div>
+    <!-- UPCOMING TOGGLE -->
+    <div class="flex items-center gap-2">
+      <button
+        @click="
+          includeUpcoming = !includeUpcoming;
+          loadRecommendations();
+        "
+        class="px-3 py-2 text-xs rounded border transition"
+        :class="
+          includeUpcoming
+            ? 'bg-indigo-600 text-white border-indigo-600'
+            : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+        "
+      >
+        {{ includeUpcoming ? "✓ Upcoming enthalten" : "Upcoming ausblenden" }}
+      </button>
 
+      <span class="text-xs text-zinc-500">
+        Noch nicht erschienene Anime anzeigen
+      </span>
+    </div>
     <!-- GENRES -->
     <div class="flex flex-wrap gap-2">
       <h2 class="w-full font-semibold">Genres</h2>
