@@ -1,0 +1,9 @@
+export const GENRE_THRESHOLD = 0.15;
+export const TAG_THRESHOLD = 0.2;
+export const NEG_SCARCITY_ALPHA_GENRE = 1.1;
+export const NEG_SCARCITY_ALPHA_TAG = 1.3;
+export const UNSEEN_GENRE_PENALTY = 0.6;
+export const UNSEEN_TAG_PENALTY = 0.4;
+export const MIN_GLOBAL_TAG_COUNT = 50;
+export const POSITIVE_GENRE_MIN = 3.5;
+export const WEAK_GENRE_NEGATIVE_FACTOR = 0.6;

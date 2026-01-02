@@ -2,6 +2,16 @@ import { GlobalStats } from "./types/GlobalStats";
 import { TasteProfile } from "./types/TasteProfile";
 import { idf } from "./globalStats";
 import { mapToSortedArray } from "./utils";
+import { GENRE_THRESHOLD,
+  TAG_THRESHOLD,
+  NEG_SCARCITY_ALPHA_GENRE,
+  NEG_SCARCITY_ALPHA_TAG,
+  UNSEEN_GENRE_PENALTY,
+  UNSEEN_TAG_PENALTY,
+  MIN_GLOBAL_TAG_COUNT,
+  POSITIVE_GENRE_MIN,
+  WEAK_GENRE_NEGATIVE_FACTOR
+} from "./tasteConfig";
 
 export function buildTasteProfile(
   completedIds: number[],
@@ -93,11 +103,7 @@ export function buildTasteProfile(
   const unseenGenres = new Map<string, number>();
   const unseenTags = new Map<number, number>();
 
-  const GENRE_THRESHOLD = 0.15;
-  const TAG_THRESHOLD = 0.2;
 
-  const NEG_SCARCITY_ALPHA_GENRE = 1.1;
-  const NEG_SCARCITY_ALPHA_TAG = 1.3;
 
   function scarcityBoost(exposure: number, alpha: number) {
     return 1 + alpha / Math.sqrt(Math.max(1, exposure));
@@ -131,9 +137,7 @@ export function buildTasteProfile(
    * Unseen = uninteressant
    * (global relevant, never seen)
    * ---------------------------------- */
-  const UNSEEN_GENRE_PENALTY = 0.6;
-  const UNSEEN_TAG_PENALTY = 0.4;
-  const MIN_GLOBAL_TAG_COUNT = 50;
+
 
   for (const [name] of global.genreCount) {
     if (
@@ -174,8 +178,7 @@ export function buildTasteProfile(
   /* ----------------------------------
    * Reclassify weak positive genres
    * ---------------------------------- */
-  const POSITIVE_GENRE_MIN = 3.5;
-  const WEAK_GENRE_NEGATIVE_FACTOR = 0.6;
+
 
   for (const [name, value] of genres) {
     if (value < POSITIVE_GENRE_MIN) {

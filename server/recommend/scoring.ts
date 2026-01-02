@@ -11,8 +11,7 @@ import {
   AVG_SCORE_BASELINE,
   AVG_SCORE_MIN_MULTIPLIER,
   AVG_SCORE_MAX_MULTIPLIER,
-} from "./config";
-
+} from "./scoringConfig";
 export function scoreAnime(anime: any, taste: any) {
   let rawScore = 0;
 
