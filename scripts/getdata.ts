@@ -3,7 +3,7 @@ import { prisma } from "../utils/prisma";
 import { anilistRequest } from "../services/anilist/anilistClient";
 import { enqueueAniList } from "../services/anilist/anilistQueue";
 
-const PER_PAGE = 50; // bewusst konservativ
+const PER_PAGE = 50;
 const DRY_RUN = false;
 
 const QUERY = `
@@ -19,21 +19,26 @@ query ($page: Int!, $perPage: Int!) {
       seasonYear
       episodes
       averageScore
+      startDate {
+        year
+        month
+        day
+      }
+      endDate {
+        year
+        month
+        day
+      }
     }
   }
 }
 `;
 
 async function main() {
-  console.log("🔄 Full AniList pagination for anime meta data");
+  console.log("🔄 Full AniList pagination for anime meta data (with fuzzy dates)");
 
-  // 🔹 Alle IDs aus deiner DB in ein Set laden
   const dbIds = new Set(
-    (
-      await prisma.anime.findMany({
-        select: { id: true },
-      })
-    ).map((a) => a.id)
+    (await prisma.anime.findMany({ select: { id: true } })).map((a) => a.id)
   );
 
   console.log(`📦 DB contains ${dbIds.size} anime`);
@@ -43,7 +48,7 @@ async function main() {
 
   while (true) {
     const res: any = await enqueueAniList(() =>
-      anilistRequest<any>(QUERY, {
+      anilistRequest(QUERY, {
         page,
         perPage: PER_PAGE,
       })
@@ -52,13 +57,11 @@ async function main() {
     const media = res?.Page?.media ?? [];
     const pageInfo = res?.Page?.pageInfo;
 
-    console.log(
-      `➡️ Page ${page} – received ${media.length} entries`
-    );
+    console.log(`➡️ Page ${page} – received ${media.length} entries`);
 
     for (const m of media) {
-      // ❗ Nur updaten, wenn wir den Anime kennen
       if (!dbIds.has(m.id)) continue;
+
       if (!DRY_RUN) {
         await prisma.anime.update({
           where: { id: m.id },
@@ -67,6 +70,16 @@ async function main() {
             seasonYear: m.seasonYear ?? null,
             episodes: m.episodes ?? null,
             averageScore: m.averageScore ?? null,
+
+            // ✅ Fuzzy start date
+            startYear: m.startDate?.year ?? null,
+            startMonth: m.startDate?.month ?? null,
+            startDay: m.startDate?.day ?? null,
+
+            // ✅ Fuzzy end date
+            endYear: m.endDate?.year ?? null,
+            endMonth: m.endDate?.month ?? null,
+            endDay: m.endDate?.day ?? null,
           },
         });
       }
