@@ -165,6 +165,8 @@ export default defineEventHandler(async (event) => {
       season: a.season,
       seasonYear: a.startYear,
       episodes: a.episodes,
+      genres: a.genres.map((g: { name: string }) => g.name),
+      tags: a.tags.map((t: { name: string }) => t.name),
       matchedGenres,
       matchedTags,
     });

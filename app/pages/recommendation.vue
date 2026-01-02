@@ -11,6 +11,8 @@ type Recommendation = {
   cover: string | null;
   format: "TV" | "MOVIE";
   score: number;
+  genres: string[];
+  tags: string[];
   matchedGenres: string[];
   matchedTags: string[];
 };
@@ -435,18 +437,19 @@ function anilistUrl(id: number) {
 
           <div class="flex flex-wrap gap-1">
             <span
-              v-for="g in a.matchedGenres"
+              v-for="g in a.genres"
               :key="g"
               class="px-2 py-0.5 text-xs rounded bg-indigo-600/20 text-indigo-300"
+              
             >
-              {{ g }}
+             <a :href="`https://anilist.co/search/anime/${encodeURIComponent(g)}`" target="_blank" rel="noopener noreferrer">{{ g }}</a>
             </span>
             <span
-              v-for="t in a.matchedTags"
+              v-for="t in a.tags"
               :key="t"
               class="px-2 py-0.5 text-xs rounded bg-zinc-700/40 text-zinc-300"
             >
-              {{ t }}
+              <a :href="`https://anilist.co/search/anime/?genres=${encodeURIComponent(t)}`" target="_blank" rel="noopener noreferrer">{{ t }}</a>
             </span>
           </div>
 
@@ -487,7 +490,7 @@ function anilistUrl(id: number) {
 
           <div class="flex flex-wrap gap-1 mt-1">
             <span
-              v-for="g in a.matchedGenres"
+              v-for="g in a.genres"
               :key="g"
               class="text-xs text-indigo-400"
             >
