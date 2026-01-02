@@ -16,6 +16,18 @@ query FullAnime($id: Int!) {
     seasonYear
     episodes
     updatedAt
+
+    startDate {
+      year
+      month
+      day
+    }
+    endDate {
+      year
+      month
+      day
+    }
+
     coverImage {
       large
     }
@@ -38,6 +50,12 @@ query FullAnime($id: Int!) {
 }
 `;
 
+type FuzzyDate = {
+  year: number | null;
+  month: number | null;
+  day: number | null;
+};
+
 type FullAnimeResponse = {
   Media: {
     id: number;
@@ -51,6 +69,10 @@ type FullAnimeResponse = {
     seasonYear: number | null;
     episodes: number | null;
     updatedAt: number;
+
+    startDate: FuzzyDate | null;
+    endDate: FuzzyDate | null;
+
     coverImage: { large: string | null };
     genres: string[];
     tags: {
@@ -81,6 +103,10 @@ function hashAnime(m: FullAnimeResponse["Media"]) {
         season: m.season,
         seasonYear: m.seasonYear,
         episodes: m.episodes,
+
+        startDate: m.startDate,
+        endDate: m.endDate,
+
         genres: m.genres,
         tags: m.tags.map((t) => t.id),
       })
@@ -120,6 +146,15 @@ export async function syncAnime(anilistId: number) {
       season: Media.season,
       seasonYear: Media.seasonYear,
       episodes: Media.episodes,
+
+      startYear: Media.startDate?.year ?? null,
+      startMonth: Media.startDate?.month ?? null,
+      startDay: Media.startDate?.day ?? null,
+
+      endYear: Media.endDate?.year ?? null,
+      endMonth: Media.endDate?.month ?? null,
+      endDay: Media.endDate?.day ?? null,
+
       dataHash,
     },
     create: {
@@ -132,6 +167,15 @@ export async function syncAnime(anilistId: number) {
       season: Media.season,
       seasonYear: Media.seasonYear,
       episodes: Media.episodes,
+
+      startYear: Media.startDate?.year ?? null,
+      startMonth: Media.startDate?.month ?? null,
+      startDay: Media.startDate?.day ?? null,
+
+      endYear: Media.endDate?.year ?? null,
+      endMonth: Media.endDate?.month ?? null,
+      endDay: Media.endDate?.day ?? null,
+
       dataHash,
     },
   });

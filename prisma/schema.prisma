@@ -21,7 +21,13 @@ model Anime {
   averageScore  Int?
   season        String?         
   seasonYear    Int?
-  episodes      Int?        
+  episodes      Int?
+  startYear     Int?
+  startMonth    Int?
+  startDay      Int?
+  endYear       Int?
+  endMonth      Int?
+  endDay        Int?       
   relationsTo   AnimeRelation[] @relation("ToAnime")
   relationsFrom AnimeRelation[] @relation("FromAnime")
 
