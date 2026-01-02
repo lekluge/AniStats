@@ -312,7 +312,8 @@ function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
 
-onMounted(() => {
+onMounted(async() => {
+  await loadAllAnime();
   // 1️⃣ bestehende Compare-Users laden
   if (compareUsersCookie.value.length) {
     users.value = [...compareUsersCookie.value];
