@@ -2,7 +2,8 @@ import { GlobalStats } from "./types/GlobalStats";
 import { TasteProfile } from "./types/TasteProfile";
 import { idf } from "./globalStats";
 import { mapToSortedArray } from "./utils";
-import { GENRE_THRESHOLD,
+import {
+  GENRE_THRESHOLD,
   TAG_THRESHOLD,
   NEG_SCARCITY_ALPHA_GENRE,
   NEG_SCARCITY_ALPHA_TAG,
@@ -10,7 +11,8 @@ import { GENRE_THRESHOLD,
   UNSEEN_TAG_PENALTY,
   MIN_GLOBAL_TAG_COUNT,
   POSITIVE_GENRE_MIN,
-  WEAK_GENRE_NEGATIVE_FACTOR
+  WEAK_GENRE_NEGATIVE_FACTOR,
+  CORE_GENRE_EXPOSURE_BOOST,
 } from "./tasteConfig";
 
 export function buildTasteProfile(
@@ -20,107 +22,94 @@ export function buildTasteProfile(
   global: GlobalStats,
   debug?: { user?: string; topN?: number; log?: boolean }
 ): TasteProfile {
-  /* ----------------------------------
-   * Raw net scores
-   * ---------------------------------- */
   const genreScore = new Map<string, number>();
   const tagScore = new Map<number, number>();
 
-  /* ----------------------------------
-   * Exposure (user evidence)
-   * ---------------------------------- */
   const genreExposure = new Map<string, number>();
   const tagExposure = new Map<number, number>();
 
-  /* ----------------------------------
-   * Debug name lookup (LOG ONLY)
-   * ---------------------------------- */
   const tagNames = new Map<number, string>();
 
-  // 🔹 WICHTIG: globale Tag-ID → Name Map
+  // globale Tag-Namen
   for (const a of animeById.values()) {
     for (const t of a.tags) {
-      if (!tagNames.has(t.tagId)) {
-        tagNames.set(t.tagId, t.name);
-      }
+      if (!tagNames.has(t.tagId)) tagNames.set(t.tagId, t.name);
     }
   }
 
   /* ----------------------------------
-   * Build net taste from completed anime
+   * Build net taste
    * ---------------------------------- */
   for (const id of completedIds) {
     const a = animeById.get(id);
     if (!a) continue;
 
     const score = scoreById.get(id) ?? 5;
-    if (score === 5) continue; // neutral → ignore
+    if (score === 5) continue;
 
-    // -1 .. +1
     const signedWeight = (score - 5) / 5;
 
-    /* -------- Genres -------- */
     for (const g of a.genres) {
       const name = g.name;
-
       genreExposure.set(name, (genreExposure.get(name) ?? 0) + 1);
 
-      const idfWeight = idf(
-        global.genreCount.get(name) ?? 1,
-        global.totalAnime
-      );
+      const w =
+        signedWeight * idf(global.genreCount.get(name) ?? 1, global.totalAnime);
 
-      const w = signedWeight * idfWeight;
       genreScore.set(name, (genreScore.get(name) ?? 0) + w);
     }
 
-    /* -------- Tags -------- */
     for (const t of a.tags) {
       const id = t.tagId;
-
       tagExposure.set(id, (tagExposure.get(id) ?? 0) + 1);
 
-      const idfWeight = idf(global.tagCount.get(id) ?? 1, global.totalAnime);
+      const w =
+        signedWeight * idf(global.tagCount.get(id) ?? 1, global.totalAnime);
 
-      const w = signedWeight * idfWeight;
       tagScore.set(id, (tagScore.get(id) ?? 0) + w);
     }
   }
 
   /* ----------------------------------
-   * Split into positive / negative
-   * + Scarcity boost for negative
+   * Buckets
    * ---------------------------------- */
   const genres = new Map<string, number>();
   const negativeGenres = new Map<string, number>();
-
   const tags = new Map<number, number>();
   const negativeTags = new Map<number, number>();
-
-  /* ----------------------------------
-   * Unseen (uninteressant)
-   * ---------------------------------- */
   const unseenGenres = new Map<string, number>();
   const unseenTags = new Map<number, number>();
 
-
+  const TOTAL = Math.max(1, completedIds.length);
+  const CORE_GENRE_MIN_SHARE = 0.25;
 
   function scarcityBoost(exposure: number, alpha: number) {
     return 1 + alpha / Math.sqrt(Math.max(1, exposure));
   }
 
+  /* ----------------------------------
+   * Genres
+   * ---------------------------------- */
   for (const [name, v] of genreScore) {
+    const exposure = genreExposure.get(name) ?? 0;
+    const share = exposure / TOTAL;
+    const isCoreGenre = share >= CORE_GENRE_MIN_SHARE;
+
     if (v > GENRE_THRESHOLD) {
-      genres.set(name, v);
-    } else if (v < -GENRE_THRESHOLD) {
-      const exp = genreExposure.get(name) ?? 1;
+      const boostedValue = isCoreGenre ? v * CORE_GENRE_EXPOSURE_BOOST : v;
+
+      genres.set(name, boostedValue);
+    } else if (v < -GENRE_THRESHOLD && !isCoreGenre) {
       negativeGenres.set(
         name,
-        Math.abs(v) * scarcityBoost(exp, NEG_SCARCITY_ALPHA_GENRE)
+        Math.abs(v) * scarcityBoost(exposure, NEG_SCARCITY_ALPHA_GENRE)
       );
     }
   }
 
+  /* ----------------------------------
+   * Tags
+   * ---------------------------------- */
   for (const [id, v] of tagScore) {
     if (v > TAG_THRESHOLD) {
       tags.set(id, v);
@@ -134,38 +123,26 @@ export function buildTasteProfile(
   }
 
   /* ----------------------------------
-   * Unseen = uninteressant
-   * (global relevant, never seen)
+   * Unseen
    * ---------------------------------- */
-
-
   for (const [name] of global.genreCount) {
-    if (
-      !genreExposure.has(name) &&
-      !genres.has(name) &&
-      !negativeGenres.has(name)
-    ) {
+    if (!genreExposure.has(name) && !genres.has(name)) {
       unseenGenres.set(name, UNSEEN_GENRE_PENALTY);
     }
   }
 
   for (const [id, count] of global.tagCount) {
     if (count < MIN_GLOBAL_TAG_COUNT) continue;
-
-    if (!tagExposure.has(id) && !tags.has(id) && !negativeTags.has(id)) {
+    if (!tagExposure.has(id) && !tags.has(id)) {
       unseenTags.set(id, UNSEEN_TAG_PENALTY);
     }
   }
 
   /* ----------------------------------
-   * Soft-Cap / Saturation
+   * Soften
    * ---------------------------------- */
   function soften<K>(m: Map<K, number>) {
     for (const [k, v] of m) m.set(k, Math.log1p(v));
-  }
-
-  function cap<K>(m: Map<K, number>, max: number) {
-    for (const [k, v] of m) m.set(k, Math.min(v, max));
   }
 
   soften(genres);
@@ -176,18 +153,20 @@ export function buildTasteProfile(
   soften(unseenTags);
 
   /* ----------------------------------
-   * Reclassify weak positive genres
+   * Reclassify weak positives (nur wenn KEIN Core)
    * ---------------------------------- */
-
-
   for (const [name, value] of genres) {
-    if (value < POSITIVE_GENRE_MIN) {
-      genres.delete(name);
+    const share = (genreExposure.get(name) ?? 0) / TOTAL;
+    const isCore = share >= CORE_GENRE_MIN_SHARE;
 
-      const existingNeg = negativeGenres.get(name) ?? 0;
+    if (value < POSITIVE_GENRE_MIN && !isCore) {
+      genres.delete(name);
       negativeGenres.set(
         name,
-        Math.max(existingNeg, value * WEAK_GENRE_NEGATIVE_FACTOR)
+        Math.max(
+          negativeGenres.get(name) ?? 0,
+          value * WEAK_GENRE_NEGATIVE_FACTOR
+        )
       );
     }
   }
