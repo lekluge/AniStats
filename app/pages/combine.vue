@@ -31,7 +31,7 @@ type Cover = {
 
 type LayoutMode = "grid" | "list";
 type FilterState = "include" | "exclude";
-type CombineSortMode = "count" | "minutes";
+type CombineSortMode = "count" | "minutes" | "score";
 
 /* -----------------------------
  * State
@@ -303,6 +303,11 @@ function sortGrid<T extends { count: number; minutesWatched: number }>(
     if (sortMode.value === "count") {
       return b.count - a.count;
     }
+    if (sortMode.value === "score") {
+      const aScore = (a as any).meanScore ?? 0;
+      const bScore = (b as any).meanScore ?? 0;
+      return bScore - aScore;
+    }
     return b.minutesWatched - a.minutesWatched;
   });
 }
@@ -393,6 +398,17 @@ function anilistUrl(id: number) {
           "
         >
           Anzahl
+        </button>
+        <button
+          @click="sortMode = 'score'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            sortMode === 'score'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          Score
         </button>
         <button
           @click="sortMode = 'minutes'"

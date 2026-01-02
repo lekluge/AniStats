@@ -27,7 +27,7 @@ type GenreCover = {
 
 type LayoutMode = "grid" | "list";
 type GenreState = "include" | "exclude";
-type GenreSortMode = "count" | "minutes";
+type GenreSortMode = "count" | "minutes" | "score";
 
 /* -----------------------------
  * State
@@ -249,6 +249,15 @@ function sortGenres<T extends { count: number; minutesWatched: number }>(
     if (genreSortMode.value === "count") {
       return b.count - a.count;
     }
+    if (genreSortMode.value === "score") {
+      const aScore = a.hasOwnProperty("meanScore")
+        ? (a as any).meanScore
+        : 0;
+      const bScore = b.hasOwnProperty("meanScore")
+        ? (b as any).meanScore
+        : 0;
+      return bScore - aScore;
+    }
     return b.minutesWatched - a.minutesWatched;
   });
 }
@@ -340,6 +349,17 @@ function anilistUrl(id: number) {
           "
         >
           Anzahl
+        </button>
+        <button
+           @click="genreSortMode = 'score'"
+          class="px-3 py-2 text-xs rounded border"
+          :class="
+            genreSortMode === 'score'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-zinc-900 text-zinc-300'
+          "
+        >
+          Score
         </button>
         <button
           @click="genreSortMode = 'minutes'"
