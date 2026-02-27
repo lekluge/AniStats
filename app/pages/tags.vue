@@ -8,7 +8,7 @@ const route = useRoute();
 const pageSize = 50;
 const currentPage = ref(1);
 const totalPages = computed(() =>
-  Math.max(1, Math.ceil(listAnime.value.length / pageSize))
+  Math.max(1, Math.ceil(listAnime.value.length / pageSize)),
 );
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
@@ -37,7 +37,7 @@ const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
 const tagSortMode = ref<TagSortMode>("count");
 
-definePageMeta({ title: "Tags" });
+definePageMeta({ title: "Tags", middleware: "auth" });
 
 /* -----------------------------
  * API
@@ -72,7 +72,7 @@ onMounted(async () => {
 watch(
   () => route.query,
   () => applyQueryFilters(),
-  { deep: true }
+  { deep: true },
 );
 /* -----------------------------
  * TAG STATE
@@ -150,7 +150,7 @@ const filteredEntries = computed(() => {
 const includedTags = computed(() =>
   Object.entries(tagStates.value)
     .filter(([, s]) => s === "include")
-    .map(([t]) => t)
+    .map(([t]) => t),
 );
 
 const isCombinedMode = computed(() => includedTags.value.length > 1);
@@ -270,7 +270,7 @@ const combinedStats = computed(() => {
  * SORTING
  * ----------------------------- */
 function sortTags<T extends { count: number; minutesWatched: number }>(
-  list: T[]
+  list: T[],
 ) {
   return [...list].sort((a, b) => {
     if (tagSortMode.value === "count") {
@@ -317,7 +317,7 @@ const listAnime = computed(() =>
     cover:
       typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
-  }))
+  })),
 );
 
 /* -----------------------------

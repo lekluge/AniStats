@@ -5,7 +5,6 @@ import type { AnimeEntry } from "~/types/anime";
 import GameCard from "../components/GameCard.vue";
 import { useRoute } from "vue-router";
 const route = useRoute();
-
 const pageSize = 50;
 const currentPage = ref(1);
 const totalPages = computed(() =>
@@ -15,8 +14,7 @@ const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
 });
-
-definePageMeta({ title: "Combine" });
+definePageMeta({ title: "Combine", middleware: "auth" });
 
 /* -----------------------------
  * Types

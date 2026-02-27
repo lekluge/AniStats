@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { api } from "~/composables/useApi";
 
+import { api } from "~/composables/useApi";
 /* -----------------------------
  * Types
  * ----------------------------- */
@@ -64,7 +64,7 @@ const tagSearch = ref("");
 const allGenres = ref<string[]>([]);
 const allTags = ref<string[]>([]);
 
-definePageMeta({ title: "Recommendations" });
+definePageMeta({ title: "Recommendations", middleware: "auth" });
 
 /* -----------------------------
  * LOAD FILTER OPTIONS

@@ -2,6 +2,7 @@
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
+
 const anilistUser = useCookie<string>("anilist-user", {
   default: () => "",
 });
@@ -14,7 +15,7 @@ type FilterState = "include" | "exclude";
 /* -----------------------------
  * State
  * ----------------------------- */
-definePageMeta({ title: 'Compare' })
+definePageMeta({ title: 'Compare', middleware: "auth" })
 const userInput = ref("");
 const compareUsersCookie = useCookie<string[]>("compare-users", {
   default: () => [],

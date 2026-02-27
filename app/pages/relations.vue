@@ -8,7 +8,7 @@ const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const groups = ref<any[]>([]);
-definePageMeta({ title: "Relations" });
+definePageMeta({ title: "Relations", middleware: "auth" });
 /* -----------------------------
  * Search
  * ----------------------------- */

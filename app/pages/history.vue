@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({
-  middleware: "auth"
+  middleware: "auth", title: "History"
 })
 import HistoryCard from "~/components/HistoryCard.vue"
 

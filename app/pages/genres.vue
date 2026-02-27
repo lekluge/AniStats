@@ -40,7 +40,7 @@ const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
 const genreSortMode = ref<GenreSortMode>("count");
 
-definePageMeta({ title: "Genres" });
+definePageMeta({ title: "Genres", middleware: "auth" });
 
 /* -----------------------------
  * API
