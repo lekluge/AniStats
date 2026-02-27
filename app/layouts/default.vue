@@ -23,6 +23,7 @@
 
         <!-- Desktop Navigation -->
         <nav class="hidden md:flex gap-1 text-sm">
+          <div v-if="user">
           <NuxtLink to="/genres" class="nav-link">Genres</NuxtLink>
           <NuxtLink to="/tags" class="nav-link">Tags</NuxtLink>
           <NuxtLink to="/combine" class="nav-link">Combine</NuxtLink>
@@ -31,9 +32,10 @@
           <NuxtLink to="/recommendation" class="nav-link">
             Recommendation
           </NuxtLink>
-          <NuxtLink v-if="user" to="/history" class="nav-link">
+          <NuxtLink to="/history" class="nav-link">
             History
           </NuxtLink>
+          </div>
           <div class="flex items-center gap-4">
             <button
               v-if="!user"
@@ -102,6 +104,7 @@
         class="md:hidden border-t border-zinc-800/70 bg-zinc-950/95 backdrop-blur"
       >
         <nav class="px-4 py-4 space-y-2 text-sm">
+          <div v-if="user">
           <NuxtLink to="/genres" class="nav-link" @click="closeMenu">
             Genres
           </NuxtLink>
@@ -120,9 +123,10 @@
           <NuxtLink to="/recommendation" class="nav-link" @click="closeMenu">
             Recommendation
           </NuxtLink>
-          <NuxtLink v-if="user" to="/history" class="nav-link" @click="closeMenu">
+          <NuxtLink to="/history" class="nav-link" @click="closeMenu">
             History
           </NuxtLink>
+          </div>
           <div class="pt-4 border-t border-zinc-800">
             <button
               v-if="!user"
