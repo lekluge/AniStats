@@ -8,8 +8,20 @@
         class="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between"
       >
         <!-- Logo / Home -->
-        <NuxtLink
+        <NuxtLink v-if="!user"
           to="/"
+          class="flex items-center gap-3 group"
+          @click="closeMenu"
+        >
+          <img
+            src="/logo.png"
+            alt="AniList Stats"
+            class="h-8 w-auto transition group-hover:opacity-80"
+          />
+          <span class="sr-only">Home</span>
+        </NuxtLink>
+        <NuxtLink v-else
+          to="/dashboard"
           class="flex items-center gap-3 group"
           @click="closeMenu"
         >
