@@ -188,10 +188,12 @@ const watchTimelineData = computed(() => {
   const map: Record<number, number> = {};
 
   for (const e of entries.value) {
-    if (!e.seasonYear) continue;
+    if (!e.completedAt?.year) continue;
 
     const minutes = (e.progress ?? 0) * (e.duration ?? 20);
-    map[e.seasonYear] = (map[e.seasonYear] || 0) + minutes;
+    const year = e.completedAt.year;
+
+    map[year] = (map[year] || 0) + minutes;
   }
 
   return Object.entries(map)
