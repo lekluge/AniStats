@@ -2,12 +2,10 @@
   <div class="min-h-screen bg-zinc-950 text-zinc-100">
     <!-- HEADER -->
     <header
-      class="sticky top-0 z-50 border-b border-zinc-800/70
-             bg-zinc-950/80 backdrop-blur"
+      class="sticky top-0 z-50 border-b border-zinc-800/70 bg-zinc-950/80 backdrop-blur"
     >
       <div
-        class="mx-auto max-w-6xl px-4 py-4
-               flex items-center justify-between"
+        class="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between"
       >
         <!-- Logo / Home -->
         <NuxtLink
@@ -33,12 +31,34 @@
           <NuxtLink to="/recommendation" class="nav-link">
             Recommendation
           </NuxtLink>
+          <NuxtLink v-if="user" to="/history" class="nav-link">
+            History
+          </NuxtLink>
+          <div class="flex items-center gap-4">
+            <button
+              v-if="!user"
+              @click="login"
+              class="px-4 py-2 bg-blue-600 text-white rounded"
+            >
+              Login with AniList
+            </button>
+
+            <div v-else class="flex items-center gap-3">
+              <span class="text-zinc-300 text-sm"> 👋 {{ user.name }} </span>
+
+              <button
+                @click="logout"
+                class="px-3 py-1 text-sm bg-zinc-800 hover:bg-zinc-700 rounded transition"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
         </nav>
 
         <!-- Mobile Burger -->
         <button
-          class="md:hidden p-2 rounded-lg
-                 hover:bg-zinc-800/70 transition"
+          class="md:hidden p-2 rounded-lg hover:bg-zinc-800/70 transition"
           @click="menuOpen = !menuOpen"
           aria-label="Toggle navigation"
         >
@@ -79,8 +99,7 @@
       <!-- Mobile Menu -->
       <div
         v-if="menuOpen"
-        class="md:hidden border-t border-zinc-800/70
-               bg-zinc-950/95 backdrop-blur"
+        class="md:hidden border-t border-zinc-800/70 bg-zinc-950/95 backdrop-blur"
       >
         <nav class="px-4 py-4 space-y-2 text-sm">
           <NuxtLink to="/genres" class="nav-link" @click="closeMenu">
@@ -101,6 +120,28 @@
           <NuxtLink to="/recommendation" class="nav-link" @click="closeMenu">
             Recommendation
           </NuxtLink>
+          <NuxtLink v-if="user" to="/history" class="nav-link" @click="closeMenu">
+            History
+          </NuxtLink>
+          <div class="pt-4 border-t border-zinc-800">
+            <button
+              v-if="!user"
+              @click="login"
+              class="w-full px-4 py-2 bg-blue-600 text-white rounded"
+            >
+              Login with AniList
+            </button>
+
+            <div v-else class="space-y-2">
+              <div class="text-sm text-zinc-400">👋 {{ user.name }}</div>
+              <button
+                @click="logout"
+                class="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
         </nav>
       </div>
     </header>
@@ -120,5 +161,6 @@ const menuOpen = ref(false);
 const closeMenu = () => {
   menuOpen.value = false;
 };
-</script>
+const { user, login, logout } = useAuth();
 
+</script>

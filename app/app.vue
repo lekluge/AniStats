@@ -22,4 +22,7 @@ useHead(() => {
     ]
   }
 })
+const {loadUser} = useAuth();
+
+onMounted(loadUser);
 </script>
