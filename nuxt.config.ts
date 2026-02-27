@@ -6,4 +6,10 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
   vite: { plugins: [tailwindcss()] },
+  runtimeConfig: {
+    anilistClientId: process.env.ANILIST_CLIENT_ID,
+    anilistClientSecret: process.env.ANILIST_CLIENT_SECRET,
+    anilistRedirectUri: process.env.ANILIST_REDIRECT_URI,
+    debug: process.env.DEBUG === "true"
+  }
 });
