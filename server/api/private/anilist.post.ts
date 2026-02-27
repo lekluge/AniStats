@@ -1,11 +1,12 @@
-import { prisma } from "../../utils/prisma";
+import { prisma } from "../../../utils/prisma";
 import { createError } from "h3";
 import crypto from "crypto";
-import { anilistRequest } from "../../services/anilist/anilistClient";
+import { anilistRequest } from "../../../services/anilist/anilistClient";
 
 export default defineEventHandler(async (event) => {
   const { user } = getQuery(event);
   const userName = String(user || "").trim();
+  
 
   if (!userName) {
     throw createError({ statusCode: 400, statusMessage: "Missing ?user=" });

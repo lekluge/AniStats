@@ -35,12 +35,12 @@ async function loadRelations() {
       return;
     }
 
-    const userRes = await api.get("/api/anilist-user-list", {
+    const userRes = await api.get("/api/private/anilist-user-list", {
       params: { user: username.value },
     });
     const statusMap: Record<number, string> = userRes.data?.statusMap ?? {};
 
-    const relRes = await api.get("/api/relations");
+    const relRes = await api.get("/api/private/relations");
     const allGroups = relRes.data?.groups ?? [];
 
     const visibleGroups = allGroups.filter((g: any) => {

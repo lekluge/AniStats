@@ -73,7 +73,7 @@ async function loadGenreTags() {
   if (!username.value) {
     return;
   }
-  const res = await api.get("/api/genreTags");
+  const res = await api.get("/api/private/genreTags");
   allGenres.value = res.data.genres;
   allTags.value = res.data.tags.map((t: any) => t.name);
 }
@@ -138,7 +138,7 @@ async function loadRecommendations() {
     if (includeTags.length) params.tags = includeTags.join(",");
     if (excludeTags.length) params.excludeTags = excludeTags.join(",");
 
-    const res = await api.get("/api/recommendation", { params });
+    const res = await api.get("/api/private/recommendation", { params });
     items.value = res.data.items;
   } catch (e: any) {
     error.value = e?.message ?? "Unbekannter Fehler";

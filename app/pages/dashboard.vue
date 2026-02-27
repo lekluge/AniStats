@@ -55,7 +55,7 @@ async function loadAnime() {
       return;
     }
 
-    const res = await api.post("/api/anilist", null, {
+    const res = await api.post("/api/private/anilist", null, {
       params: { user: username.value },
     });
 

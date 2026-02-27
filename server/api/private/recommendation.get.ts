@@ -1,19 +1,19 @@
 import { defineEventHandler, getQuery, createError, setHeader } from "h3";
-import { prisma } from "../../utils/prisma";
+import { prisma } from "../../../utils/prisma";
 import crypto from "crypto";
 
-import { EXCLUDED_STATUSES } from "../recommend/config";
-import { loadUserAnilistEntries } from "../recommend/anilist";
-import { loadGlobalStats } from "../recommend/globalStats";
-import { buildTasteProfile } from "../recommend/tasteProfile";
-import { scoreAnime } from "../recommend/scoring";
-import { buildChainMap, isFirstUnseenInChain } from "../recommend/chain";
+import { EXCLUDED_STATUSES } from "../../recommend/config";
+import { loadUserAnilistEntries } from "../../recommend/anilist";
+import { loadGlobalStats } from "../../recommend/globalStats";
+import { buildTasteProfile } from "../../recommend/tasteProfile";
+import { scoreAnime } from "../../recommend/scoring";
+import { buildChainMap, isFirstUnseenInChain } from "../../recommend/chain";
 import {
   parseNumber,
   parseList,
   hasStartDate,
   isReleased,
-} from "../recommend/filters";
+} from "../../recommend/filters";
 
 /* ----------------------------------
  * Handler

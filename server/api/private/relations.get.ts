@@ -1,5 +1,5 @@
 import { defineEventHandler, setHeader } from "h3";
-import { prisma } from "../../utils/prisma";
+import { prisma } from "../../../utils/prisma";
 import crypto from "crypto";
 
 const CHAIN_REL = new Set(["PREQUEL", "SEQUEL"] as const);

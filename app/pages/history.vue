@@ -103,7 +103,7 @@ async function loadHistory() {
   currentPage.value = 1
 
   try {
-    const res = await $fetch<HistoryEntry[]>("/api/history", {
+    const res = await $fetch<HistoryEntry[]>("/api/private/history", {
       query: { start: start.value, end: end.value },
     })
 

@@ -50,7 +50,7 @@ const tagSearch = ref("");
  * API
  * ----------------------------- */
 async function loadAllAnime() {
-  const res = await api.get("/api/relations");
+  const res = await api.get("/api/private/relations");
 
   allAnime.value = res.data.groups.flatMap((g: any) =>
     g.chain.map((c: any) => ({
@@ -82,7 +82,7 @@ function removeUser(name: string) {
 async function loadSingleUser(username: string) {
   loading.value = true;
   try {
-    const res = await api.post("/api/anilist", null, {
+    const res = await api.post("/api/private/anilist", null, {
       params: { user: username },
     });
 
@@ -103,7 +103,7 @@ async function loadUsers() {
 
     const results = await Promise.all(
       users.value.map((u) =>
-        api.post("/api/anilist", null, { params: { user: u } })
+        api.post("/api/private/anilist", null, { params: { user: u } })
       )
     );
 
