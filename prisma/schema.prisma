@@ -33,6 +33,12 @@ model Anime {
 
   genres        AnimeGenre[]    
   tags          AnimeTag[]
+
+  @@index([format])
+  @@index([startYear])
+  @@index([season])
+  @@index([averageScore])
+  @@index([season, startYear])
 }
 
 model AnimeGenre {
@@ -68,6 +74,9 @@ model AnimeRelation {
   to   Anime @relation("ToAnime",   fields: [toId],   references: [id])
 
   @@unique([fromId, toId, relationType])
+  @@index([toId])
+  @@index([relationType])
+  @@index([relationType, fromId, toId])
 }
 model Genre {
   name String @id
@@ -82,6 +91,9 @@ model Tag {
   isAdult     Boolean
 
   updatedAt  DateTime @updatedAt
+
+  @@index([name])
+  @@index([category])
 }
 model SyncState {
   key   String @id
