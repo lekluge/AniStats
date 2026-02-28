@@ -112,8 +112,8 @@ const statusLabels: Record<string, string> = {
   PAUSED: "Paused",
 };
 const statusColors: Record<string, string> = {
-  Completed: "#22c55e", // grün
-  Planning: "#a3e635", // hellgrün
+  Completed: "#22c55e", // gruen
+  Planning: "#a3e635", // hellgruen
   Watching: "#38bdf8", // blau
   Dropped: "#fb7185", // rot
   Paused: "#facc15", // gelb
@@ -154,7 +154,7 @@ watchEffect(() => {
     legend: {
       bottom: 0,
       textStyle: {
-        color: "#a1a1aa",
+        color: "#7b8898",
       },
     },
     series: [
@@ -164,7 +164,7 @@ watchEffect(() => {
         avoidLabelOverlap: false,
         itemStyle: {
           borderRadius: 6,
-          borderColor: "#09090b",
+          borderColor: "#e6edf5",
           borderWidth: 2,
           color: (params: any) => statusColors[params.name],
         },
@@ -210,9 +210,9 @@ watchEffect(() => {
   timelineChartOption.value = {
     tooltip: {
       trigger: "axis",
-      backgroundColor: "#09090b",
-      borderColor: "#27272a",
-      textStyle: { color: "#e5e7eb" },
+      backgroundColor: "#ffffff",
+      borderColor: "#dbe5f0",
+      textStyle: { color: "#1f2a37" },
       formatter: (params: any[]) => {
         const p = params[0];
         const [ts, hours] = p.value;
@@ -244,7 +244,7 @@ watchEffect(() => {
     xAxis: {
       type: "time",
       axisLabel: {
-        color: "#a1a1aa",
+        color: "#7b8898",
         formatter: (v: number) => `${new Date(v).getFullYear()}`,
       },
       splitLine: { show: false },
@@ -253,9 +253,9 @@ watchEffect(() => {
     yAxis: {
       type: "value",
       name: "Stunden",
-      axisLabel: { color: "#a1a1aa" },
+      axisLabel: { color: "#7b8898" },
       splitLine: {
-        lineStyle: { color: "#27272a" },
+        lineStyle: { color: "#e6edf5" },
       },
     },
 
@@ -267,14 +267,14 @@ watchEffect(() => {
         symbol: "circle",
         symbolSize: 6,
         lineStyle: {
-          color: "#a78bfa",
+          color: "#3db4f2",
           width: 3,
         },
         itemStyle: {
-          color: "#a78bfa",
+          color: "#3db4f2",
         },
         areaStyle: {
-          color: "rgba(167,139,250,0.15)",
+          color: "rgba(61,180,242,0.18)",
         },
       },
     ],
@@ -283,17 +283,15 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div
-      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
+    <div class="page-header">
       <h1 class="text-3xl font-bold">Dashboard</h1>
 
       <div class="flex gap-2">
         <input
           v-model="username"
-          class="rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm"
+          class="ui-input"
           placeholder="AniList Username"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
@@ -301,7 +299,7 @@ watchEffect(() => {
         />
         <button
           @click="loadAnime"
-          class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
+          class="ui-btn ui-btn-primary"
           :disabled="loading"
         >
           Laden
@@ -310,7 +308,7 @@ watchEffect(() => {
     </div>
 
     <!-- States -->
-    <div v-if="loading" class="text-zinc-400">Lade AniList Daten…</div>
+    <div v-if="loading" class="text-zinc-400">Lade AniList Daten...</div>
 
     <div v-else-if="error" class="text-red-400">Fehler: {{ error }}</div>
 

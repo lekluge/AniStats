@@ -1,78 +1,40 @@
 <template>
-  <div class="min-h-screen bg-zinc-950 text-zinc-100">
-    <!-- HEADER -->
-    <header
-      class="sticky top-0 z-50 border-b border-zinc-800/70 bg-zinc-950/80 backdrop-blur"
-    >
-      <div
-        class="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between"
-      >
-        <!-- Logo / Home -->
-        <NuxtLink v-if="!user"
-          to="/"
-          class="flex items-center gap-3 group"
-          @click="closeMenu"
-        >
-          <img
-            src="/logo.png"
-            alt="AniList Stats"
-            class="h-8 w-auto transition group-hover:opacity-80"
-          />
-          <span class="sr-only">Home</span>
-        </NuxtLink>
-        <NuxtLink v-else
-          to="/dashboard"
-          class="flex items-center gap-3 group"
-          @click="closeMenu"
-        >
-          <img
-            src="/logo.png"
-            alt="AniList Stats"
-            class="h-8 w-auto transition group-hover:opacity-80"
-          />
-          <span class="sr-only">Home</span>
+  <div class="min-h-screen text-slate-900">
+    <header class="sticky top-0 z-50 border-b border-zinc-800/70 bg-zinc-950/95 backdrop-blur-xl">
+      <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <NuxtLink :to="user ? '/dashboard' : '/'" class="flex items-center gap-3" @click="closeMenu">
+          <img src="/logo.png" alt="AniList Stats" class="h-8 w-auto" />
+          <div class="hidden sm:block leading-tight">
+            <div class="text-sm font-semibold text-slate-800">AniList Stats</div>
+            <div class="text-xs text-zinc-500">Insights Dashboard</div>
+          </div>
         </NuxtLink>
 
-        <!-- Desktop Navigation -->
-        <nav class="hidden md:flex gap-1 text-sm">
-          <div v-if="user">
-          <NuxtLink to="/genres" class="nav-link">Genres</NuxtLink>
-          <NuxtLink to="/tags" class="nav-link">Tags</NuxtLink>
-          <NuxtLink to="/combine" class="nav-link">Combine</NuxtLink>
-          <NuxtLink to="/relations" class="nav-link">Relations</NuxtLink>
-          <NuxtLink to="/compare" class="nav-link">Compare</NuxtLink>
-          <NuxtLink to="/recommendation" class="nav-link">
-            Recommendation
-          </NuxtLink>
-          <NuxtLink to="/history" class="nav-link">
-            History
-          </NuxtLink>
-          </div>
-          <div class="flex items-center gap-4">
-            <button
-              v-if="!user"
-              @click="login"
-              class="px-4 py-2 bg-blue-600 text-white rounded"
-            >
-              Login with AniList
-            </button>
-
-            <div v-else class="flex items-center gap-3">
-              <span class="text-zinc-300 text-sm"> 👋 {{ user.name }} </span>
-
-              <button
-                @click="logout"
-                class="px-3 py-1 text-sm bg-zinc-800 hover:bg-zinc-700 rounded transition"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
+        <nav class="hidden md:flex items-center gap-1 text-sm">
+          <template v-if="user">
+            <NuxtLink to="/genres" class="nav-link">Genres</NuxtLink>
+            <NuxtLink to="/tags" class="nav-link">Tags</NuxtLink>
+            <NuxtLink to="/combine" class="nav-link">Combine</NuxtLink>
+            <NuxtLink to="/relations" class="nav-link">Relations</NuxtLink>
+            <NuxtLink to="/compare" class="nav-link">Compare</NuxtLink>
+            <NuxtLink to="/recommendation" class="nav-link">Recommendation</NuxtLink>
+            <NuxtLink to="/history" class="nav-link">History</NuxtLink>
+          </template>
         </nav>
 
-        <!-- Mobile Burger -->
+        <div class="hidden md:flex items-center gap-3">
+          <button @click="toggleTheme" class="ui-btn">
+            {{ themeLabel }}
+          </button>
+          <button v-if="!user" @click="login" class="ui-btn ui-btn-primary">Login with AniList</button>
+          <template v-else>
+            <span class="rounded-full border border-zinc-800 px-3 py-1 text-sm text-zinc-400">{{ user.name }}</span>
+            <button @click="logout" class="ui-btn">Logout</button>
+          </template>
+        </div>
+
         <button
-          class="md:hidden p-2 rounded-lg hover:bg-zinc-800/70 transition"
+          class="md:hidden rounded-lg p-2 transition hover:bg-zinc-800/70"
           @click="menuOpen = !menuOpen"
           aria-label="Toggle navigation"
         >
@@ -84,14 +46,8 @@
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 6h16M4 12h16M4 18h16"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-
           <svg
             v-else
             xmlns="http://www.w3.org/2000/svg"
@@ -100,83 +56,54 @@
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <!-- Mobile Menu -->
-      <div
-        v-if="menuOpen"
-        class="md:hidden border-t border-zinc-800/70 bg-zinc-950/95 backdrop-blur"
-      >
-        <nav class="px-4 py-4 space-y-2 text-sm">
-          <div v-if="user">
-          <NuxtLink to="/genres" class="nav-link" @click="closeMenu">
-            Genres
-          </NuxtLink>
-          <NuxtLink to="/tags" class="nav-link" @click="closeMenu">
-            Tags
-          </NuxtLink>
-          <NuxtLink to="/combine" class="nav-link" @click="closeMenu">
-            Combine
-          </NuxtLink>
-          <NuxtLink to="/relations" class="nav-link" @click="closeMenu">
-            Relations
-          </NuxtLink>
-          <NuxtLink to="/compare" class="nav-link" @click="closeMenu">
-            Compare
-          </NuxtLink>
-          <NuxtLink to="/recommendation" class="nav-link" @click="closeMenu">
-            Recommendation
-          </NuxtLink>
-          <NuxtLink to="/history" class="nav-link" @click="closeMenu">
-            History
-          </NuxtLink>
-          </div>
-          <div class="pt-4 border-t border-zinc-800">
-            <button
-              v-if="!user"
-              @click="login"
-              class="w-full px-4 py-2 bg-blue-600 text-white rounded"
-            >
-              Login with AniList
-            </button>
+      <div v-if="menuOpen" class="border-t border-zinc-800/70 bg-zinc-950/95 px-4 py-4 md:hidden">
+        <nav class="space-y-2 text-sm">
+          <template v-if="user">
+            <NuxtLink to="/genres" class="nav-link" @click="closeMenu">Genres</NuxtLink>
+            <NuxtLink to="/tags" class="nav-link" @click="closeMenu">Tags</NuxtLink>
+            <NuxtLink to="/combine" class="nav-link" @click="closeMenu">Combine</NuxtLink>
+            <NuxtLink to="/relations" class="nav-link" @click="closeMenu">Relations</NuxtLink>
+            <NuxtLink to="/compare" class="nav-link" @click="closeMenu">Compare</NuxtLink>
+            <NuxtLink to="/recommendation" class="nav-link" @click="closeMenu">Recommendation</NuxtLink>
+            <NuxtLink to="/history" class="nav-link" @click="closeMenu">History</NuxtLink>
+          </template>
 
+          <div class="pt-4 border-t border-zinc-800/70">
+            <button @click="toggleTheme" class="ui-btn w-full mb-2">
+              {{ themeLabel }}
+            </button>
+            <button v-if="!user" @click="login" class="ui-btn ui-btn-primary w-full">Login with AniList</button>
             <div v-else class="space-y-2">
-              <div class="text-sm text-zinc-400">👋 {{ user.name }}</div>
-              <button
-                @click="logout"
-                class="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded"
-              >
-                Logout
-              </button>
+              <div class="rounded-lg bg-zinc-900/40 px-3 py-2 text-sm text-zinc-400">{{ user.name }}</div>
+              <button @click="logout" class="ui-btn w-full">Logout</button>
             </div>
           </div>
         </nav>
       </div>
     </header>
 
-    <!-- CONTENT -->
-    <main class="mx-auto max-w-6xl px-4 py-8">
+    <main class="mx-auto w-full max-w-7xl px-4 py-8 lg:px-6">
       <slot />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 const menuOpen = ref(false);
-
 const closeMenu = () => {
   menuOpen.value = false;
 };
-const { user, login, logout } = useAuth();
 
+const { user, login, logout } = useAuth();
+const { theme, toggleTheme } = useTheme();
+const themeLabel = computed(() =>
+  theme.value === "dark" ? "Light Mode" : "Dark Mode"
+);
 </script>

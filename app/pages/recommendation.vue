@@ -75,7 +75,7 @@ async function loadGenreTags() {
   }
   const res = await api.get("/api/private/genreTags");
   allGenres.value = res.data.genres;
-  allTags.value = res.data.tags.map((t: any) => t.name);
+  allTags.value = res.data.tags.map((t: { name: string }) => t.name);
 }
 
 /* -----------------------------
@@ -173,7 +173,7 @@ function toggleTitleMode() {
 }
 
 /**
- * Liefert 1 oder 2 Zeilen Titel (je nach Verfügbarkeit),
+ * Liefert 1 oder 2 Zeilen Titel (je nach Verfuegbarkeit),
  * und respektiert den globalen titleMode.
  */
 function getTitleLines(a: Recommendation): {
@@ -200,25 +200,23 @@ function anilistUrl(id: number) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div
-      class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
-    >
+    <div class="page-header">
       <h1 class="text-3xl font-bold">Recommendations</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
         <div class="flex gap-2">
           <input
             v-model="username"
-            class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+            class="ui-input"
             placeholder="AniList Username"
             @keydown.enter.prevent="loadRecommendations"
             @keydown.space.prevent="loadRecommendations"
           />
           <button
             @click="loadRecommendations"
-            class="bg-indigo-600 px-4 py-2 rounded"
+            class="ui-btn ui-btn-primary"
             :disabled="loading"
           >
             Laden
@@ -228,11 +226,11 @@ function anilistUrl(id: number) {
         <!-- Title toggle -->
         <button
           @click="toggleTitleMode"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm text-zinc-200 hover:border-zinc-700"
+          class="ui-btn"
           :disabled="loading"
           title="Titel-Reihenfolge umschalten"
         >
-          {{ titleMode === "EN_FIRST" ? "EN → RO" : "RO → EN" }}
+          {{ titleMode === "EN_FIRST" ? "EN -> RO" : "RO -> EN" }}
         </button>
       </div>
     </div>
@@ -241,7 +239,7 @@ function anilistUrl(id: number) {
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <select
         v-model="filterSeason"
-        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+        class="ui-input"
       >
         <option :value="null">Season (alle)</option>
         <option>SPRING</option>
@@ -254,35 +252,35 @@ function anilistUrl(id: number) {
         v-model.number="seasonYearMin"
         type="number"
         placeholder="Season Year Min"
-        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+        class="ui-input"
       />
 
       <input
         v-model.number="seasonYearMax"
         type="number"
         :placeholder="`Season Year Max (${CURRENT_YEAR})`"
-        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+        class="ui-input"
       />
 
       <input
         v-model.number="episodesMin"
         type="number"
         placeholder="Min Episodes"
-        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+        class="ui-input"
       />
 
       <input
         v-model.number="episodesMax"
         type="number"
         placeholder="Max Episodes"
-        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+        class="ui-input"
       />
 
       <input
         v-model.number="averageScoreMin"
         type="number"
         placeholder="Min Avg Score"
-        class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded"
+        class="ui-input"
       />
     </div>
     <!-- UPCOMING TOGGLE -->
@@ -299,7 +297,7 @@ function anilistUrl(id: number) {
             : 'bg-zinc-900 text-zinc-300 border-zinc-800'
         "
       >
-        {{ includeUpcoming ? "✓ Upcoming enthalten" : "Upcoming ausblenden" }}
+        {{ includeUpcoming ? "Upcoming einbeziehen" : "Upcoming ausblenden" }}
       </button>
 
       <span class="text-xs text-zinc-500">
@@ -327,8 +325,8 @@ function anilistUrl(id: number) {
     <!-- TAG SEARCH -->
     <input
       v-model="tagSearch"
-      placeholder="Tags suchen…"
-      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+      placeholder="Tags suchen..."
+      class="ui-input w-full px-4"
     />
 
     <!-- TAGS -->
@@ -440,16 +438,15 @@ function anilistUrl(id: number) {
               v-for="g in a.genres"
               :key="g"
               class="px-2 py-0.5 text-xs rounded bg-indigo-600/20 text-indigo-300"
-              
             >
-             <a :href="`https://anilist.co/search/anime/${encodeURIComponent(g)}`" target="_blank" rel="noopener noreferrer">{{ g }}</a>
+              <a :href="`https://anilist.co/search/anime/${encodeURIComponent(g)}`" target="_blank" rel="noopener noreferrer">{{ g }}</a>
             </span>
             <span
               v-for="t in a.tags"
               :key="t"
               class="px-2 py-0.5 text-xs rounded bg-zinc-700/40 text-zinc-300"
             >
-              <a :href="`https://anilist.co/search/anime/?genres=${encodeURIComponent(t)}`" target="_blank" rel="noopener noreferrer">{{ t }}</a>
+              <a :href="`https://anilist.co/search/anime/${encodeURIComponent(t)}`" target="_blank" rel="noopener noreferrer">{{ t }}</a>
             </span>
           </div>
 

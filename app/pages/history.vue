@@ -160,26 +160,26 @@ function anilistUrl(id: number) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
+    <div class="page-header">
       <h1 class="text-3xl font-bold">History</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           type="date"
           v-model="start"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-40"
+          class="ui-input w-full sm:w-40"
         />
         <input
           type="date"
           v-model="end"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-40"
+          class="ui-input w-full sm:w-40"
         />
         <!-- Optional: Button bleibt als fallback drin -->
         <button
           @click="loadHistory"
-          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
+          class="ui-btn ui-btn-primary w-full sm:w-auto"
           :disabled="loading || !start || !end"
           title="Optional – Auto-Load passiert auch automatisch"
         >

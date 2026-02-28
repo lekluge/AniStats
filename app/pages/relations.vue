@@ -135,17 +135,15 @@ function displayTitle(en?: string | null, ro?: string | null) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div
-      class="flex flex-col md:flex-row md:justify-between md:items-center gap-4"
-    >
+    <div class="page-header md:justify-between md:items-center">
       <h1 class="text-3xl font-bold">Anime Relations</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded text-sm w-full sm:w-40"
+          class="ui-input w-full sm:w-40"
           placeholder="AniList Username"
           @keydown.enter.prevent="loadRelations"
           @keydown.space.prevent="loadRelations"
@@ -153,7 +151,7 @@ function displayTitle(en?: string | null, ro?: string | null) {
 
         <button
           @click="loadRelations"
-          class="bg-indigo-600 px-4 py-2 rounded text-sm w-full sm:w-auto"
+          class="ui-btn ui-btn-primary w-full sm:w-auto"
         >
           Laden
         </button>
@@ -165,7 +163,7 @@ function displayTitle(en?: string | null, ro?: string | null) {
       v-if="!loading"
       v-model="search"
       placeholder="Anime suchen (English / Romaji)…"
-      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-3 md:py-2 rounded"
+      class="ui-input w-full px-4 py-3 md:py-2"
     />
 
     <!-- Summary -->

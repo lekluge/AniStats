@@ -313,22 +313,22 @@ function anilistUrl(id: number) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
+    <div class="page-header">
       <h1 class="text-3xl font-bold">Genres</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
-          class="bg-zinc-900 border border-zinc-800 px-3 py-2 rounded w-full sm:w-48"
+          class="ui-input w-full sm:w-48"
           placeholder="AniList Username"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
         <button
           @click="loadAnime"
-          class="bg-indigo-600 px-4 py-2 rounded w-full sm:w-auto"
+          class="ui-btn ui-btn-primary w-full sm:w-auto"
           :disabled="loading"
         >
           Laden

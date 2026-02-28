@@ -313,6 +313,10 @@ function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
 }
 
+function setSeenFilter(value: SeenFilter) {
+  seenFilter.value = value
+}
+
 onMounted(async() => {
   await loadAllAnime();
   // 1️⃣ bestehende Compare-Users laden
@@ -350,11 +354,9 @@ watch(
 <!-- TEMPLATE BLEIBT 1:1 UNVERÄNDERT -->
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div
-      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
+    <div class="page-header">
       <h1 class="text-3xl font-bold">Compare Users</h1>
 
       <!-- <button
@@ -372,7 +374,7 @@ watch(
         @keydown.space.prevent="addUser"
         @keydown.enter.prevent="addUser"
         placeholder="User eingeben + Leertaste"
-        class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+        class="ui-input w-full px-4"
       />
 
       <div class="flex flex-wrap gap-2">
@@ -396,7 +398,7 @@ watch(
     <input
       v-model="search"
       placeholder="Anime suchen (English / Romaji)…"
-      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+      class="ui-input w-full px-4"
     />
 
     <!-- Seen Filter -->
@@ -404,7 +406,7 @@ watch(
       <button
         v-for="f in ['allUsers', 'all', 'noneUsers']"
         :key="f"
-        @click="seenFilter = f as any"
+        @click="setSeenFilter(f as SeenFilter)"
         class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto transition"
         :class="
           seenFilter === f
@@ -444,7 +446,7 @@ watch(
     <input
       v-model="tagSearch"
       placeholder="Tags suchen…"
-      class="w-full bg-zinc-900 border border-zinc-800 px-4 py-2 rounded"
+      class="ui-input w-full px-4"
     />
 
     <!-- Tags -->

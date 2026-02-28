@@ -360,22 +360,22 @@ function anilistUrl(id: number) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="page-shell">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
+    <div class="page-header">
       <h1 class="text-3xl font-bold">Combined</h1>
 
       <div class="flex gap-2">
         <input
           v-model="username"
-          class="bg-zinc-900 border px-3 py-2 rounded"
+          class="ui-input"
           placeholder="AniList Username"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
         <button
           @click="loadAnime"
-          class="bg-indigo-600 px-4 py-2 rounded"
+          class="ui-btn ui-btn-primary"
           :disabled="loading"
         >
           Laden
@@ -469,7 +469,7 @@ function anilistUrl(id: number) {
     <input
       v-model="tagSearch"
       placeholder="Tags suchen…"
-      class="w-full bg-zinc-900 border px-4 py-2 rounded"
+      class="ui-input w-full px-4"
     />
 
     <!-- Tags -->

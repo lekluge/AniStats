@@ -1,127 +1,65 @@
 <script setup lang="ts">
-const { login } = useAuth()
+const { login } = useAuth();
 definePageMeta({
-  middleware: "guest", title: "Welcome"
-})
+  middleware: "guest",
+  title: "Welcome",
+});
 </script>
 
 <template>
-  <div class="relative overflow-hidden">
-
-    <!-- Background Gradient -->
-    <div class="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-600/10 via-purple-600/10 to-pink-600/10" />
-    <div class="absolute inset-0 -z-10 bg-zinc-950/90" />
-
-    <div class="mx-auto max-w-6xl px-6 py-20 space-y-28">
-
-      <!-- HERO -->
-      <section class="text-center space-y-8">
-
-        <h1 class="text-5xl sm:text-6xl font-bold tracking-tight">
-          Deine <span class="text-indigo-500">Anime-Statistiken</span><br />
-          neu visualisiert.
-        </h1>
-
-        <p class="text-lg text-zinc-400 max-w-2xl mx-auto">
-          AniStats verbindet sich mit deinem AniList-Account und zeigt dir
-          Stunden, Episoden, Trends und Watch-Verhalten in interaktiven Charts.
-        </p>
-
-        <div class="flex justify-center gap-4">
-          <button
-            @click="login"
-            class="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-xl font-semibold text-white transition shadow-lg shadow-indigo-600/20"
-          >
+  <div class="relative overflow-hidden page-shell">
+    <section class="ui-card p-8 md:p-12">
+      <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
+        <div class="space-y-5">
+          <div class="inline-flex rounded-full border border-zinc-800 bg-zinc-900/40 px-3 py-1 text-xs font-medium text-zinc-500">
+            AniList-inspired analytics workspace
+          </div>
+          <h1 class="text-4xl sm:text-5xl font-bold tracking-tight text-slate-800">
+            Deine Anime-Statistiken
+            <span class="text-indigo-500"> professionell visualisiert</span>
+          </h1>
+          <p class="max-w-xl text-base text-zinc-400">
+            Verbinde deinen AniList Account und analysiere Genres, Tags, Relations und History
+            in einem konsistenten Dashboard.
+          </p>
+          <button @click="login" class="ui-btn ui-btn-primary px-8 py-3 text-base font-semibold">
             Login mit AniList
           </button>
-
         </div>
 
-      </section>
-
-      <!-- FEATURES -->
-      <section class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-
-        <div class="rounded-3xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-8 space-y-4 hover:border-indigo-500/40 transition">
-          <div class="text-3xl">📊</div>
-          <h3 class="text-xl font-semibold">Automatische KPIs</h3>
-          <p class="text-zinc-400">
-            Anime, Episoden, Stunden und Completion-Rate – sofort berechnet.
-          </p>
-        </div>
-
-        <div class="rounded-3xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-8 space-y-4 hover:border-indigo-500/40 transition">
-          <div class="text-3xl">📈</div>
-          <h3 class="text-xl font-semibold">Interaktive Charts</h3>
-          <p class="text-zinc-400">
-            Status-Verteilung, Timeline und Trend-Analysen auf einen Blick.
-          </p>
-        </div>
-
-        <div class="rounded-3xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-8 space-y-4 hover:border-indigo-500/40 transition">
-          <div class="text-3xl">📅</div>
-          <h3 class="text-xl font-semibold">History & Seasons</h3>
-          <p class="text-zinc-400">
-            Filtere nach Zeitraum oder Season und erkenne deine Muster.
-          </p>
-        </div>
-
-      </section>
-
-      <!-- HOW IT WORKS -->
-      <section class="space-y-12">
-
-        <h2 class="text-3xl font-bold text-center">
-          So funktioniert AniStats
-        </h2>
-
-        <div class="grid gap-8 sm:grid-cols-3">
-
-          <div class="rounded-2xl bg-zinc-900/50 border border-zinc-800 p-6 text-center space-y-3">
-            <div class="text-indigo-500 text-2xl font-bold">1</div>
-            <h4 class="font-semibold">Einloggen</h4>
-            <p class="text-zinc-400 text-sm">
-              Sicher via AniList OAuth verbinden.
-            </p>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="ui-card space-y-2">
+            <div class="text-xs uppercase tracking-wide text-zinc-500">KPI</div>
+            <div class="text-2xl font-semibold text-slate-800">Automatisch</div>
+            <p class="text-sm text-zinc-400">Anime, Episoden, Stunden und Completion auf einen Blick.</p>
           </div>
-
-          <div class="rounded-2xl bg-zinc-900/50 border border-zinc-800 p-6 text-center space-y-3">
-            <div class="text-indigo-500 text-2xl font-bold">2</div>
-            <h4 class="font-semibold">Daten abrufen</h4>
-            <p class="text-zinc-400 text-sm">
-              Deine Anime-Listen werden automatisch geladen.
-            </p>
+          <div class="ui-card space-y-2">
+            <div class="text-xs uppercase tracking-wide text-zinc-500">Charts</div>
+            <div class="text-2xl font-semibold text-slate-800">Interaktiv</div>
+            <p class="text-sm text-zinc-400">Status-Verteilung und Timeline direkt aus deinen Listendaten.</p>
           </div>
-
-          <div class="rounded-2xl bg-zinc-900/50 border border-zinc-800 p-6 text-center space-y-3">
-            <div class="text-indigo-500 text-2xl font-bold">3</div>
-            <h4 class="font-semibold">Insights genießen</h4>
-            <p class="text-zinc-400 text-sm">
-              Interaktive Visualisierungen & persönliche Trends.
-            </p>
+          <div class="ui-card space-y-2 sm:col-span-2">
+            <div class="text-xs uppercase tracking-wide text-zinc-500">Deep Dive</div>
+            <div class="text-2xl font-semibold text-slate-800">Filter + Recommendations</div>
+            <p class="text-sm text-zinc-400">Kombiniere Genre/Tag-Filter, vergleiche User und entdecke passende Titel.</p>
           </div>
-
         </div>
+      </div>
+    </section>
 
-      </section>
-
-      <!-- CTA -->
-      <section class="text-center space-y-6">
-
-        <h3 class="text-2xl font-semibold">
-          Bereit für deine Anime-Insights?
-        </h3>
-
-        <button
-          @click="login"
-          class="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-2xl text-lg font-semibold transition shadow-xl shadow-indigo-600/20"
-        >
-          Jetzt Login mit AniList
-        </button>
-
-      </section>
-
-    </div>
-
+    <section class="grid gap-4 md:grid-cols-3">
+      <div class="ui-card space-y-2">
+        <div class="text-xs font-semibold text-zinc-500">1. Einloggen</div>
+        <p class="text-sm text-zinc-400">Sicher mit AniList OAuth authentifizieren.</p>
+      </div>
+      <div class="ui-card space-y-2">
+        <div class="text-xs font-semibold text-zinc-500">2. Daten laden</div>
+        <p class="text-sm text-zinc-400">Listen werden automatisch abgerufen und aufbereitet.</p>
+      </div>
+      <div class="ui-card space-y-2">
+        <div class="text-xs font-semibold text-zinc-500">3. Auswerten</div>
+        <p class="text-sm text-zinc-400">Direkt in Dashboard, History, Compare und Recommendation arbeiten.</p>
+      </div>
+    </section>
   </div>
 </template>
