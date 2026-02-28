@@ -20,9 +20,9 @@ function resolvePath(
 
 export function useLocale() {
   const localeCookie = useCookie<AppLocale>("anistats-locale", {
-    default: () => "de",
+    default: () => "en",
   });
-  const locale = useState<AppLocale>("app-locale", () => localeCookie.value ?? "de");
+  const locale = useState<AppLocale>("app-locale", () => localeCookie.value ?? "en");
   const initialized = useState<boolean>("app-locale-initialized", () => false);
 
   function initLocale() {
@@ -32,7 +32,7 @@ export function useLocale() {
       locale.value = fromStorage;
       localeCookie.value = fromStorage;
     } else {
-      locale.value = localeCookie.value ?? "de";
+      locale.value = localeCookie.value ?? "en";
     }
     initialized.value = true;
   }
@@ -51,7 +51,7 @@ export function useLocale() {
 
   function t(key: string): string {
     const langTable = translations[locale.value] as Record<string, unknown>;
-    const fallbackTable = translations.de as Record<string, unknown>;
+    const fallbackTable = translations.en as Record<string, unknown>;
     const segments = key.split(".");
     const localized = resolvePath(langTable, segments);
     if (localized) return localized;
