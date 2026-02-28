@@ -19,6 +19,46 @@ import type {
   AnimeWithRelations,
   RecommendationItem,
 } from "../../types/api/private";
+import type { GlobalStats } from "../../recommend/types/GlobalStats";
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function computeColdStartScore(
+  anime: AnimeWithGenresTags,
+  globalStats: GlobalStats
+): number {
+  const total = Math.max(1, globalStats.totalAnime);
+
+  const genreSignals = anime.genres.map(
+    (g) => (globalStats.genreCount.get(g.name) ?? 0) / total
+  );
+  const tagSignals = anime.tags
+    .map((t) =>
+      typeof t.tagId === "number"
+        ? (globalStats.tagCount.get(t.tagId) ?? 0) / total
+        : 0
+    )
+    .filter((v) => v > 0);
+
+  const genreStrength =
+    genreSignals.length > 0
+      ? genreSignals.reduce((sum, v) => sum + v, 0) / genreSignals.length
+      : 0;
+  const tagStrength =
+    tagSignals.length > 0
+      ? tagSignals.reduce((sum, v) => sum + v, 0) / tagSignals.length
+      : 0;
+
+  const quality =
+    typeof anime.averageScore === "number" ? clamp01(anime.averageScore / 100) : 0;
+  const combinationBreadth = clamp01((anime.genres.length * anime.tags.length) / 25);
+  const richness = clamp01((anime.genres.length + anime.tags.length) / 15);
+  const diversity = Math.max(combinationBreadth, richness);
+
+  return quality * 0.45 + genreStrength * 0.3 + tagStrength * 0.15 + diversity * 0.1;
+}
 
 /* ----------------------------------
  * Handler
@@ -102,85 +142,93 @@ export default defineEventHandler(async (event) => {
     globalStats,
     { user, topN: 30, log: true }
   );
+  const hasTasteSignal = taste.genres.size > 0 || taste.tags.size > 0;
 
   const recs: RecommendationItem[] = [];
 
   for (const a of anime) {
     if (excludedIds.has(a.id)) continue;
 
-    // ❌ kein Startdatum → nie empfehlen
+    // no start date -> never recommend
     if (!hasStartDate(a)) continue;
 
-    // ❌ Upcoming nur wenn explizit erlaubt
+    // upcoming only if explicitly enabled
     if (!includeUpcoming && !isReleased(a)) continue;
 
-    // 🔹 Season-Filter
+    // season filter
     if (filterSeason && a.season !== filterSeason) continue;
 
-    // 🔹 Year-Filter
+    // year filter
     if (seasonYearMin !== null && (a.startYear ?? 0) < seasonYearMin) continue;
     if (seasonYearMax !== null && (a.startYear ?? 9999) > seasonYearMax)
       continue;
 
-    // 🔹 Episoden
+    // episode filter
     if (episodesMin !== null && (a.episodes ?? 0) < episodesMin) continue;
     if (episodesMax !== null && (a.episodes ?? Infinity) > episodesMax)
       continue;
 
-    // 🔹 Average Score
+    // average score filter
     if (avgScoreMin !== null && (a.averageScore ?? 0) < avgScoreMin) continue;
     if (avgScoreMax !== null && (a.averageScore ?? Infinity) > avgScoreMax)
       continue;
 
-    // 🔹 Chain-Logik
+    // chain logic
     if (!isFirstUnseenInChain(a.id, chainMap, excludedIds)) continue;
 
-    // 🚫 HARD BLOCK: uninteressantes (unseen) Genre
-    if (a.genres.some((g) => taste.unseenGenres.has(g.name))) {
-      continue;
-    }
-
-    const { score, matchedGenres, matchedTags } = scoreAnime(a, taste);
-    if (score <= 0 || matchedTags.length === 0) continue;
-
-    // 🔹 Genre Include (ALLE ausgewählten Genres müssen enthalten sein)
+    // genre include
     if (
       includeGenres &&
-      !includeGenres.every((g) =>
-        a.genres.some((ag) => ag.name === g)
-      )
+      !includeGenres.every((g) => a.genres.some((ag) => ag.name === g))
     ) {
       continue;
     }
 
-    // 🔹 Genre Exclude (KEINES der ausgeschlossenen Genres darf enthalten sein)
+    // genre exclude
     if (
       excludeGenres &&
-      excludeGenres.some((g) =>
-        a.genres.some((ag) => ag.name === g)
-      )
+      excludeGenres.some((g) => a.genres.some((ag) => ag.name === g))
     ) {
       continue;
     }
 
-    // 🔹 Tag Include (ALLE ausgewählten Tags müssen enthalten sein)
+    // tag include
     if (
       includeTags &&
-      !includeTags.every((t) =>
-        a.tags.some((at) => at.name === t)
-      )
+      !includeTags.every((t) => a.tags.some((at) => at.name === t))
     ) {
       continue;
     }
 
-    // 🔹 Tag Exclude (KEINER der ausgeschlossenen Tags darf enthalten sein)
+    // tag exclude
     if (
       excludeTags &&
-      excludeTags.some((t) =>
-        a.tags.some((at) => at.name === t)
-      )
+      excludeTags.some((t) => a.tags.some((at) => at.name === t))
     ) {
       continue;
+    }
+
+    let score = 0;
+    let matchedGenres: string[] = [];
+    let matchedTags: string[] = [];
+
+    if (hasTasteSignal) {
+      // hard block: unseen genre for users with rating-based taste profile
+      if (a.genres.some((g) => taste.unseenGenres.has(g.name))) {
+        continue;
+      }
+
+      const scored = scoreAnime(a, taste);
+      score = scored.score;
+      matchedGenres = scored.matchedGenres;
+      matchedTags = scored.matchedTags;
+
+      if (score <= 0 || matchedTags.length === 0) continue;
+    } else {
+      // cold start fallback: rank by genre/tag combination strength + quality.
+      if (a.genres.length === 0 && a.tags.length === 0) continue;
+      score = computeColdStartScore(a, globalStats);
+      if (score <= 0) continue;
     }
 
     recs.push({
