@@ -2,6 +2,65 @@ import { prisma } from "../../../utils/prisma";
 import { createError } from "h3";
 import crypto from "crypto";
 import { anilistRequest } from "../../../services/anilist/anilistClient";
+import type { AniListCollection, AniUserMediaEntry } from "../../types/api/anilist";
+import type { AnimeWithGenresTags } from "../../types/api/private";
+
+interface NormalizedAniUserMediaEntry {
+  status: string | null
+  score: number | null
+  progress: number | null
+  completedAt: AniUserMediaEntry["completedAt"]
+  startedAt: AniUserMediaEntry["startedAt"]
+  media: {
+    id: number
+    season: string | null
+    seasonYear: number | null
+    duration: number | null
+    episodes: number | null
+  }
+}
+
+interface NormalizedAniList {
+  entries: NormalizedAniUserMediaEntry[]
+}
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined
+}
+
+function isNormalizedEntry(
+  value: AniUserMediaEntry | null | undefined
+): value is NormalizedAniUserMediaEntry {
+  if (!isPresent(value) || !isPresent(value.media)) return false
+  return typeof value.media.id === "number"
+}
+
+function normalizeAniLists(
+  response: AniListCollection<AniUserMediaEntry>
+): NormalizedAniList[] {
+  const lists = response.MediaListCollection
+    ? response.MediaListCollection.lists ?? []
+    : []
+
+  return lists.filter(isPresent).map((list) => ({
+    entries: (list.entries ?? [])
+      .filter(isNormalizedEntry)
+      .map((entry) => ({
+        status: entry.status ?? null,
+        score: entry.score ?? null,
+        progress: entry.progress ?? null,
+        completedAt: entry.completedAt ?? null,
+        startedAt: entry.startedAt ?? null,
+        media: {
+          id: entry.media.id,
+          season: entry.media.season ?? null,
+          seasonYear: entry.media.seasonYear ?? null,
+          duration: entry.media.duration ?? null,
+          episodes: entry.media.episodes ?? null,
+        },
+      })),
+  }))
+}
 
 export default defineEventHandler(async (event) => {
   const { user } = getQuery(event);
@@ -38,18 +97,17 @@ export default defineEventHandler(async (event) => {
     }
   `;
 
-  const res: any = await anilistRequest<any>(query, {
-  userName,
-});
+  const res = await anilistRequest<AniListCollection<AniUserMediaEntry>>(query, {
+    userName,
+  });
 
-  const lists = res?.MediaListCollection?.lists ?? [];
+  const lists = normalizeAniLists(res)
   /* -----------------------------
    * 2. IDs sammeln
    * ----------------------------- */
   const mediaIds: number[] = lists
-    .flatMap((l: any) => l.entries ?? [])
-    .map((e: any) => e.media?.id)
-    .filter(Boolean);
+    .flatMap((l) => l.entries)
+    .map((e) => e.media.id)
 
   const uniqueIds = [...new Set(mediaIds)].sort((a, b) => a - b);
 
@@ -65,7 +123,7 @@ export default defineEventHandler(async (event) => {
       .update(uniqueIds.join(","))
       .digest("hex");
 
-  let animeRows = await storage.getItem<any[]>(cacheKey);
+  let animeRows = await storage.getItem<AnimeWithGenresTags[]>(cacheKey);
 
   if (!animeRows) {
     animeRows = await prisma.anime.findMany({
@@ -82,14 +140,14 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const animeMap = new Map(animeRows.map((a: any) => [a.id, a]));
+  const animeMap = new Map(animeRows.map((a) => [a.id, a]));
 
   /* -----------------------------
    * 4. Merge → AniList-Struktur
    * ----------------------------- */
-  const enrichedLists = lists.map((l: any) => ({
+  const enrichedLists = lists.map((l) => ({
     ...l,
-    entries: l.entries.map((e: any) => {
+    entries: l.entries.map((e) => {
       const a = animeMap.get(e.media.id);
 
       // Fallback: falls Anime noch nicht in DB ist
@@ -99,10 +157,10 @@ export default defineEventHandler(async (event) => {
         ...e,
         media: {
           id: a.id,
-          season: e.media.season ?? null,
-          seasonYear: e.media.seasonYear ?? null,
-          duration: e.media.duration ?? null,
-          episodes: e.media.episodes ?? null,
+          season: e.media.season,
+          seasonYear: e.media.seasonYear,
+          duration: e.media.duration,
+          episodes: e.media.episodes,
 
           title: {
             romaji: a.titleRo ?? null,
@@ -111,9 +169,9 @@ export default defineEventHandler(async (event) => {
 
           format: a.format ?? null,
 
-          genres: a.genres.map((g: any) => g.name),
+          genres: a.genres.map((g) => g.name),
 
-          tags: a.tags.map((t: any) => ({
+          tags: a.tags.map((t) => ({
             name: t.name,
             rank: t.rank,
           })),

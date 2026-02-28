@@ -14,6 +14,11 @@ import {
   hasStartDate,
   isReleased,
 } from "../../recommend/filters";
+import type {
+  AnimeWithGenresTags,
+  AnimeWithRelations,
+  RecommendationItem,
+} from "../../types/api/private";
 
 /* ----------------------------------
  * Handler
@@ -69,7 +74,7 @@ export default defineEventHandler(async (event) => {
     crypto.createHash("sha1").update("anime-relation").digest("hex");
 
   const anime =
-    (await storage.getItem<any[]>(animeKey)) ??
+    (await storage.getItem<AnimeWithGenresTags[]>(animeKey)) ??
     (await prisma.anime.findMany({
       where: { format: { in: ["TV", "MOVIE"] } },
       include: { genres: true, tags: true },
@@ -78,7 +83,7 @@ export default defineEventHandler(async (event) => {
   await storage.setItem(animeKey, anime, { ttl: 60 * 60 * 8 });
 
   const relations =
-    (await storage.getItem<any[]>(relKey)) ??
+    (await storage.getItem<AnimeWithRelations[]>(relKey)) ??
     (await prisma.anime.findMany({
       include: { relationsFrom: true, relationsTo: true },
     }));
@@ -98,7 +103,7 @@ export default defineEventHandler(async (event) => {
     { user, topN: 30, log: true }
   );
 
-  const recs: any[] = [];
+  const recs: RecommendationItem[] = [];
 
   for (const a of anime) {
     if (excludedIds.has(a.id)) continue;
@@ -131,9 +136,7 @@ export default defineEventHandler(async (event) => {
     if (!isFirstUnseenInChain(a.id, chainMap, excludedIds)) continue;
 
     // 🚫 HARD BLOCK: uninteressantes (unseen) Genre
-    if (
-      a.genres.some((g: { name: string }) => taste.unseenGenres?.has(g.name))
-    ) {
+    if (a.genres.some((g) => taste.unseenGenres.has(g.name))) {
       continue;
     }
 
@@ -144,7 +147,7 @@ export default defineEventHandler(async (event) => {
     if (
       includeGenres &&
       !includeGenres.every((g) =>
-        a.genres.some((ag: { name: string }) => ag.name === g)
+        a.genres.some((ag) => ag.name === g)
       )
     ) {
       continue;
@@ -154,7 +157,7 @@ export default defineEventHandler(async (event) => {
     if (
       excludeGenres &&
       excludeGenres.some((g) =>
-        a.genres.some((ag: { name: string }) => ag.name === g)
+        a.genres.some((ag) => ag.name === g)
       )
     ) {
       continue;
@@ -164,7 +167,7 @@ export default defineEventHandler(async (event) => {
     if (
       includeTags &&
       !includeTags.every((t) =>
-        a.tags.some((at: { name: string }) => at.name === t)
+        a.tags.some((at) => at.name === t)
       )
     ) {
       continue;
@@ -174,7 +177,7 @@ export default defineEventHandler(async (event) => {
     if (
       excludeTags &&
       excludeTags.some((t) =>
-        a.tags.some((at: { name: string }) => at.name === t)
+        a.tags.some((at) => at.name === t)
       )
     ) {
       continue;
@@ -191,8 +194,8 @@ export default defineEventHandler(async (event) => {
       season: a.season,
       seasonYear: a.startYear,
       episodes: a.episodes,
-      genres: a.genres.map((g: { name: string }) => g.name),
-      tags: a.tags.map((t: { name: string }) => t.name),
+      genres: a.genres.map((g) => g.name),
+      tags: a.tags.map((t) => t.name),
       matchedGenres,
       matchedTags,
     });

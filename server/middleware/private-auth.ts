@@ -1,7 +1,13 @@
 import { getCookie, createError, deleteCookie } from "h3"
 import crypto from "crypto"
+import type { AniViewerIdResponse } from "../types/api/auth"
 
 const VERIFY_TTL_SECONDS = 60 * 5
+
+function hasViewerId(response: AniViewerIdResponse): boolean {
+  if (!response.data || !response.data.Viewer) return false
+  return typeof response.data.Viewer.id === "number"
+}
 
 async function verifyAniListToken(token: string): Promise<boolean> {
   const storage = useStorage("cache")
@@ -13,7 +19,7 @@ async function verifyAniListToken(token: string): Promise<boolean> {
     return true
   }
 
-  const res: any = await $fetch("https://graphql.anilist.co", {
+  const res = await $fetch<AniViewerIdResponse>("https://graphql.anilist.co", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -24,7 +30,7 @@ async function verifyAniListToken(token: string): Promise<boolean> {
     },
   })
 
-  const isValid = Boolean(res?.data?.Viewer?.id)
+  const isValid = hasViewerId(res)
   if (!isValid) return false
 
   await storage.setItem(cacheKey, true, { ttl: VERIFY_TTL_SECONDS })
@@ -57,8 +63,16 @@ export default defineEventHandler(async (event) => {
         statusMessage: "Unauthorized",
       })
     }
-  } catch (err: any) {
-    if (err?.statusCode === 401) throw err
+  } catch (err: unknown) {
+    const statusCode =
+      typeof err === "object" &&
+      err !== null &&
+      "statusCode" in err &&
+      typeof (err as { statusCode?: unknown }).statusCode === "number"
+        ? (err as { statusCode: number }).statusCode
+        : null
+
+    if (statusCode === 401) throw err
 
     throw createError({
       statusCode: 503,

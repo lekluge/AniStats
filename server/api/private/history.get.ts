@@ -1,5 +1,45 @@
 import { prisma } from "../../../utils/prisma"
 import { createError } from "h3"
+import type {
+  AniGraphQLResponse,
+  AniHistoryPageData,
+  FuzzyDate,
+} from "../../types/api/anilist"
+import type { AniViewerIdResponse } from "../../types/api/auth"
+import type { AnimeWithGenresTags } from "../../types/api/private"
+
+interface HistoryEntry {
+  mediaId: number
+  startedAt: FuzzyDate | null
+  completedAt: FuzzyDate | null
+}
+
+function getViewerId(response: AniViewerIdResponse): number | null {
+  if (!response.data || !response.data.Viewer) return null
+  return typeof response.data.Viewer.id === "number" ? response.data.Viewer.id : null
+}
+
+function getPageEntries(
+  response: AniGraphQLResponse<AniHistoryPageData>
+): { hasNextPage: boolean; entries: HistoryEntry[] } {
+  const page = response.data ? response.data.Page : null
+  if (!page) {
+    return { hasNextPage: false, entries: [] }
+  }
+
+  const entries: HistoryEntry[] = (page.mediaList ?? [])
+    .filter((entry): entry is { mediaId: number; startedAt?: FuzzyDate | null; completedAt?: FuzzyDate | null } => typeof entry.mediaId === "number")
+    .map((entry) => ({
+      mediaId: entry.mediaId,
+      startedAt: entry.startedAt ?? null,
+      completedAt: entry.completedAt ?? null,
+    }))
+
+  return {
+    hasNextPage: Boolean(page.pageInfo && page.pageInfo.hasNextPage),
+    entries,
+  }
+}
 
 export default defineEventHandler(async (event) => {
   const token = getCookie(event, "anilist_token")
@@ -28,7 +68,7 @@ export default defineEventHandler(async (event) => {
   /* -----------------------------
    * 1. Viewer ID holen
    * ----------------------------- */
-  const viewerRes: any = await $fetch("https://graphql.anilist.co", {
+  const viewerRes = await $fetch<AniViewerIdResponse>("https://graphql.anilist.co", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -45,7 +85,7 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  const userId = viewerRes?.data?.Viewer?.id
+  const userId = getViewerId(viewerRes)
 
   if (!userId) {
     throw createError({
@@ -57,19 +97,15 @@ export default defineEventHandler(async (event) => {
   /* -----------------------------
    * 2. Pagination
    * ----------------------------- */
-  type FuzzyDate = { year: number; month: number; day: number }
-
   let page = 1
   let hasNextPage = true
 
-  const allEntries: {
-    mediaId: number
-    startedAt: FuzzyDate | null
-    completedAt: FuzzyDate | null
-  }[] = []
+  const allEntries: HistoryEntry[] = []
 
   while (hasNextPage) {
-    const response: any = await $fetch("https://graphql.anilist.co", {
+    const response = await $fetch<AniGraphQLResponse<AniHistoryPageData>>(
+      "https://graphql.anilist.co",
+      {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -111,9 +147,10 @@ export default defineEventHandler(async (event) => {
           page,
         },
       },
-    })
+      }
+    )
 
-    if (response.errors) {
+    if (response.errors && response.errors.length > 0) {
       console.error(response.errors)
       throw createError({
         statusCode: 500,
@@ -121,17 +158,9 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    const pageData = response.data.Page
-
-    allEntries.push(
-      ...pageData.mediaList.map((e: any) => ({
-        mediaId: e.mediaId,
-        startedAt: e.startedAt ?? null,
-        completedAt: e.completedAt ?? null,
-      }))
-    )
-
-    hasNextPage = pageData.pageInfo.hasNextPage
+    const pageResult = getPageEntries(response)
+    allEntries.push(...pageResult.entries)
+    hasNextPage = pageResult.hasNextPage
     page++
   }
 
@@ -144,7 +173,7 @@ export default defineEventHandler(async (event) => {
    * ----------------------------- */
   const uniqueIds = [...new Set(allEntries.map((e) => e.mediaId))]
 
-  const animeRows = await prisma.anime.findMany({
+  const animeRows: AnimeWithGenresTags[] = await prisma.anime.findMany({
     where: { id: { in: uniqueIds } },
     include: {
       genres: true,
@@ -160,12 +189,12 @@ export default defineEventHandler(async (event) => {
       const anime = animeMap.get(id)
       if (!anime) return null
 
-      const activity = activityMap.get(id)
+      const activity = activityMap.get(id) ?? null
 
       return {
         ...anime,
-        startedAt: activity?.startedAt ?? null,
-        completedAt: activity?.completedAt ?? null,
+        startedAt: activity ? activity.startedAt : null,
+        completedAt: activity ? activity.completedAt : null,
       }
     })
     .filter(Boolean)

@@ -1,6 +1,7 @@
 import { defineEventHandler, setHeader } from "h3";
 import { prisma } from "../../../utils/prisma";
 import crypto from "crypto";
+import type { GenreTagCache } from "../../types/api/private";
 
 /**
  * GET /api/genreTags
@@ -17,8 +18,9 @@ export default defineEventHandler(async (event) => {
     crypto
       .createHash("sha1")
       .digest("hex");
-  let genres, tags;
-  const cached = await storage.getItem<any>(cacheKey);
+  let genres: GenreTagCache["genres"];
+  let tags: GenreTagCache["tags"];
+  const cached = await storage.getItem<GenreTagCache>(cacheKey);
   if (cached && cached.genres && cached.tags) {
     genres = cached.genres;
     tags = cached.tags;
@@ -41,24 +43,9 @@ export default defineEventHandler(async (event) => {
     ]);
     await storage.setItem(cacheKey, { genres, tags }, { ttl: 60 * 60 * 48 });
   }
-
-
-
-  interface Genre {
-    name: string;
-  }
-
-  interface Tag {
-    id: number;
-    name: string;
-    category: string | null;
-    isAdult: boolean;
-    rank: number | null;
-  }
-
   return {
-    genres: (genres as Genre[]).map((g: Genre) => g.name),
-    tags: (tags as Tag[]).map((t: Tag) => ({
+    genres: genres.map((g) => g.name),
+    tags: tags.map((t) => ({
       id: t.id,
       name: t.name,
       category: t.category,

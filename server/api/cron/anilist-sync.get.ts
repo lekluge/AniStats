@@ -8,7 +8,7 @@ export default defineEventHandler(async () => {
     where: { key: "anilist_sync_running" },
   })
 
-  if (running?.value === "1") {
+  if (running && running.value === "1") {
     throw createError({
       statusCode: 409,
       statusMessage: "AniList sync already running",

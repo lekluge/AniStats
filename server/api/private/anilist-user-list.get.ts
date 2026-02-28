@@ -1,15 +1,57 @@
 import { defineEventHandler, getQuery, createError } from "h3"
+import type {
+  AniGraphQLResponse,
+  AniListCollection,
+  AniUserStatusEntry,
+} from "../../types/api/anilist"
 
 /* ----------------------------------
  * Helpers
  * ---------------------------------- */
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+interface NormalizedStatusEntry {
+  mediaId: number
+  status: string
+}
+
+interface NormalizedStatusList {
+  entries: NormalizedStatusEntry[]
+}
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined
+}
+
+function isNormalizedStatusEntry(
+  value: AniUserStatusEntry | null | undefined
+): value is NormalizedStatusEntry {
+  return (
+    isPresent(value) &&
+    typeof value.mediaId === "number" &&
+    typeof value.status === "string" &&
+    value.status.length > 0
+  )
+}
+
+function normalizeStatusLists(
+  response: AniGraphQLResponse<AniListCollection<AniUserStatusEntry>>
+): NormalizedStatusList[] {
+  const lists =
+    response.data && response.data.MediaListCollection
+      ? response.data.MediaListCollection.lists ?? []
+      : []
+
+  return lists.filter(isPresent).map((list) => ({
+    entries: (list.entries ?? []).filter(isNormalizedStatusEntry),
+  }))
+}
+
 async function aniFetch(
   query: string,
-  variables: any,
+  variables: Record<string, unknown>,
   attempt = 1
-): Promise<any> {
+): Promise<AniGraphQLResponse<AniListCollection<AniUserStatusEntry>>> {
   const res = await fetch("https://graphql.anilist.co", {
     method: "POST",
     headers: {
@@ -82,18 +124,14 @@ export default defineEventHandler(async (event) => {
 
   const res = await aniFetch(USER_LIST_QUERY, { user })
 
-  const lists = res?.data?.MediaListCollection?.lists ?? []
+  const lists = normalizeStatusLists(res)
 
   // Map: animeId -> status
   const statusMap: Record<number, string> = {}
 
   for (const list of lists) {
-    const entries = list?.entries ?? []
-    for (const e of entries) {
-      const id = e?.mediaId
-      const status = e?.status
-      if (!id || !status) continue
-      statusMap[id] = status
+    for (const entry of list.entries) {
+      statusMap[entry.mediaId] = entry.status
     }
   }
 

@@ -1,3 +1,5 @@
+import type { AniOAuthTokenResponse } from "../../types/api/auth"
+
 export default defineEventHandler(async (event) => {
   const { code } = getQuery(event)
 
@@ -15,13 +17,16 @@ export default defineEventHandler(async (event) => {
     code: String(code),
   })
 
-  const tokenRes: any = await $fetch("https://anilist.co/api/v2/oauth/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: params.toString(),
-  })
+  const tokenRes = await $fetch<AniOAuthTokenResponse>(
+    "https://anilist.co/api/v2/oauth/token",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    }
+  )
 
   const token = tokenRes.access_token
 

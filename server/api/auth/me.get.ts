@@ -1,3 +1,11 @@
+import type { AniViewerNameResponse } from "../../types/api/auth"
+
+function getViewerName(response: AniViewerNameResponse): string | null {
+  if (!response.data || !response.data.Viewer) return null
+  const name = response.data.Viewer.name
+  return typeof name === "string" && name.length > 0 ? name : null
+}
+
 export default defineEventHandler(async (event) => {
   const token = getCookie(event, "anilist_token")
 
@@ -7,7 +15,9 @@ export default defineEventHandler(async (event) => {
 
   // Minimal: Viewer abfragen (oder du hast bereits user in DB)
   try {
-    const viewerRes: any = await $fetch("https://graphql.anilist.co", {
+    const viewerRes = await $fetch<AniViewerNameResponse>(
+      "https://graphql.anilist.co",
+      {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -16,9 +26,10 @@ export default defineEventHandler(async (event) => {
       body: {
         query: `query { Viewer { name } }`,
       },
-    })
+      }
+    )
 
-    const name = viewerRes?.data?.Viewer?.name
+    const name = getViewerName(viewerRes)
     return { user: name ? { name } : null }
   } catch {
     return { user: null }

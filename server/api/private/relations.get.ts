@@ -1,8 +1,16 @@
 import { defineEventHandler, setHeader } from "h3";
 import { prisma } from "../../../utils/prisma";
 import crypto from "crypto";
+import type {
+  AnimeWithRelationsAndMeta,
+  ChainItem,
+  RelationGroup,
+  RelationItem,
+  RelationResponse,
+  RelationTag,
+} from "../../types/api/private";
 
-const CHAIN_REL = new Set(["PREQUEL", "SEQUEL"] as const);
+const CHAIN_REL: Set<string> = new Set(["PREQUEL", "SEQUEL"]);
 
 function pickDeterministic<T extends { toId: number }>(edges: T[]) {
   return [...edges].sort((a, b) => a.toId - b.toId)[0] ?? null;
@@ -11,7 +19,7 @@ function pickDeterministic<T extends { toId: number }>(edges: T[]) {
 /* ----------------------------------
  * ✅ Server Cache (IN-MEMORY)
  * ---------------------------------- */
-let cachedResult: any | null = null;
+let cachedResult: RelationResponse | null = null;
 let cachedAt = 0;
 const CACHE_TTL = 1000 * 60 * 60; // 1 Stunde
 
@@ -28,7 +36,7 @@ export default defineEventHandler(async (event) => {
     crypto
       .createHash("sha1")
       .digest("hex");
-  let anime = await storage.getItem<any[]>(cacheKey);
+  let anime = await storage.getItem<AnimeWithRelationsAndMeta[]>(cacheKey);
   /* ----------------------------------
    * 1) ALLE Anime inkl. Relations + Genres + Tags
    * ---------------------------------- */
@@ -49,12 +57,12 @@ export default defineEventHandler(async (event) => {
   
 
   const byId = new Map(anime.map((a) => [a.id, a]));
-  const ROOT_REL = new Set(["PREQUEL", "PARENT"] as const);
+  const ROOT_REL: Set<string> = new Set(["PREQUEL", "PARENT"]);
 
   /* ----------------------------------
    * 2) Root-Finder
    * ---------------------------------- */
-  function findRoot(start: any) {
+  function findRoot(start: AnimeWithRelationsAndMeta) {
     let current = start;
     const visited = new Set<number>();
 
@@ -63,8 +71,8 @@ export default defineEventHandler(async (event) => {
       visited.add(current.id);
 
       const prequels = (current.relationsFrom ?? [])
-        .filter((r: any) => ROOT_REL.has(r.relationType))
-        .filter((r: any) => r.toId && r.toId !== current.id);
+        .filter((r) => ROOT_REL.has(r.relationType))
+        .filter((r) => r.toId !== current.id);
 
       const next = pickDeterministic(prequels);
       if (!next) break;
@@ -81,7 +89,7 @@ export default defineEventHandler(async (event) => {
   /* ----------------------------------
    * 3) Alle Roots bestimmen
    * ---------------------------------- */
-  const rootMap = new Map<number, any>();
+  const rootMap = new Map<number, AnimeWithRelationsAndMeta>();
 
   for (const a of anime) {
     const root = findRoot(a);
@@ -93,11 +101,11 @@ export default defineEventHandler(async (event) => {
   /* ----------------------------------
    * 4) Chains mit METADATEN
    * ---------------------------------- */
-  const groups: any[] = [];
+  const groups: RelationGroup[] = [];
 
   for (const root of rootMap.values()) {
     let current = root;
-    const chain: any[] = [];
+    const chain: Omit<ChainItem, "related">[] = [];
     const fwdVisited = new Set<number>();
 
     while (true) {
@@ -109,8 +117,8 @@ export default defineEventHandler(async (event) => {
         titleEn: current.titleEn,
         titleRo: current.titleRo,
         cover: current.cover,
-        genres: current.genres.map((g: any) => g.name),
-        tags: current.tags.map((t: any) => ({
+        genres: current.genres.map((g) => g.name),
+        tags: current.tags.map((t): RelationTag => ({
           id: t.tagId,
           name: t.name,
           rank: t.rank,
@@ -119,8 +127,8 @@ export default defineEventHandler(async (event) => {
       });
 
       const sequels = (current.relationsFrom ?? [])
-        .filter((r: any) => r.relationType === "SEQUEL")
-        .filter((r: any) => r.toId && r.toId !== current.id);
+        .filter((r) => r.relationType === "SEQUEL")
+        .filter((r) => r.toId !== current.id);
 
       const next = pickDeterministic(sequels);
       if (!next) break;
@@ -136,7 +144,7 @@ export default defineEventHandler(async (event) => {
     /* ----------------------------------
      * 5) Related (MIT GENRES & TAGS)
      * ---------------------------------- */
-    const chainWithRelated: any[] = [];
+    const chainWithRelated: ChainItem[] = [];
     const globallySeenRelated = new Set<number>();
 
     for (const item of chain) {
@@ -144,15 +152,15 @@ export default defineEventHandler(async (event) => {
       if (!node) continue;
 
       const related = (node.relationsFrom ?? [])
-        .filter((r: any) => r.toId && r.toId !== node.id)
-        .filter((r: any) => !CHAIN_REL.has(r.relationType))
-        .filter((r: any) => !chainIds.has(r.toId))
-        .filter((r: any) => {
+        .filter((r) => r.toId !== node.id)
+        .filter((r) => !CHAIN_REL.has(r.relationType))
+        .filter((r) => !chainIds.has(r.toId))
+        .filter((r) => {
           if (globallySeenRelated.has(r.toId)) return false;
           globallySeenRelated.add(r.toId);
           return true;
         })
-        .map((r: any) => {
+        .map((r): RelationItem | null => {
           const to = byId.get(r.toId);
           if (!to) return null;
 
@@ -162,8 +170,8 @@ export default defineEventHandler(async (event) => {
             titleRo: to.titleRo,
             cover: to.cover,
             relationType: r.relationType,
-            genres: to.genres.map((g: any) => g.name),
-            tags: to.tags.map((t: any) => ({
+            genres: to.genres.map((g) => g.name),
+            tags: to.tags.map((t): RelationTag => ({
               id: t.tagId,
               name: t.name,
               rank: t.rank,
@@ -171,7 +179,7 @@ export default defineEventHandler(async (event) => {
             })),
           };
         })
-        .filter(Boolean);
+        .filter((value): value is RelationItem => value !== null);
 
       chainWithRelated.push({
         ...item,
@@ -186,7 +194,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const result = {
+  const result: RelationResponse = {
     ok: true,
     count: groups.length,
     groups,
