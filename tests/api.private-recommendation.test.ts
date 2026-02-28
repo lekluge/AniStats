@@ -7,8 +7,25 @@ const state = vi.hoisted(() => ({
 
 const prismaAnimeFindManyMock = vi.hoisted(() => vi.fn(async () => []))
 const loadUserEntriesMock = vi.hoisted(() => vi.fn(async () => []))
-const loadGlobalStatsMock = vi.hoisted(() => vi.fn(async () => ({ totalAnime: 1, genreCount: new Map(), tagCount: new Map() })))
-const buildTasteProfileMock = vi.hoisted(() => vi.fn(() => ({ unseenGenres: new Set<string>() })))
+const loadGlobalStatsMock = vi.hoisted(
+  () =>
+    vi.fn(async () => ({
+      totalAnime: 100,
+      genreCount: new Map<string, number>(),
+      tagCount: new Map<number, number>(),
+    }))
+)
+const buildTasteProfileMock = vi.hoisted(
+  () =>
+    vi.fn(() => ({
+      genres: new Map<string, number>(),
+      tags: new Map<number, number>(),
+      negativeGenres: new Map<string, number>(),
+      negativeTags: new Map<number, number>(),
+      unseenGenres: new Map<string, number>(),
+      unseenTags: new Map<number, number>(),
+    }))
+)
 const scoreAnimeMock = vi.hoisted(() =>
   vi.fn((anime: any) => ({
     score: anime.id === 2 ? 0.91 : 0.73,
@@ -107,7 +124,7 @@ describe("api/private/recommendation.get", () => {
           startYear: 2024,
           episodes: 12,
           genres: [{ name: "Action" }],
-          tags: [{ name: "School" }],
+          tags: [{ name: "School", tagId: 1 }],
         },
         {
           id: 3,
@@ -120,7 +137,7 @@ describe("api/private/recommendation.get", () => {
           startYear: 2023,
           episodes: 1,
           genres: [{ name: "Action" }],
-          tags: [{ name: "School" }],
+          tags: [{ name: "School", tagId: 1 }],
         },
       ])
       .mockResolvedValueOnce([{ id: 2, relationsFrom: [], relationsTo: [] }])
@@ -133,5 +150,118 @@ describe("api/private/recommendation.get", () => {
     expect(out.items.TV).toHaveLength(1)
     expect(out.items.MOVIE).toHaveLength(1)
     expect(out.items.TV[0].id).toBe(2)
+  })
+
+  it("still returns recommendations for users without rating signal (cold start)", async () => {
+    state.query = { user: "NoRatings", includeUpcoming: "true" }
+    loadUserEntriesMock.mockResolvedValueOnce([
+      { mediaId: 1, status: "COMPLETED", score: null },
+    ])
+    buildTasteProfileMock.mockReturnValueOnce({
+      genres: new Map<string, number>(),
+      tags: new Map<number, number>(),
+      negativeGenres: new Map<string, number>(),
+      negativeTags: new Map<number, number>(),
+      unseenGenres: new Map<string, number>([["Action", 1]]),
+      unseenTags: new Map<number, number>(),
+    })
+    prismaAnimeFindManyMock
+      .mockResolvedValueOnce([
+        {
+          id: 2,
+          titleEn: "TV Title",
+          titleRo: "TV Ro",
+          cover: "tv.jpg",
+          format: "TV",
+          averageScore: 81,
+          season: "SPRING",
+          startYear: 2024,
+          startMonth: 1,
+          startDay: 1,
+          episodes: 12,
+          genres: [{ name: "Action" }],
+          tags: [{ name: "School", tagId: 1 }],
+        },
+      ])
+      .mockResolvedValueOnce([{ id: 2, relationsFrom: [], relationsTo: [] }])
+
+    const mod = await import("../server/api/private/recommendation.get")
+    const out = await mod.default({} as any)
+
+    expect(out.total).toBe(1)
+    expect(out.items.TV).toHaveLength(1)
+    expect(out.items.TV[0].id).toBe(2)
+    expect(out.items.TV[0].score).toBeGreaterThan(0)
+  })
+
+  it("prefers richer genre/tag combinations in cold start", async () => {
+    state.query = { user: "ComboUser", includeUpcoming: "true" }
+    loadUserEntriesMock.mockResolvedValueOnce([])
+    loadGlobalStatsMock.mockResolvedValueOnce({
+      totalAnime: 100,
+      genreCount: new Map<string, number>([
+        ["Action", 20],
+        ["Drama", 18],
+        ["Comedy", 16],
+      ]),
+      tagCount: new Map<number, number>([
+        [1, 22],
+        [2, 20],
+        [3, 18],
+      ]),
+    })
+    buildTasteProfileMock.mockReturnValueOnce({
+      genres: new Map<string, number>(),
+      tags: new Map<number, number>(),
+      negativeGenres: new Map<string, number>(),
+      negativeTags: new Map<number, number>(),
+      unseenGenres: new Map<string, number>(),
+      unseenTags: new Map<number, number>(),
+    })
+
+    prismaAnimeFindManyMock
+      .mockResolvedValueOnce([
+        {
+          id: 10,
+          titleEn: "High Score Sparse",
+          titleRo: "Sparse",
+          cover: "sparse.jpg",
+          format: "TV",
+          averageScore: 95,
+          season: "SPRING",
+          startYear: 2024,
+          startMonth: 1,
+          startDay: 1,
+          episodes: 12,
+          genres: [{ name: "Action" }],
+          tags: [],
+        },
+        {
+          id: 20,
+          titleEn: "Richer Combo",
+          titleRo: "Richer",
+          cover: "richer.jpg",
+          format: "TV",
+          averageScore: 85,
+          season: "SPRING",
+          startYear: 2024,
+          startMonth: 1,
+          startDay: 1,
+          episodes: 12,
+          genres: [{ name: "Action" }, { name: "Drama" }, { name: "Comedy" }],
+          tags: [
+            { name: "School", tagId: 1 },
+            { name: "Friendship", tagId: 2 },
+            { name: "Coming of Age", tagId: 3 },
+          ],
+        },
+      ])
+      .mockResolvedValueOnce([{ id: 10, relationsFrom: [], relationsTo: [] }])
+
+    const mod = await import("../server/api/private/recommendation.get")
+    const out = await mod.default({} as any)
+
+    expect(out.items.TV).toHaveLength(2)
+    expect(out.items.TV[0].id).toBe(20)
   })
 })
