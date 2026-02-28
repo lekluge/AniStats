@@ -17,6 +17,7 @@ interface NormalizedAniUserMediaEntry {
     seasonYear: number | null
     duration: number | null
     episodes: number | null
+    countryOfOrigin: string | null
   }
 }
 
@@ -57,6 +58,7 @@ function normalizeAniLists(
           seasonYear: entry.media.seasonYear ?? null,
           duration: entry.media.duration ?? null,
           episodes: entry.media.episodes ?? null,
+          countryOfOrigin: entry.media.countryOfOrigin ?? null,
         },
       })),
   }))
@@ -90,6 +92,7 @@ export default defineEventHandler(async (event) => {
               seasonYear
               duration
               episodes
+              countryOfOrigin
             }
           }
         }
@@ -161,6 +164,7 @@ export default defineEventHandler(async (event) => {
           seasonYear: e.media.seasonYear,
           duration: e.media.duration,
           episodes: e.media.episodes,
+          countryOfOrigin: e.media.countryOfOrigin,
 
           title: {
             romaji: a.titleRo ?? null,

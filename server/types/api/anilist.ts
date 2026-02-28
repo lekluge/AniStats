@@ -38,6 +38,7 @@ export interface AniUserMediaEntry {
     seasonYear?: number | null
     duration?: number | null
     episodes?: number | null
+    countryOfOrigin?: string | null
   } | null
 }
 

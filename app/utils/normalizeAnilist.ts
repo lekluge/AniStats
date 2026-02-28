@@ -11,6 +11,8 @@ export function normalizeAnilist(lists: any[]): AnimeEntry[] {
         progress: e.progress ?? 0,
         episodes: e.media?.episodes ?? null,
         duration: e.media?.duration ?? null,
+        format: e.media?.format ?? null,
+        countryOfOrigin: e.media?.countryOfOrigin ?? null,
         genres: e.media?.genres ?? [],
         seasonYear: e.media?.seasonYear ?? null,
         title: e.media?.title,

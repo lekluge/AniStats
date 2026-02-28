@@ -4,6 +4,8 @@ export interface AnimeEntry {
   progress: number
   duration: number | null
   episodes: number | null
+  format?: string | null
+  countryOfOrigin?: string | null
   genres: string[]
   tags: { name: string, rank: number }[]
   seasonYear: number | null
