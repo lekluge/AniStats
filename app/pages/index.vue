@@ -4,6 +4,7 @@ const { t } = useLocale();
 definePageMeta({
   middleware: "guest",
   title: "Welcome",
+  description: "Track your AniList stats, discover trends, and explore genres, tags, history and recommendations in one dashboard.",
 });
 
 const highlights = computed(() => [
