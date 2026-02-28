@@ -27,6 +27,8 @@ useHead(() => {
       { property: "og:type", content: "website" },
       { property: "og:url", content: canonicalUrl },
       { property: "og:image", content: `${config.public.siteUrl}/logo.png` },
+      { property: "og:image:width", content: "294" },
+      { property: "og:image:height", content: "204" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: pageTitle ? `AniStats - ${pageTitle}` : "AniStats" },
       { name: "twitter:description", content: pageDescription },
