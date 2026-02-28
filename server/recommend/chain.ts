@@ -1,63 +1,97 @@
+import type { RecommendationAnimeWithRelations, RelationEdge } from "./types/entities";
+
 const ROOT_REL = new Set(["PREQUEL", "PARENT"]);
 const SEQUEL_REL = "SEQUEL";
+
+export interface ChainRelationEdge {
+  fromId: number;
+  toId: number;
+  relationType: string;
+}
 
 function pickDeterministic<T extends { toId: number }>(edges: T[]) {
   return [...edges].sort((a, b) => a.toId - b.toId)[0] ?? null;
 }
 
+export function buildChainMap(relations: RecommendationAnimeWithRelations[]) {
+  const edges: ChainRelationEdge[] = [];
+  for (const anime of relations) {
+    for (const edge of anime.relationsFrom ?? []) {
+      edges.push({
+        fromId: anime.id,
+        toId: edge.toId,
+        relationType: edge.relationType,
+      });
+    }
+  }
+  return buildChainMapFromEdges(edges, relations.map((a) => a.id));
+}
 
-export function buildChainMap(relations: any[]) {
-  const byId = new Map<number, any>();
-  relations.forEach((a) => byId.set(a.id, a));
+export function buildChainMapFromEdges(
+  edges: ChainRelationEdge[],
+  explicitNodeIds: number[] = []
+) {
+  const byFromId = new Map<number, RelationEdge[]>();
+  const allNodeIds = new Set<number>(explicitNodeIds);
 
-  function findRoot(start: any) {
-    let current = start;
+  for (const edge of edges) {
+    allNodeIds.add(edge.fromId);
+    allNodeIds.add(edge.toId);
+
+    const list = byFromId.get(edge.fromId);
+    const compact: RelationEdge = {
+      toId: edge.toId,
+      relationType: edge.relationType,
+    };
+    if (list) {
+      list.push(compact);
+    } else {
+      byFromId.set(edge.fromId, [compact]);
+    }
+  }
+
+  function findRoot(startId: number) {
+    let currentId = startId;
     const visited = new Set<number>();
     while (true) {
-      if (visited.has(current.id)) break;
-      visited.add(current.id);
+      if (visited.has(currentId)) break;
+      visited.add(currentId);
 
-      const prequels = (current.relationsFrom ?? [])
-        .filter((r: any) => ROOT_REL.has(r.relationType))
-        .filter((r: any) => r.toId !== current.id);
+      const prequels = (byFromId.get(currentId) ?? [])
+        .filter((r: RelationEdge) => ROOT_REL.has(r.relationType))
+        .filter((r: RelationEdge) => r.toId !== currentId);
 
       const next = pickDeterministic(prequels);
       if (!next) break;
-
-      const node = byId.get(next.toId);
-      if (!node) break;
-      current = node;
+      currentId = next.toId;
     }
-    return current;
+    return currentId;
   }
 
   const chainByAnimeId = new Map<number, number[]>();
 
-  for (const a of relations) {
-    const root = findRoot(a);
-    let current = root;
+  for (const id of allNodeIds) {
+    const rootId = findRoot(id);
+    let currentId = rootId;
     const chain: number[] = [];
     const visited = new Set<number>();
 
     while (true) {
-      if (visited.has(current.id)) break;
-      visited.add(current.id);
-      chain.push(current.id);
+      if (visited.has(currentId)) break;
+      visited.add(currentId);
+      chain.push(currentId);
 
-      const sequels = (current.relationsFrom ?? [])
-        .filter((r: any) => r.relationType === SEQUEL_REL)
-        .filter((r: any) => r.toId !== current.id);
+      const sequels = (byFromId.get(currentId) ?? [])
+        .filter((r: RelationEdge) => r.relationType === SEQUEL_REL)
+        .filter((r: RelationEdge) => r.toId !== currentId);
 
       const next = pickDeterministic(sequels);
       if (!next) break;
-
-      const node = byId.get(next.toId);
-      if (!node) break;
-      current = node;
+      currentId = next.toId;
     }
 
-    for (const id of chain) {
-      chainByAnimeId.set(id, chain);
+    for (const chainId of chain) {
+      chainByAnimeId.set(chainId, chain);
     }
   }
 

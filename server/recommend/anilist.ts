@@ -1,9 +1,11 @@
 import { anilistRequest } from "../../services/anilist/anilistClient";
 import { CACHE_TTL_ANILIST } from "./config";
+import type { AniListCollection } from "../types/api/anilist";
+import type { AnilistMediaListEntry } from "./types/entities";
 
 const anilistCache = new Map<
   string,
-  { at: number; data: { mediaId: number; status: string; score: number | null }[] }
+  { at: number; data: AnilistMediaListEntry[] }
 >();
 
 const QUERY = `
@@ -25,16 +27,22 @@ export async function loadUserAnilistEntries(user: string) {
   const now = Date.now();
   if (hit && now - hit.at < CACHE_TTL_ANILIST) return hit.data;
 
-  const res: any = await anilistRequest(QUERY, { userName: user });
-  const out = [];
+  const res = await anilistRequest<AniListCollection<{
+    status?: string | null;
+    score?: number | null;
+    media?: { id?: number | null } | null;
+  }>>(QUERY, { userName: user });
+  const out: AnilistMediaListEntry[] = [];
 
-  for (const l of res?.MediaListCollection?.lists ?? []) {
-    for (const e of l.entries ?? []) {
-      if (!e?.media?.id) continue;
+  for (const list of res.MediaListCollection?.lists ?? []) {
+    if (!list) continue;
+    for (const entry of list.entries ?? []) {
+      const id = entry?.media?.id;
+      if (!id) continue;
       out.push({
-        mediaId: e.media.id,
-        status: String(e.status),
-        score: typeof e.score === "number" ? e.score : null,
+        mediaId: id,
+        status: typeof entry?.status === "string" ? entry.status : "",
+        score: typeof entry?.score === "number" ? entry.score : null,
       });
     }
   }

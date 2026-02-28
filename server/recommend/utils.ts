@@ -30,12 +30,12 @@ export function calcStats(values: number[]) {
   };
 }
 
-export function parseNumber(v: any): number | null {
+export function parseNumber(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-export function parseList(v: any): string[] | null {
+export function parseList(v: unknown): string[] | null {
   if (!v || typeof v !== "string") return null;
   return v
     .split(",")

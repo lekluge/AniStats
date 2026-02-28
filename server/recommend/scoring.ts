@@ -12,7 +12,10 @@ import {
   AVG_SCORE_MIN_MULTIPLIER,
   AVG_SCORE_MAX_MULTIPLIER,
 } from "./scoringConfig";
-export function scoreAnime(anime: any, taste: any) {
+import type { TasteProfile } from "./types/TasteProfile";
+import type { RecommendationAnime } from "./types/entities";
+
+export function scoreAnime(anime: RecommendationAnime, taste: TasteProfile) {
   let rawScore = 0;
 
   const matchedGenres: string[] = [];
@@ -24,7 +27,7 @@ export function scoreAnime(anime: any, taste: any) {
   let hasUnseenGenre = false;
 
   for (const g of anime.genres) {
-    if (taste.unseenGenres?.has(g.name)) {
+    if (taste.unseenGenres.has(g.name)) {
       hasUnseenGenre = true;
       break;
     }
@@ -36,7 +39,7 @@ export function scoreAnime(anime: any, taste: any) {
   for (const g of anime.genres) {
     const name = g.name;
 
-    const w = taste.genres?.get(name);
+    const w = taste.genres.get(name);
     if (w) {
       rawScore += w * GENRE_WEIGHT;
       matchedGenres.push(name);
@@ -54,7 +57,7 @@ export function scoreAnime(anime: any, taste: any) {
   for (const t of anime.tags) {
     const id = t.tagId;
 
-    let w = taste.tags?.get(id);
+    let w = taste.tags.get(id);
     if (!w) continue;
 
     if (MAX_SINGLE_TAG_CONTRIBUTION !== null) {

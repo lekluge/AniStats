@@ -1,6 +1,7 @@
 export default defineEventHandler(() => {
+  const now = new Date().toISOString();
   return {
     ok: true,
-    time: new Date().toISOString(),
-  }
-})
+    time: now,
+  };
+});

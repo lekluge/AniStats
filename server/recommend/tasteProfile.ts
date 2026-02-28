@@ -1,5 +1,6 @@
 import { GlobalStats } from "./types/GlobalStats";
 import { TasteProfile } from "./types/TasteProfile";
+import type { RecommendationAnime } from "./types/entities";
 import { idf } from "./globalStats";
 import { mapToSortedArray } from "./utils";
 import {
@@ -20,7 +21,7 @@ import {
 export function buildTasteProfile(
   completedIds: number[],
   scoreById: Map<number, number | null>,
-  animeById: Map<number, any>,
+  animeById: Map<number, RecommendationAnime>,
   global: GlobalStats,
   debug?: { user?: string; topN?: number; log?: boolean }
 ): TasteProfile {

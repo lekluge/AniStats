@@ -1,21 +1,22 @@
 import type { AniOAuthTokenResponse } from "../../types/api/auth"
 
 export default defineEventHandler(async (event) => {
-  const { code } = getQuery(event)
+  const { code } = getQuery(event);
+  const authCode = typeof code === "string" ? code : null;
 
-  if (!code) {
-    throw createError({ statusCode: 400, statusMessage: "Missing code" })
+  if (!authCode) {
+    throw createError({ statusCode: 400, statusMessage: "Missing code" });
   }
 
-  const config = useRuntimeConfig()
+  const config = useRuntimeConfig();
 
   const params = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: config.anilistClientId,
     client_secret: config.anilistClientSecret,
     redirect_uri: config.anilistRedirectUri,
-    code: String(code),
-  })
+    code: authCode,
+  });
 
   const tokenRes = await $fetch<AniOAuthTokenResponse>(
     "https://anilist.co/api/v2/oauth/token",
@@ -26,12 +27,12 @@ export default defineEventHandler(async (event) => {
       },
       body: params.toString(),
     }
-  )
+  );
 
-  const token = tokenRes.access_token
+  const token = tokenRes.access_token;
 
   if (!token) {
-    throw createError({ statusCode: 500, statusMessage: "No token received" })
+    throw createError({ statusCode: 500, statusMessage: "No token received" });
   }
 
   setCookie(event, "anilist_token", token, {
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
     sameSite: "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",
-  })
+  });
 
-  return sendRedirect(event, "/")
-})
+  return sendRedirect(event, "/");
+});

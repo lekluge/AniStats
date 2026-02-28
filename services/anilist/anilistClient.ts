@@ -1,12 +1,8 @@
-import { createError } from "h3";
 import { enqueueAniList } from "./anilistQueue";
-const ANILIST_URL = "https://graphql.anilist.co";
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function anilistRequest<T>(
   query: string,
-  variables: Record<string, any>,
+  variables: Record<string, unknown>,
   attempt = 1
 ): Promise<T> {
   return enqueueAniList(async () => {

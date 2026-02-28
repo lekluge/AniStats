@@ -1,5 +1,7 @@
 import { GlobalStats } from "./types/GlobalStats";
-export async function loadGlobalStats(anime: any[]): Promise<GlobalStats> {
+import type { RecommendationAnime } from "./types/entities";
+
+export async function loadGlobalStats(anime: RecommendationAnime[]): Promise<GlobalStats> {
   const tagCount = new Map<number, number>();
   const genreCount = new Map<string, number>();
 
