@@ -1,30 +1,22 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
 
-/* -----------------------------
- * State
- * ----------------------------- */
+const { t } = useLocale();
+
 const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const groups = ref<any[]>([]);
-definePageMeta({ title: "Relations", middleware: "auth" });
-/* -----------------------------
- * Search
- * ----------------------------- */
 const search = ref("");
+
+definePageMeta({ title: "Relations", middleware: "auth" });
 
 function matchesQuery(query: string, en?: string | null, ro?: string | null) {
   if (!query) return true;
   const q = query.toLowerCase();
-  return (
-    (en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q))
-  );
+  return (en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q));
 }
 
-/* -----------------------------
- * Load Relations + User List
- * ----------------------------- */
 async function loadRelations() {
   loading.value = true;
   error.value = null;
@@ -68,17 +60,13 @@ async function loadRelations() {
       })),
     }));
   } catch (e: any) {
-    error.value = e?.message ?? "Fehler beim Laden";
+    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("relations.loadError")}`;
   } finally {
     loading.value = false;
   }
 }
 
 onMounted(loadRelations);
-
-/* -----------------------------
- * Computed
- * ----------------------------- */
 
 const pageSize = 20;
 const currentPage = ref(1);
@@ -97,17 +85,12 @@ const filteredGroups = computed(() => {
 });
 
 const groupCount = computed(() => filteredGroups.value.length);
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredGroups.value.length / pageSize))
-);
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredGroups.value.length / pageSize)));
 const paginatedGroups = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return filteredGroups.value.slice(start, start + pageSize);
 });
 
-/* -----------------------------
- * UI Helpers
- * ----------------------------- */
 function statusColor(status?: string) {
   switch (status) {
     case "COMPLETED":
@@ -130,78 +113,59 @@ function anilistUrl(id: number) {
 }
 
 function displayTitle(en?: string | null, ro?: string | null) {
-  return en || ro || "—";
+  return en || ro || "-";
 }
 </script>
 
 <template>
   <div class="page-shell">
-    <!-- Header -->
     <div class="page-header md:justify-between md:items-center">
-      <h1 class="text-3xl font-bold">Anime Relations</h1>
+      <h1 class="text-3xl font-bold">{{ t("relations.title") }}</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
         <input
           v-model="username"
           class="ui-input w-full sm:w-40"
-          placeholder="AniList Username"
+          :placeholder="t('common.usernamePlaceholder')"
           @keydown.enter.prevent="loadRelations"
           @keydown.space.prevent="loadRelations"
         />
 
-        <button
-          @click="loadRelations"
-          class="ui-btn ui-btn-primary w-full sm:w-auto"
-        >
-          Laden
+        <button class="ui-btn ui-btn-primary w-full sm:w-auto" @click="loadRelations">
+          {{ t("common.load") }}
         </button>
       </div>
     </div>
 
-    <!-- Search -->
     <input
       v-if="!loading"
       v-model="search"
-      placeholder="Anime suchen (English / Romaji)…"
+      :placeholder="t('common.animeSearchPlaceholder')"
       class="ui-input w-full px-4 py-3 md:py-2"
     />
 
-    <!-- Summary -->
     <div class="text-sm text-zinc-400">
-      {{ groupCount }} Franchises gefunden
+      {{ groupCount }} {{ t("relations.franchisesFound") }}
     </div>
 
-    <!-- States -->
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
-      />
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <template v-if="!loading && !error">
-      <!-- Pagination -->
       <div class="flex items-center justify-between text-sm mb-2">
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === 1"
-          @click="currentPage--"
-        >
-          ← Zurück
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
+          &larr; {{ t("common.back") }}
         </button>
 
-        <span>Seite {{ currentPage }} / {{ totalPages }}</span>
+        <span>{{ t("common.page") }} {{ currentPage }} / {{ totalPages }}</span>
 
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          Weiter →
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === totalPages" @click="currentPage++">
+          {{ t("common.next") }} &rarr;
         </button>
       </div>
 
-      <!-- Groups -->
       <div v-if="paginatedGroups.length" class="space-y-4">
         <div
           v-for="group in paginatedGroups"
@@ -210,13 +174,8 @@ function displayTitle(en?: string | null, ro?: string | null) {
         >
           <div class="pl-2 md:pl-4 space-y-4 text-sm">
             <div v-for="item in group.chain" :key="item.id" class="space-y-2">
-              <!-- Main -->
               <div class="flex items-start gap-3">
-                <img
-                  v-if="item.cover"
-                  :src="item.cover"
-                  class="h-14 sm:h-12 aspect-2/3 rounded object-cover shrink-0"
-                />
+                <img v-if="item.cover" :src="item.cover" class="h-14 sm:h-12 aspect-2/3 rounded object-cover shrink-0" />
 
                 <a
                   :href="anilistUrl(item.id)"
@@ -226,24 +185,13 @@ function displayTitle(en?: string | null, ro?: string | null) {
                   {{ displayTitle(item.titleEn, item.titleRo) }}
                 </a>
 
-                <span
-                  class="text-xs whitespace-nowrap"
-                  :class="statusColor(item.status)"
-                >
-                  {{ item.status ?? "—" }}
+                <span class="text-xs whitespace-nowrap" :class="statusColor(item.status)">
+                  {{ item.status ?? "-" }}
                 </span>
               </div>
 
-              <!-- Related -->
-              <div
-                v-if="item.related?.length"
-                class="pl-4 sm:pl-8 space-y-2 text-xs text-zinc-400"
-              >
-                <div
-                  v-for="r in item.related"
-                  :key="r.id"
-                  class="flex items-start gap-2"
-                >
+              <div v-if="item.related?.length" class="pl-4 sm:pl-8 space-y-2 text-xs text-zinc-400">
+                <div v-for="r in item.related" :key="r.id" class="flex items-start gap-2">
                   <img
                     v-if="r.cover"
                     :src="r.cover"
@@ -256,16 +204,11 @@ function displayTitle(en?: string | null, ro?: string | null) {
                     class="flex-1 wrap-break-word hover:text-indigo-400"
                   >
                     {{ displayTitle(r.titleEn, r.titleRo) }}
-                    <span class="ml-1 text-zinc-500">
-                      ({{ r.relationType }})
-                    </span>
+                    <span class="ml-1 text-zinc-500">({{ r.relationType }})</span>
                   </a>
 
-                  <span
-                    class="text-xs whitespace-nowrap"
-                    :class="statusColor(r.status)"
-                  >
-                    {{ r.status ?? "—" }}
+                  <span class="text-xs whitespace-nowrap" :class="statusColor(r.status)">
+                    {{ r.status ?? "-" }}
                   </span>
                 </div>
               </div>
@@ -273,7 +216,7 @@ function displayTitle(en?: string | null, ro?: string | null) {
           </div>
         </div>
       </div>
-      <div v-else class="text-zinc-500">Keine Relations gefunden</div>
+      <div v-else class="text-zinc-500">{{ t("common.noRelationsFound") }}</div>
     </template>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+const { t } = useLocale();
 
 type GenreCover = {
   id: number;
@@ -62,7 +63,7 @@ function goToList() {
       <h3
         class="text-base font-semibold leading-tight wrap-break-word cursor-pointer hover:text-indigo-400"
         @click="goToList"
-        title="Filter and open list view"
+        :title="t('common.filterOpenList')"
       >
         {{ data.genre }}
       </h3>
@@ -86,15 +87,15 @@ function goToList() {
 
       <div class="flex-1 grid grid-cols-3 gap-2 text-sm">
         <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
-          <div class="text-xs text-zinc-400">Count</div>
+          <div class="text-xs text-zinc-400">{{ t("common.count") }}</div>
           <div class="font-semibold">{{ data.count }}</div>
         </div>
         <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
-          <div class="text-xs text-zinc-400">Avg Score</div>
+          <div class="text-xs text-zinc-400">{{ t("common.avgScore") }}</div>
           <div class="font-semibold">{{ data.meanScore || "-" }}</div>
         </div>
         <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
-          <div class="text-xs text-zinc-400">Time</div>
+          <div class="text-xs text-zinc-400">{{ t("common.time") }}</div>
           <div class="font-semibold">{{ hours }} h</div>
         </div>
       </div>
@@ -120,7 +121,7 @@ function goToList() {
         v-if="remainingCount"
         class="h-16 aspect-2/3 rounded-md flex items-center justify-center bg-zinc-800/70 text-xs text-zinc-300 cursor-pointer hover:text-indigo-400"
         @click="goToList"
-        title="Filter and open list view"
+        :title="t('common.filterOpenList')"
       >
         +{{ remainingCount }}
       </div>

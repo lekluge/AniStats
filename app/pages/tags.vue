@@ -4,32 +4,23 @@ import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 import GameCard from "../components/GameCard.vue";
 import { useRoute } from "vue-router";
+
+const { t } = useLocale();
 const route = useRoute();
+
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(listAnime.value.length / pageSize)),
-);
+const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
 });
-/* -----------------------------
- * Types
- * ----------------------------- */
-type TagCover = {
-  id: number;
-  title: string;
-  cover: string;
-};
 
+type TagCover = { id: number; title: string; cover: string };
 type LayoutMode = "grid" | "list";
 type TagState = "include" | "exclude";
 type TagSortMode = "count" | "minutes" | "score";
 
-/* -----------------------------
- * State
- * ----------------------------- */
 const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -39,9 +30,6 @@ const tagSortMode = ref<TagSortMode>("count");
 
 definePageMeta({ title: "Tags", middleware: "auth" });
 
-/* -----------------------------
- * API
- * ----------------------------- */
 async function loadAnime() {
   loading.value = true;
   error.value = null;
@@ -57,7 +45,7 @@ async function loadAnime() {
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e: any) {
-    error.value = e?.message ?? "Unbekannter Fehler";
+    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("tags.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -72,11 +60,9 @@ onMounted(async () => {
 watch(
   () => route.query,
   () => applyQueryFilters(),
-  { deep: true },
+  { deep: true }
 );
-/* -----------------------------
- * TAG STATE
- * ----------------------------- */
+
 function applyQueryFilters() {
   const qLayout = route.query.layout;
   const qFilter = route.query.filter;
@@ -87,7 +73,6 @@ function applyQueryFilters() {
     layoutMode.value = "list";
   }
 
-  // Nur reagieren, wenn es wirklich ein Tag-Filter ist
   if (qType === "tag" && typeof qFilter === "string") {
     tagStates.value = {
       [qFilter]: qMode ?? "include",
@@ -99,19 +84,16 @@ const tagStates = ref<Record<string, TagState>>({});
 const tagSearch = ref("");
 const showAllTags = ref(false);
 
-/* -----------------------------
- * TAG LIST
- * ----------------------------- */
 const allTags = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.tags?.forEach((t) => set.add(t.name)));
+  entries.value.forEach((e) => e.tags?.forEach((tag) => set.add(tag.name)));
   return [...set].sort();
 });
 
 const filteredTags = computed(() => {
   if (!tagSearch.value.trim()) return [];
   const q = tagSearch.value.toLowerCase();
-  return allTags.value.filter((t) => t.toLowerCase().includes(q));
+  return allTags.value.filter((tag) => tag.toLowerCase().includes(q));
 });
 
 const selectedTags = computed(() => Object.keys(tagStates.value));
@@ -119,24 +101,21 @@ const selectedTags = computed(() => Object.keys(tagStates.value));
 const visibleTags = computed(() => {
   const set = new Set<string>();
 
-  selectedTags.value.forEach((t) => set.add(t));
-  filteredTags.value.forEach((t) => set.add(t));
+  selectedTags.value.forEach((tag) => set.add(tag));
+  filteredTags.value.forEach((tag) => set.add(tag));
 
   const all = [...set].sort();
   if (showAllTags.value) return all;
 
   const pinned = selectedTags.value;
-  const rest = all.filter((t) => !pinned.includes(t));
+  const rest = all.filter((tag) => !pinned.includes(tag));
 
   return [...pinned, ...rest.slice(0, 40)];
 });
 
-/* -----------------------------
- * FILTERED ENTRIES
- * ----------------------------- */
 const filteredEntries = computed(() => {
   return entries.value.filter((e) => {
-    const tags = e.tags?.map((t) => t.name) ?? [];
+    const tags = e.tags?.map((tag) => tag.name) ?? [];
 
     for (const [tag, state] of Object.entries(tagStates.value)) {
       if (state === "include" && !tags.includes(tag)) return false;
@@ -150,14 +129,11 @@ const filteredEntries = computed(() => {
 const includedTags = computed(() =>
   Object.entries(tagStates.value)
     .filter(([, s]) => s === "include")
-    .map(([t]) => t),
+    .map(([tag]) => tag)
 );
 
 const isCombinedMode = computed(() => includedTags.value.length > 1);
 
-/* -----------------------------
- * GRID STATS
- * ----------------------------- */
 const normalTagStats = computed(() => {
   const map: Record<
     string,
@@ -197,34 +173,27 @@ const normalTagStats = computed(() => {
       const cover =
         typeof e.coverImage === "string"
           ? e.coverImage
-          : e.coverImage?.extraLarge ||
-            e.coverImage?.large ||
-            e.coverImage?.medium;
+          : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
 
       if (cover && !map[name].covers.some((c) => c.id === e.id)) {
         map[name].covers.push({
           id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+          title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
           cover,
         });
       }
     }
   }
 
-  return Object.entries(map).map(([tag, t]) => ({
+  return Object.entries(map).map(([tag, entry]) => ({
     genre: tag,
-    count: t.count,
-    meanScore: t.scoreCount
-      ? Math.round((t.scoreSum / t.scoreCount) * 10) / 10
-      : 0,
-    minutesWatched: t.minutesWatched,
-    covers: t.covers,
+    count: entry.count,
+    meanScore: entry.scoreCount ? Math.round((entry.scoreSum / entry.scoreCount) * 10) / 10 : 0,
+    minutesWatched: entry.minutesWatched,
+    covers: entry.covers,
   }));
 });
 
-/* -----------------------------
- * COMBINED CARD
- * ----------------------------- */
 const combinedStats = computed(() => {
   if (!isCombinedMode.value) return null;
 
@@ -244,14 +213,12 @@ const combinedStats = computed(() => {
     const cover =
       typeof e.coverImage === "string"
         ? e.coverImage
-        : e.coverImage?.extraLarge ||
-          e.coverImage?.large ||
-          e.coverImage?.medium;
+        : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
 
     if (cover && !covers.some((c) => c.id === e.id)) {
       covers.push({
         id: e.id,
-        title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+        title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
         cover,
       });
     }
@@ -266,16 +233,9 @@ const combinedStats = computed(() => {
   };
 });
 
-/* -----------------------------
- * SORTING
- * ----------------------------- */
-function sortTags<T extends { count: number; minutesWatched: number }>(
-  list: T[],
-) {
+function sortTags<T extends { count: number; minutesWatched: number }>(list: T[]) {
   return [...list].sort((a, b) => {
-    if (tagSortMode.value === "count") {
-      return b.count - a.count;
-    }
+    if (tagSortMode.value === "count") return b.count - a.count;
     if (tagSortMode.value === "score") {
       const aScore = (a as any).meanScore ?? 0;
       const bScore = (b as any).meanScore ?? 0;
@@ -285,44 +245,34 @@ function sortTags<T extends { count: number; minutesWatched: number }>(
   });
 }
 
-/* -----------------------------
- * FEATURED COVER FIX + SORT
- * ----------------------------- */
 const displayedTags = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
 
   const sorted = sortTags(normalTagStats.value);
   const used = new Set<number>();
 
-  return sorted.map((g) => {
-    if (!g.covers?.length) return g;
+  return sorted.map((entry) => {
+    if (!entry.covers?.length) return entry;
 
-    const featured = g.covers.find((c) => !used.has(c.id)) ?? g.covers[0];
+    const featured = entry.covers.find((c) => !used.has(c.id)) ?? entry.covers[0];
     used.add(featured.id);
 
     return {
-      ...g,
-      covers: [featured, ...g.covers.filter((c) => c.id !== featured.id)],
+      ...entry,
+      covers: [featured, ...entry.covers.filter((c) => c.id !== featured.id)],
     };
   });
 });
 
-/* -----------------------------
- * LIST MODE
- * ----------------------------- */
 const listAnime = computed(() =>
   filteredEntries.value.map((e) => ({
     id: e.id,
-    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
-    cover:
-      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
+    title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
+    cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
-  })),
+  }))
 );
 
-/* -----------------------------
- * Helpers
- * ----------------------------- */
 function toggleTag(tag: string) {
   const current = tagStates.value[tag];
 
@@ -338,62 +288,45 @@ function anilistUrl(id: number) {
 
 <template>
   <div class="page-shell">
-    <!-- Header -->
     <div class="page-header">
-      <h1 class="text-3xl font-bold">Tags</h1>
+      <h1 class="text-3xl font-bold">{{ t("nav.tags") }}</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
           class="ui-input w-full sm:w-48"
-          placeholder="AniList Username"
+          :placeholder="t('common.usernamePlaceholder')"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
-        <button
-          @click="loadAnime"
-          class="ui-btn ui-btn-primary w-full sm:w-auto"
-        >
-          Laden
+        <button @click="loadAnime" class="ui-btn ui-btn-primary w-full sm:w-auto">
+          {{ t("common.load") }}
         </button>
       </div>
     </div>
 
-    <!-- Sort + Layout -->
     <div class="flex flex-wrap gap-2 justify-between items-center">
       <div class="flex gap-2">
         <button
           @click="tagSortMode = 'count'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            tagSortMode === 'count'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="tagSortMode === 'count' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Anzahl
+          {{ t("common.count") }}
         </button>
         <button
           @click="tagSortMode = 'score'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            tagSortMode === 'score'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="tagSortMode === 'score' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Score
+          {{ t("common.score") }}
         </button>
         <button
           @click="tagSortMode = 'minutes'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            tagSortMode === 'minutes'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="tagSortMode === 'minutes' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Stunden
+          {{ t("common.hours") }}
         </button>
       </div>
 
@@ -401,105 +334,64 @@ function anilistUrl(id: number) {
         <button
           @click="layoutMode = 'grid'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            layoutMode === 'grid'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Grid
+          {{ t("common.grid") }}
         </button>
         <button
           @click="layoutMode = 'list'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            layoutMode === 'list'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          List
+          {{ t("common.list") }}
         </button>
       </div>
     </div>
 
-    <!-- Tag Search -->
-    <input
-      v-if="!loading"
-      v-model="tagSearch"
-      placeholder="Tags suchen…"
-      class="ui-input w-full px-4"
-    />
+    <input v-if="!loading" v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
 
-    <!-- Loading / Error -->
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
-      />
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <!-- Tag Filter -->
-    <div
-      v-else-if="tagSearch.trim() || selectedTags.length"
-      class="flex flex-wrap gap-2"
-    >
+    <div v-else-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
       <button
-        v-for="t in visibleTags"
-        :key="t"
-        @click="toggleTag(t)"
+        v-for="tag in visibleTags"
+        :key="tag"
+        @click="toggleTag(tag)"
         class="px-3 py-2 rounded-full text-xs border"
         :class="{
-          'bg-indigo-600 text-white': tagStates[t] === 'include',
-          'bg-red-600 text-white': tagStates[t] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !tagStates[t],
+          'bg-indigo-600 text-white': tagStates[tag] === 'include',
+          'bg-red-600 text-white': tagStates[tag] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !tagStates[tag],
         }"
       >
-        {{ t }}
+        {{ tag }}
       </button>
     </div>
 
-    <!-- GRID -->
-    <div
-      v-if="!loading && !error && layoutMode === 'grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
+    <div v-if="!loading && !error && layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard
         v-for="(g, i) in displayedTags"
         :key="g.genre"
         :rank="i + 1"
         :data="g"
         target="/tags"
-        :filter="{
-          key: 'filter',
-          typeKey: 'filterType',
-          typeValue: 'tag',
-          modeKey: 'filterMode',
-          modeValue: 'include',
-        }"
+        :filter="{ key: 'filter', typeKey: 'filterType', typeValue: 'tag', modeKey: 'filterMode', modeValue: 'include' }"
       />
     </div>
 
-    <!-- LIST -->
     <div v-else-if="!loading && !error">
-      <!-- Pagination -->
       <div class="flex items-center justify-between text-sm mb-2">
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === 1"
-          @click="currentPage--"
-        >
-          ← Zurück
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
+          &larr; {{ t("common.back") }}
         </button>
 
-        <span>Seite {{ currentPage }} / {{ totalPages }}</span>
+        <span>{{ t("common.page") }} {{ currentPage }} / {{ totalPages }}</span>
 
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          Weiter →
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === totalPages" @click="currentPage++">
+          {{ t("common.next") }} &rarr;
         </button>
       </div>
       <div class="space-y-2">
@@ -508,21 +400,11 @@ function anilistUrl(id: number) {
           :key="a.id"
           class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
         >
-          <img
-            v-if="a.cover"
-            :src="a.cover"
-            class="h-14 aspect-2/3 rounded object-cover shrink-0"
-          />
-          <a
-            :href="anilistUrl(a.id)"
-            target="_blank"
-            class="flex-1 hover:underline hover:text-indigo-400"
-          >
+          <img v-if="a.cover" :src="a.cover" class="h-14 aspect-2/3 rounded object-cover shrink-0" />
+          <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>
-          <span class="text-xs text-zinc-400">
-            {{ a.score || "—" }}
-          </span>
+          <span class="text-xs text-zinc-400">{{ a.score || "-" }}</span>
         </div>
       </div>
     </div>

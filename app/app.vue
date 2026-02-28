@@ -31,8 +31,10 @@ useHead(() => {
 
 const { loadUser } = useAuth()
 const { initTheme } = useTheme()
+const { initLocale } = useLocale()
 
 onMounted(() => {
+  initLocale()
   initTheme()
   loadUser()
 })

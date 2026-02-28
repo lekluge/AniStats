@@ -14,6 +14,7 @@ use([CanvasRenderer, PieChart, LineChart, BarChart, TooltipComponent, LegendComp
 type MetricMode = "titles" | "hours" | "score";
 
 definePageMeta({ title: "Dashboard", middleware: "auth" });
+const { t } = useLocale();
 
 const usernameCookie = useCookie<string>("anilist-user", { default: () => "" });
 const username = computed({
@@ -58,7 +59,7 @@ async function loadAnime() {
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
     lastLoadedUser.value = currentUser;
   } catch (e: any) {
-    error.value = e?.message ?? "Unbekannter Fehler";
+    error.value = e?.message ?? t("common.unknown");
   } finally {
     loading.value = false;
   }
@@ -129,12 +130,12 @@ const scoreStdDev = computed(() => {
 });
 
 const overviewStats = computed(() => [
-  { label: "Total Anime", value: totalAnime.value },
-  { label: "Episodes Watched", value: totalEpisodes.value },
-  { label: "Days Watched", value: totalDaysWatched.value },
-  { label: "Days Planned", value: totalPlannedDays.value },
-  { label: "Mean Score", value: meanScore.value },
-  { label: "Standard Deviation", value: scoreStdDev.value },
+  { label: t("dashboard.totalAnime"), value: totalAnime.value },
+  { label: t("dashboard.episodesWatched"), value: totalEpisodes.value },
+  { label: t("dashboard.daysWatched"), value: totalDaysWatched.value },
+  { label: t("dashboard.daysPlanned"), value: totalPlannedDays.value },
+  { label: t("dashboard.meanScore"), value: meanScore.value },
+  { label: t("dashboard.standardDeviation"), value: scoreStdDev.value },
 ]);
 
 function computeMetricValue(
@@ -225,17 +226,17 @@ function makeLineOption(labels: string[], values: number[], labelName: string) {
 }
 
 function metricLabel(mode: MetricMode) {
-  if (mode === "titles") return "Titles";
-  if (mode === "hours") return "Hours";
-  return "Mean Score";
+  if (mode === "titles") return t("dashboard.titles");
+  if (mode === "hours") return t("common.hours");
+  return t("dashboard.meanScore");
 }
 
 function mapCountry(value?: string | null) {
   const key = (value ?? "").toUpperCase();
-  if (key === "JP") return "Japan";
-  if (key === "KR") return "Korea";
-  if (key === "CN") return "China";
-  if (!key) return "Unknown";
+  if (key === "JP") return t("dashboard.japan");
+  if (key === "KR") return t("dashboard.korea");
+  if (key === "CN") return t("dashboard.china");
+  if (!key) return t("common.unknown");
   return key;
 }
 
@@ -257,20 +258,20 @@ const formatDistribution = computed(() => {
   });
 });
 
-const statusLabels: Record<string, string> = {
-  COMPLETED: "Completed",
-  PLANNING: "Planning",
-  CURRENT: "Watching",
-  DROPPED: "Dropped",
-  PAUSED: "Paused",
-  REPEATING: "Repeating",
-};
+const statusLabels = computed<Record<string, string>>(() => ({
+  COMPLETED: t("dashboard.completed"),
+  PLANNING: t("dashboard.planning"),
+  CURRENT: t("dashboard.watching"),
+  DROPPED: t("dashboard.dropped"),
+  PAUSED: t("dashboard.paused"),
+  REPEATING: t("dashboard.repeating"),
+}));
 const statusDistribution = computed(() => {
   const map: Record<string, number> = {};
   for (const e of entries.value) {
     map[e.status] = (map[e.status] || 0) + 1;
   }
-  return Object.entries(map).map(([name, value]) => ({ name: statusLabels[name] ?? name, value }));
+  return Object.entries(map).map(([name, value]) => ({ name: statusLabels.value[name] ?? name, value }));
 });
 
 const countryDistribution = computed(() => {
@@ -300,7 +301,7 @@ function makeDonutOption(rows: Array<{ name: string; value: number }>) {
         type: "pie",
         radius: ["62%", "82%"],
         center: ["50%", "50%"],
-        data: pieRows.length ? pieRows : [{ name: "Empty", value: 1 }],
+        data: pieRows.length ? pieRows : [{ name: t("common.unknown"), value: 1 }],
         label: { show: false },
         itemStyle: {
           borderWidth: hasSingleSlice ? 0 : 2,
@@ -347,7 +348,7 @@ const episodeBins = [
   { label: "29-55", match: (n: number | null) => n !== null && n >= 29 && n <= 55 },
   { label: "56-100", match: (n: number | null) => n !== null && n >= 56 && n <= 100 },
   { label: "101+", match: (n: number | null) => n !== null && n >= 101 },
-  { label: "Unknown", match: (n: number | null) => n === null || n === 0 },
+  { label: t("common.unknown"), match: (n: number | null) => n === null || n === 0 },
 ];
 
 const episodeDist = computed(() => {
@@ -356,7 +357,7 @@ const episodeDist = computed(() => {
 
   for (const e of entries.value) {
     const ep = e.episodes ?? null;
-    const bucket = episodeBins.find((b) => b.match(ep))?.label ?? "Unknown";
+    const bucket = episodeBins.find((b) => b.match(ep))?.label ?? t("common.unknown");
     const cur = map.get(bucket)!;
     cur.titles += 1;
     cur.hours += ((e.progress ?? 0) * (e.duration ?? 20)) / 60;
@@ -436,17 +437,17 @@ function getPercent(value: number) {
 <template>
   <div class="page-shell">
     <div class="page-header">
-      <h1 class="text-3xl font-bold">Dashboard</h1>
+      <h1 class="text-3xl font-bold">{{ t("dashboard.title") }}</h1>
 
       <div class="flex gap-2">
         <input
           v-model="username"
           class="ui-input"
-          placeholder="AniList Username"
+          :placeholder="t('common.usernamePlaceholder')"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
-        <button @click="loadAnime" class="ui-btn ui-btn-primary" :disabled="loading">Laden</button>
+        <button @click="loadAnime" class="ui-btn ui-btn-primary" :disabled="loading">{{ t("common.load") }}</button>
       </div>
     </div>
 
@@ -454,7 +455,7 @@ function getPercent(value: number) {
       <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
     </div>
 
-    <div v-else-if="error" class="text-red-400">Fehler: {{ error }}</div>
+    <div v-else-if="error" class="text-red-400">{{ t("common.errorPrefix") }}: {{ error }}</div>
 
     <div v-else class="space-y-6 rounded-2xl border border-[#1c3554] bg-[#07192d] p-5 text-[#d8e3f3]">
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -466,7 +467,7 @@ function getPercent(value: number) {
 
       <div class="grid gap-4 xl:grid-cols-3">
         <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
-          <h2 class="mb-3 text-xl font-semibold">Format Distribution</h2>
+          <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.formatDistribution") }}</h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
               <VChart :style="{ height: '130px', width: '130px' }" :option="formatOption" autoresize />
@@ -481,7 +482,7 @@ function getPercent(value: number) {
         </section>
 
         <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
-          <h2 class="mb-3 text-xl font-semibold">Status Distribution</h2>
+          <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.statusDistribution") }}</h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
               <VChart :style="{ height: '130px', width: '130px' }" :option="statusOption" autoresize />
@@ -496,7 +497,7 @@ function getPercent(value: number) {
         </section>
 
         <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
-          <h2 class="mb-3 text-xl font-semibold">Country Distribution</h2>
+          <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.countryDistribution") }}</h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
               <VChart :style="{ height: '130px', width: '130px' }" :option="countryOption" autoresize />
@@ -513,10 +514,10 @@ function getPercent(value: number) {
 
       <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-xl font-semibold">Score</h2>
+          <h2 class="text-xl font-semibold">{{ t("dashboard.scoreChart") }}</h2>
           <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="scoreMetric = 'titles'">Titles Watched</button>
-            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="scoreMetric = 'hours'">Hours Watched</button>
+            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="scoreMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="scoreMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -526,11 +527,11 @@ function getPercent(value: number) {
 
       <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-xl font-semibold">Episode Count</h2>
+          <h2 class="text-xl font-semibold">{{ t("dashboard.episodeCount") }}</h2>
           <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'titles'">Titles Watched</button>
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'hours'">Hours Watched</button>
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'score'">Mean Score</button>
+            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -540,11 +541,11 @@ function getPercent(value: number) {
 
       <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-xl font-semibold">Release Year</h2>
+          <h2 class="text-xl font-semibold">{{ t("dashboard.releaseYear") }}</h2>
           <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'titles'">Titles Watched</button>
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'hours'">Hours Watched</button>
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'score'">Mean Score</button>
+            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -554,11 +555,11 @@ function getPercent(value: number) {
 
       <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-xl font-semibold">Watch Year</h2>
+          <h2 class="text-xl font-semibold">{{ t("dashboard.watchYear") }}</h2>
           <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'titles'">Titles Watched</button>
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'hours'">Hours Watched</button>
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'score'">Mean Score</button>
+            <button class="rounded-full px-3 py-1" :class="watchMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="watchMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="watchMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
           </div>
         </div>
         <ClientOnly>

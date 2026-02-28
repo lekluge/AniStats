@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+const { t } = useLocale();
 
 type AniDate = { year?: number; month?: number; day?: number };
 
@@ -37,14 +38,14 @@ function diffDays(a: Date, b: Date) {
 
 const completedText = computed(() => {
   const c = fmtYmd(props.data.completedAt ?? null);
-  return c ? `Completed: ${c}` : null;
+  return c ? `${t("history.completed")}: ${c}` : null;
 });
 
 const spanText = computed(() => {
   const s = toDate(props.data.startedAt ?? null);
   const e = toDate(props.data.completedAt ?? null);
   if (!s || !e) return "-";
-  return `${diffDays(s, e) + 1} d`;
+  return `${diffDays(s, e) + 1} ${t("history.daysShort")}`;
 });
 
 function anilistUrl(id: number) {
@@ -79,7 +80,7 @@ function anilistUrl(id: number) {
       <div class="flex-1">
         <div class="grid grid-cols-1 gap-2 text-sm">
           <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
-            <div class="text-xs text-zinc-400">Span</div>
+            <div class="text-xs text-zinc-400">{{ t("history.span") }}</div>
             <div class="font-semibold">{{ spanText }}</div>
           </div>
         </div>

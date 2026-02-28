@@ -4,21 +4,18 @@ import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 import GameCard from "../components/GameCard.vue";
 import { useRoute } from "vue-router";
+
+const { t } = useLocale();
 const route = useRoute();
+
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(listAnime.value.length / pageSize))
-);
+const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
 });
-definePageMeta({ title: "Combine", middleware: "auth" });
 
-/* -----------------------------
- * Types
- * ----------------------------- */
 type Cover = {
   id: number;
   title: string;
@@ -31,18 +28,14 @@ type LayoutMode = "grid" | "list";
 type FilterState = "include" | "exclude";
 type CombineSortMode = "count" | "minutes" | "score";
 
-/* -----------------------------
- * State
- * ----------------------------- */
 const username = useAnilistUser();
 const loading = ref(false);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
 const sortMode = ref<CombineSortMode>("count");
 
-/* -----------------------------
- * API
- * ----------------------------- */
+definePageMeta({ title: "Combine", middleware: "auth" });
+
 async function loadAnime() {
   loading.value = true;
   try {
@@ -80,15 +73,11 @@ function applyQueryFilters() {
   }
 
   if (typeof qGenre === "string") {
-    genreStates.value = {
-      [qGenre]: "include",
-    };
+    genreStates.value = { [qGenre]: "include" };
   }
 
   if (typeof qTag === "string") {
-    tagStates.value = {
-      [qTag]: "include",
-    };
+    tagStates.value = { [qTag]: "include" };
   }
 }
 
@@ -98,56 +87,50 @@ watch(
   { deep: true }
 );
 
-/* -----------------------------
- * Filters
- * ----------------------------- */
 const genreStates = ref<Record<string, FilterState>>({});
 const tagStates = ref<Record<string, FilterState>>({});
 const tagSearch = ref("");
 
 const allGenres = computed(() => {
-  const s = new Set<string>();
-  entries.value.forEach((e) => e.genres?.forEach((g) => s.add(g)));
-  return [...s].sort();
+  const set = new Set<string>();
+  entries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
+  return [...set].sort();
 });
 
 const allTags = computed(() => {
-  const s = new Set<string>();
-  entries.value.forEach((e) => e.tags?.forEach((t) => s.add(t.name)));
-  return [...s].sort();
+  const set = new Set<string>();
+  entries.value.forEach((e) => e.tags?.forEach((tag) => set.add(tag.name)));
+  return [...set].sort();
 });
 
 const filteredTags = computed(() => {
   if (!tagSearch.value.trim()) return [];
   const q = tagSearch.value.toLowerCase();
-  return allTags.value.filter((t) => t.toLowerCase().includes(q));
+  return allTags.value.filter((tag) => tag.toLowerCase().includes(q));
 });
 
 const selectedTags = computed(() => Object.keys(tagStates.value));
 
 const visibleTags = computed(() => {
   const set = new Set<string>();
-  selectedTags.value.forEach((t) => set.add(t));
-  filteredTags.value.forEach((t) => set.add(t));
+  selectedTags.value.forEach((tag) => set.add(tag));
+  filteredTags.value.forEach((tag) => set.add(tag));
   return [...set].sort();
 });
 
-/* -----------------------------
- * FILTERED ENTRIES
- * ----------------------------- */
 const filteredEntries = computed(() => {
   return entries.value.filter((e) => {
     const genres = e.genres ?? [];
-    const tags = e.tags?.map((t) => t.name) ?? [];
+    const tags = e.tags?.map((tag) => tag.name) ?? [];
 
     for (const [g, s] of Object.entries(genreStates.value)) {
       if (s === "include" && !genres.includes(g)) return false;
       if (s === "exclude" && genres.includes(g)) return false;
     }
 
-    for (const [t, s] of Object.entries(tagStates.value)) {
-      if (s === "include" && !tags.includes(t)) return false;
-      if (s === "exclude" && tags.includes(t)) return false;
+    for (const [tag, s] of Object.entries(tagStates.value)) {
+      if (s === "include" && !tags.includes(tag)) return false;
+      if (s === "exclude" && tags.includes(tag)) return false;
     }
 
     return true;
@@ -165,29 +148,25 @@ const includedFilters = computed(() => [
 
 const isCombinedMode = computed(() => includedFilters.value.length > 1);
 
-/* -----------------------------
- * GRID STATS
- * ----------------------------- */
 const gridStats = computed(() => {
   const map: Record<
     string,
     {
-      type: "genre" | "tag"; // ✅ FIX: speichert, ob Key Genre oder Tag ist
+      type: "genre" | "tag";
       count: number;
       scoreSum: number;
       scoreCount: number;
       minutesWatched: number;
-      covers: any[];
+      covers: Cover[];
     }
   > = {};
 
   for (const e of filteredEntries.value) {
     const minutes = (e.progress ?? 0) * (e.duration ?? 0);
 
-    // ✅ FIX: Keys bekommen einen Typ
     const keys = [
       ...(e.genres ?? []).map((g) => ({ key: g, type: "genre" as const })),
-      ...(e.tags?.map((t) => ({ key: t.name, type: "tag" as const })) ?? []),
+      ...(e.tags?.map((tag) => ({ key: tag.name, type: "tag" as const })) ?? []),
     ];
 
     for (const { key, type } of keys) {
@@ -213,14 +192,12 @@ const gridStats = computed(() => {
       const cover =
         typeof e.coverImage === "string"
           ? e.coverImage
-          : e.coverImage?.extraLarge ||
-            e.coverImage?.large ||
-            e.coverImage?.medium;
+          : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
 
-      if (cover && !map[key].covers.some((c: any) => c.id === e.id)) {
+      if (cover && !map[key].covers.some((c) => c.id === e.id)) {
         map[key].covers.push({
           id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? "Unknown",
+          title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
           cover,
           score: e.score ?? 0,
           minutes,
@@ -229,29 +206,22 @@ const gridStats = computed(() => {
     }
   }
 
-  return Object.entries(map).map(([k, g]) => ({
-    genre: k,
-    filterType: g.type, // ✅ FIX: wird an GameCard übergeben
+  return Object.entries(map).map(([key, g]) => ({
+    genre: key,
+    filterType: g.type,
     count: g.count,
-    meanScore: g.scoreCount
-      ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10
-      : 0,
+    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
     minutesWatched: g.minutesWatched,
-    covers: g.covers.sort(
-      (a: any, b: any) => b.score - a.score || b.minutes - a.minutes
-    ),
+    covers: g.covers.sort((a, b) => b.score - a.score || b.minutes - a.minutes),
   }));
 });
 
-/* -----------------------------
- * COMBINED CARD
- * ----------------------------- */
 const combinedGridCard = computed(() => {
   if (!isCombinedMode.value) return null;
 
-  let minutes = 0,
-    scoreSum = 0,
-    scoreCount = 0;
+  let minutes = 0;
+  let scoreSum = 0;
+  let scoreCount = 0;
   const covers: Cover[] = [];
 
   for (const e of filteredEntries.value) {
@@ -266,14 +236,12 @@ const combinedGridCard = computed(() => {
     const cover =
       typeof e.coverImage === "string"
         ? e.coverImage
-        : e.coverImage?.extraLarge ||
-          e.coverImage?.large ||
-          e.coverImage?.medium;
+        : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
 
     if (cover && !covers.some((c) => c.id === e.id)) {
       covers.push({
         id: e.id,
-        title: e.title?.english ?? e.title?.romaji ?? "Unknown",
+        title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
         cover,
         score: e.score ?? 0,
         minutes: m,
@@ -283,7 +251,6 @@ const combinedGridCard = computed(() => {
 
   return {
     genre: includedFilters.value.join(" + "),
-    // ✅ FIX: Combined Card hat keinen eindeutigen Typ → kein filterType
     count: filteredEntries.value.length,
     meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
@@ -291,16 +258,9 @@ const combinedGridCard = computed(() => {
   };
 });
 
-/* -----------------------------
- * SORTING
- * ----------------------------- */
-function sortGrid<T extends { count: number; minutesWatched: number }>(
-  list: T[]
-) {
+function sortGrid<T extends { count: number; minutesWatched: number }>(list: T[]) {
   return [...list].sort((a, b) => {
-    if (sortMode.value === "count") {
-      return b.count - a.count;
-    }
+    if (sortMode.value === "count") return b.count - a.count;
     if (sortMode.value === "score") {
       const aScore = (a as any).meanScore ?? 0;
       const bScore = (b as any).meanScore ?? 0;
@@ -310,44 +270,34 @@ function sortGrid<T extends { count: number; minutesWatched: number }>(
   });
 }
 
-/* -----------------------------
- * FEATURED COVER FIX + SORT
- * ----------------------------- */
 const displayedGrid = computed(() => {
   if (combinedGridCard.value) return [combinedGridCard.value];
 
   const sorted = sortGrid(gridStats.value);
   const used = new Set<number>();
 
-  return sorted.map((g) => {
-    if (!g.covers.length) return g;
+  return sorted.map((entry) => {
+    if (!entry.covers.length) return entry;
 
-    const featured = g.covers.find((c: any) => !used.has(c.id)) ?? g.covers[0];
+    const featured = entry.covers.find((c) => !used.has(c.id)) ?? entry.covers[0];
     used.add(featured.id);
 
     return {
-      ...g,
-      covers: [featured, ...g.covers.filter((c: any) => c.id !== featured.id)],
+      ...entry,
+      covers: [featured, ...entry.covers.filter((c) => c.id !== featured.id)],
     };
   });
 });
 
-/* -----------------------------
- * LIST VIEW
- * ----------------------------- */
 const listAnime = computed(() =>
   filteredEntries.value.map((e) => ({
     id: e.id,
-    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
-    cover:
-      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
+    title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
+    cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
   }))
 );
 
-/* -----------------------------
- * Helpers
- * ----------------------------- */
 function cycleState(map: Record<string, FilterState>, key: string) {
   if (!map[key]) map[key] = "include";
   else if (map[key] === "include") map[key] = "exclude";
@@ -361,63 +311,45 @@ function anilistUrl(id: number) {
 
 <template>
   <div class="page-shell">
-    <!-- Header -->
     <div class="page-header">
-      <h1 class="text-3xl font-bold">Combined</h1>
+      <h1 class="text-3xl font-bold">{{ t("combine.title") }}</h1>
 
       <div class="flex gap-2">
         <input
           v-model="username"
           class="ui-input"
-          placeholder="AniList Username"
+          :placeholder="t('common.usernamePlaceholder')"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
-        <button
-          @click="loadAnime"
-          class="ui-btn ui-btn-primary"
-          :disabled="loading"
-        >
-          Laden
+        <button @click="loadAnime" class="ui-btn ui-btn-primary" :disabled="loading">
+          {{ t("common.load") }}
         </button>
       </div>
     </div>
 
-    <!-- Sort + Layout -->
     <div class="flex flex-wrap gap-2 justify-between items-center">
       <div class="flex gap-2">
         <button
           @click="sortMode = 'count'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            sortMode === 'count'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="sortMode === 'count' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Anzahl
+          {{ t("common.count") }}
         </button>
         <button
           @click="sortMode = 'score'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            sortMode === 'score'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="sortMode === 'score' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Score
+          {{ t("common.score") }}
         </button>
         <button
           @click="sortMode = 'minutes'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            sortMode === 'minutes'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="sortMode === 'minutes' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Stunden
+          {{ t("common.hours") }}
         </button>
       </div>
 
@@ -425,31 +357,22 @@ function anilistUrl(id: number) {
         <button
           @click="layoutMode = 'grid'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            layoutMode === 'grid'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Grid
+          {{ t("common.grid") }}
         </button>
         <button
           @click="layoutMode = 'list'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            layoutMode === 'list'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          List
+          {{ t("common.list") }}
         </button>
       </div>
     </div>
 
-    <!-- Genres -->
     <div class="flex flex-wrap gap-2">
-      <h2 class="w-full font-semibold">Genres</h2>
+      <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
       <button
         v-for="g in allGenres"
         :key="g"
@@ -465,38 +388,25 @@ function anilistUrl(id: number) {
       </button>
     </div>
 
-    <!-- Tag Search -->
-    <input
-      v-model="tagSearch"
-      placeholder="Tags suchen…"
-      class="ui-input w-full px-4"
-    />
+    <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
 
-    <!-- Tags -->
-    <div
-      v-if="tagSearch.trim() || selectedTags.length"
-      class="flex flex-wrap gap-2"
-    >
+    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
       <button
-        v-for="t in visibleTags"
-        :key="t"
-        @click="cycleState(tagStates, t)"
+        v-for="tag in visibleTags"
+        :key="tag"
+        @click="cycleState(tagStates, tag)"
         class="px-3 py-2 rounded-full text-xs border"
         :class="{
-          'bg-indigo-600 text-white': tagStates[t] === 'include',
-          'bg-red-600 text-white': tagStates[t] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !tagStates[t],
+          'bg-indigo-600 text-white': tagStates[tag] === 'include',
+          'bg-red-600 text-white': tagStates[tag] === 'exclude',
+          'bg-zinc-900 text-zinc-300': !tagStates[tag],
         }"
       >
-        {{ t }}
+        {{ tag }}
       </button>
     </div>
 
-    <!-- GRID -->
-    <div
-      v-if="layoutMode === 'grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
+    <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard
         v-for="(g, i) in displayedGrid"
         :key="g.genre"
@@ -507,26 +417,16 @@ function anilistUrl(id: number) {
       />
     </div>
 
-    <!-- LIST -->
     <div v-else-if="layoutMode === 'list'">
-      <!-- Pagination -->
       <div class="flex items-center justify-between text-sm mb-2">
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === 1"
-          @click="currentPage--"
-        >
-          ← Zurück
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
+          &larr; {{ t("common.back") }}
         </button>
 
-        <span>Seite {{ currentPage }} / {{ totalPages }}</span>
+        <span>{{ t("common.page") }} {{ currentPage }} / {{ totalPages }}</span>
 
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          Weiter →
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === totalPages" @click="currentPage++">
+          {{ t("common.next") }} &rarr;
         </button>
       </div>
 
@@ -536,21 +436,11 @@ function anilistUrl(id: number) {
           :key="a.id"
           class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
         >
-          <img
-            v-if="a.cover"
-            :src="a.cover"
-            class="h-14 aspect-2/3 rounded object-cover shrink-0"
-          />
-          <a
-            :href="anilistUrl(a.id)"
-            target="_blank"
-            class="flex-1 hover:underline hover:text-indigo-400"
-          >
+          <img v-if="a.cover" :src="a.cover" class="h-14 aspect-2/3 rounded object-cover shrink-0" />
+          <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>
-          <span class="text-xs text-zinc-400">
-            {{ a.score || "—" }}
-          </span>
+          <span class="text-xs text-zinc-400">{{ a.score || "-" }}</span>
         </div>
       </div>
     </div>

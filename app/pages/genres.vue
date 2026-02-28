@@ -2,23 +2,20 @@
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import { useRoute } from "vue-router";
+import type { AnimeEntry } from "~/types/anime";
+import GameCard from "../components/GameCard.vue";
+
+const { t } = useLocale();
 const route = useRoute();
-// Pagination für Listenansicht
+
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(listAnime.value.length / pageSize))
-);
+const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return listAnime.value.slice(start, start + pageSize);
 });
-import type { AnimeEntry } from "~/types/anime";
-import GameCard from "../components/GameCard.vue";
 
-/* -----------------------------
- * Types
- * ----------------------------- */
 type GenreCover = {
   id: number;
   title: string;
@@ -29,11 +26,7 @@ type LayoutMode = "grid" | "list";
 type GenreState = "include" | "exclude";
 type GenreSortMode = "count" | "minutes" | "score";
 
-/* -----------------------------
- * State
- * ----------------------------- */
 const username = useAnilistUser();
-
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
@@ -42,9 +35,6 @@ const genreSortMode = ref<GenreSortMode>("count");
 
 definePageMeta({ title: "Genres", middleware: "auth" });
 
-/* -----------------------------
- * API
- * ----------------------------- */
 async function loadAnime() {
   loading.value = true;
   error.value = null;
@@ -60,7 +50,7 @@ async function loadAnime() {
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e: any) {
-    error.value = e?.message ?? "Unbekannter Fehler";
+    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("genres.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -79,10 +69,6 @@ watch(
   { deep: true }
 );
 
-/* -----------------------------
- * GENRE STATE (3-WAY)
- * ----------------------------- */
-
 function applyQueryFilters() {
   const qGenre = route.query.genre;
   const qLayout = route.query.layout;
@@ -98,6 +84,7 @@ function applyQueryFilters() {
     };
   }
 }
+
 const genreStates = ref<Record<string, GenreState>>({});
 
 const allGenres = computed(() => {
@@ -106,9 +93,6 @@ const allGenres = computed(() => {
   return [...set].sort();
 });
 
-/* -----------------------------
- * FILTERED ENTRIES
- * ----------------------------- */
 const filteredEntries = computed(() => {
   return entries.value.filter((e) => {
     const genres = e.genres ?? [];
@@ -129,9 +113,6 @@ const includedGenres = computed(() =>
 
 const isCombinedMode = computed(() => includedGenres.value.length > 1);
 
-/* -----------------------------
- * GRID: GENRE STATS
- * ----------------------------- */
 const normalGenreStats = computed(() => {
   const map: Record<
     string,
@@ -169,14 +150,12 @@ const normalGenreStats = computed(() => {
       const cover =
         typeof e.coverImage === "string"
           ? e.coverImage
-          : e.coverImage?.extraLarge ||
-            e.coverImage?.large ||
-            e.coverImage?.medium;
+          : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
 
       if (cover && !map[genre].covers.some((c) => c.id === e.id)) {
         map[genre].covers.push({
           id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+          title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
           cover,
         });
       }
@@ -186,18 +165,12 @@ const normalGenreStats = computed(() => {
   return Object.entries(map).map(([genre, g]) => ({
     genre,
     count: g.count,
-    // Math round soll 1 nachkommastelle haben
-    meanScore: g.scoreCount
-      ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10
-      : 0,
+    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
     minutesWatched: g.minutesWatched,
     covers: g.covers,
   }));
 });
 
-/* -----------------------------
- * COMBINED CARD
- * ----------------------------- */
 const combinedStats = computed(() => {
   if (!isCombinedMode.value) return null;
 
@@ -217,14 +190,12 @@ const combinedStats = computed(() => {
     const cover =
       typeof e.coverImage === "string"
         ? e.coverImage
-        : e.coverImage?.extraLarge ||
-          e.coverImage?.large ||
-          e.coverImage?.medium;
+        : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
 
     if (cover && !covers.some((c) => c.id === e.id)) {
       covers.push({
         id: e.id,
-        title: e.title?.english ?? e.title?.romaji ?? "Unknown title",
+        title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
         cover,
       });
     }
@@ -239,32 +210,18 @@ const combinedStats = computed(() => {
   };
 });
 
-/* -----------------------------
- * SORTING
- * ----------------------------- */
-function sortGenres<T extends { count: number; minutesWatched: number }>(
-  list: T[]
-) {
+function sortGenres<T extends { count: number; minutesWatched: number }>(list: T[]) {
   return [...list].sort((a, b) => {
-    if (genreSortMode.value === "count") {
-      return b.count - a.count;
-    }
+    if (genreSortMode.value === "count") return b.count - a.count;
     if (genreSortMode.value === "score") {
-      const aScore = a.hasOwnProperty("meanScore")
-        ? (a as any).meanScore
-        : 0;
-      const bScore = b.hasOwnProperty("meanScore")
-        ? (b as any).meanScore
-        : 0;
+      const aScore = a.hasOwnProperty("meanScore") ? (a as any).meanScore : 0;
+      const bScore = b.hasOwnProperty("meanScore") ? (b as any).meanScore : 0;
       return bScore - aScore;
     }
     return b.minutesWatched - a.minutesWatched;
   });
 }
 
-/* -----------------------------
- * FEATURED COVER FIX + SORT
- * ----------------------------- */
 const displayedGenres = computed(() => {
   if (combinedStats.value) return [combinedStats.value];
 
@@ -284,22 +241,15 @@ const displayedGenres = computed(() => {
   });
 });
 
-/* -----------------------------
- * LIST VIEW
- * ----------------------------- */
 const listAnime = computed(() =>
   filteredEntries.value.map((e) => ({
     id: e.id,
-    title: e.title?.english ?? e.title?.romaji ?? "Unknown",
-    cover:
-      typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
+    title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
+    cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
   }))
 );
 
-/* -----------------------------
- * Helpers
- * ----------------------------- */
 function toggleGenre(genre: string) {
   const current = genreStates.value[genre];
   if (!current) genreStates.value[genre] = "include";
@@ -314,63 +264,45 @@ function anilistUrl(id: number) {
 
 <template>
   <div class="page-shell">
-    <!-- Header -->
     <div class="page-header">
-      <h1 class="text-3xl font-bold">Genres</h1>
+      <h1 class="text-3xl font-bold">{{ t("nav.genres") }}</h1>
 
       <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <input
           v-model="username"
           class="ui-input w-full sm:w-48"
-          placeholder="AniList Username"
+          :placeholder="t('common.usernamePlaceholder')"
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
-        <button
-          @click="loadAnime"
-          class="ui-btn ui-btn-primary w-full sm:w-auto"
-          :disabled="loading"
-        >
-          Laden
+        <button @click="loadAnime" class="ui-btn ui-btn-primary w-full sm:w-auto" :disabled="loading">
+          {{ t("common.load") }}
         </button>
       </div>
     </div>
 
-    <!-- Sort + Layout -->
     <div class="flex flex-wrap gap-2 justify-between items-center">
       <div class="flex gap-2">
         <button
           @click="genreSortMode = 'count'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            genreSortMode === 'count'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="genreSortMode === 'count' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Anzahl
+          {{ t("common.count") }}
         </button>
         <button
-           @click="genreSortMode = 'score'"
+          @click="genreSortMode = 'score'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            genreSortMode === 'score'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="genreSortMode === 'score' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Score
+          {{ t("common.score") }}
         </button>
         <button
           @click="genreSortMode = 'minutes'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            genreSortMode === 'minutes'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="genreSortMode === 'minutes' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Stunden
+          {{ t("common.hours") }}
         </button>
       </div>
 
@@ -378,37 +310,25 @@ function anilistUrl(id: number) {
         <button
           @click="layoutMode = 'grid'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            layoutMode === 'grid'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          Grid
+          {{ t("common.grid") }}
         </button>
         <button
           @click="layoutMode = 'list'"
           class="px-3 py-2 text-xs rounded border"
-          :class="
-            layoutMode === 'list'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-zinc-900 text-zinc-300'
-          "
+          :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
         >
-          List
+          {{ t("common.list") }}
         </button>
       </div>
     </div>
 
-    <!-- Loading / Error -->
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
-      />
+      <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <!-- Genre Filter -->
     <div v-else class="flex flex-wrap gap-2">
       <button
         v-for="g in allGenres"
@@ -425,45 +345,27 @@ function anilistUrl(id: number) {
       </button>
     </div>
 
-    <!-- GRID -->
-    <div
-      v-if="layoutMode === 'grid'"
-      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    >
+    <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard
         v-for="(g, i) in displayedGenres"
         :key="g.genre"
         :rank="i + 1"
         :data="g"
         target="/genres"
-        :filter="{
-          key: 'genre',
-          modeKey: 'genreMode',
-          modeValue: 'include',
-        }"
+        :filter="{ key: 'genre', modeKey: 'genreMode', modeValue: 'include' }"
       />
     </div>
 
-    <!-- LIST -->
     <div v-else>
-      <!-- Pagination -->
       <div class="flex items-center justify-between text-sm mb-2">
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === 1"
-          @click="currentPage--"
-        >
-          ← Zurück
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
+          &larr; {{ t("common.back") }}
         </button>
 
-        <span>Seite {{ currentPage }} / {{ totalPages }}</span>
+        <span>{{ t("common.page") }} {{ currentPage }} / {{ totalPages }}</span>
 
-        <button
-          class="px-3 py-1 rounded border"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          Weiter →
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === totalPages" @click="currentPage++">
+          {{ t("common.next") }} &rarr;
         </button>
       </div>
       <div class="space-y-2">
@@ -472,21 +374,11 @@ function anilistUrl(id: number) {
           :key="a.id"
           class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
         >
-          <img
-            v-if="a.cover"
-            :src="a.cover"
-            class="h-14 aspect-2/3 rounded object-cover"
-          />
-          <a
-            :href="anilistUrl(a.id)"
-            target="_blank"
-            class="flex-1 hover:underline hover:text-indigo-400"
-          >
+          <img v-if="a.cover" :src="a.cover" class="h-14 aspect-2/3 rounded object-cover" />
+          <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>
-          <span class="text-xs text-zinc-400">
-            {{ a.score || "—" }}
-          </span>
+          <span class="text-xs text-zinc-400">{{ a.score || "-" }}</span>
         </div>
       </div>
     </div>
