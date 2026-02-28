@@ -1,30 +1,73 @@
-import type { AnimeEntry } from '~/types/anime'
+import type { AnimeEntry, AnimeTitle, AnimeTag, FuzzyDate } from "~/types/anime";
 
-export function normalizeAnilist(lists: any[]): AnimeEntry[] {
-  const result: AnimeEntry[] = []
+interface RawMedia {
+  id?: number | null;
+  episodes?: number | null;
+  duration?: number | null;
+  format?: string | null;
+  countryOfOrigin?: string | null;
+  genres?: Array<string | null> | null;
+  seasonYear?: number | null;
+  title?: AnimeTitle | null;
+  tags?: Array<Partial<AnimeTag> | null> | null;
+  coverImage?: { large?: string | null; extraLarge?: string | null } | null;
+}
 
-  for (const list of lists) {
-    for (const e of list.entries) {
+interface RawEntry {
+  status?: string | null;
+  score?: number | null;
+  progress?: number | null;
+  startedAt?: FuzzyDate | null;
+  completedAt?: FuzzyDate | null;
+  media?: RawMedia | null;
+}
+
+interface RawList {
+  entries?: Array<RawEntry | null> | null;
+}
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
+  const result: AnimeEntry[] = [];
+
+  for (const list of lists ?? []) {
+    for (const entry of list.entries ?? []) {
+      if (!entry?.media?.id) continue;
+
+      const media = entry.media;
+      const genres = (media.genres ?? []).filter(
+        (genre): genre is string => typeof genre === "string" && genre.length > 0
+      );
+      const tags = (media.tags ?? [])
+        .filter(isPresent)
+        .map((tag) => ({
+          name: typeof tag.name === "string" ? tag.name : "",
+          rank: typeof tag.rank === "number" ? tag.rank : 0,
+        }))
+        .filter((tag) => tag.name.length > 0);
+
       result.push({
-        status: e.status,
-        score: e.score,
-        progress: e.progress ?? 0,
-        episodes: e.media?.episodes ?? null,
-        duration: e.media?.duration ?? null,
-        format: e.media?.format ?? null,
-        countryOfOrigin: e.media?.countryOfOrigin ?? null,
-        genres: e.media?.genres ?? [],
-        seasonYear: e.media?.seasonYear ?? null,
-        title: e.media?.title,
-        id: e.media.id,
-        tags: e.media?.tags ?? [],
-        startedAt: e.startedAt ?? undefined,
-        completedAt: e.completedAt ?? undefined,
-        coverImage: e.media?.coverImage?.large
-
-      })
+        id: media.id,
+        status: entry.status ?? "",
+        score: typeof entry.score === "number" ? entry.score : 0,
+        progress: typeof entry.progress === "number" ? entry.progress : 0,
+        episodes: media.episodes ?? null,
+        duration: media.duration ?? null,
+        format: media.format ?? null,
+        countryOfOrigin: media.countryOfOrigin ?? null,
+        genres,
+        seasonYear: media.seasonYear ?? null,
+        title: media.title ?? {},
+        tags,
+        startedAt: entry.startedAt ?? null,
+        completedAt: entry.completedAt ?? null,
+        coverImage: media.coverImage?.large ?? media.coverImage?.extraLarge ?? null,
+      });
     }
   }
 
-  return result
+  return result;
 }

@@ -54,6 +54,7 @@ export const translations = {
     },
     dashboard: {
       title: "Dashboard",
+      loadError: "Failed to load dashboard data",
       totalAnime: "Total Anime",
       episodesWatched: "Episodes Watched",
       daysWatched: "Days Watched",
@@ -162,6 +163,7 @@ export const translations = {
     },
     compare: {
       title: "Compare Users",
+      loadError: "Failed to load user data",
       userInputPlaceholder: "Type user and press space",
       seenAllUsers: "Seen by all users",
       seenAnyUser: "Seen by at least one user",
@@ -172,6 +174,7 @@ export const translations = {
     },
     combine: {
       title: "Combined",
+      loadError: "Failed to load combined data",
     },
     genres: {
       loadError: "Failed to load genres",
@@ -235,6 +238,7 @@ export const translations = {
     },
     dashboard: {
       title: "Dashboard",
+      loadError: "Dashboard-Daten konnten nicht geladen werden",
       totalAnime: "Anime Gesamt",
       episodesWatched: "Gesehene Episoden",
       daysWatched: "Gesehene Tage",
@@ -341,6 +345,7 @@ export const translations = {
     },
     compare: {
       title: "User vergleichen",
+      loadError: "Nutzerdaten konnten nicht geladen werden",
       userInputPlaceholder: "User eingeben und Leertaste drücken",
       seenAllUsers: "Alle haben gesehen",
       seenAnyUser: "Mindestens einer hat gesehen",
@@ -351,6 +356,7 @@ export const translations = {
     },
     combine: {
       title: "Kombiniert",
+      loadError: "Kombinierte Daten konnten nicht geladen werden",
     },
     genres: {
       loadError: "Genres konnten nicht geladen werden",

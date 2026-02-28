@@ -2,6 +2,7 @@
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
+import type { ApiAnilistResponse } from "~/types/api";
 import GameCard from "../components/GameCard.vue";
 import { useRoute } from "vue-router";
 
@@ -10,11 +11,6 @@ const route = useRoute();
 
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
-const paginatedListAnime = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return listAnime.value.slice(start, start + pageSize);
-});
 
 type Cover = {
   id: number;
@@ -27,9 +23,20 @@ type Cover = {
 type LayoutMode = "grid" | "list";
 type FilterState = "include" | "exclude";
 type CombineSortMode = "count" | "minutes" | "score";
+type CardFilterType = "genre" | "tag";
+
+type GridCard = {
+  genre: string;
+  filterType?: CardFilterType;
+  count: number;
+  meanScore: number;
+  minutesWatched: number;
+  covers: Cover[];
+};
 
 const username = useAnilistUser();
 const loading = ref(false);
+const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
 const sortMode = ref<CombineSortMode>("count");
@@ -38,16 +45,20 @@ definePageMeta({ title: "Combine", middleware: "auth" });
 
 async function loadAnime() {
   loading.value = true;
+  error.value = null;
+
   try {
     if (!username.value) {
-      loading.value = false;
+      entries.value = [];
       return;
     }
 
-    const res = await api.post("/api/private/anilist", null, {
+    const res = await api.post<ApiAnilistResponse>("/api/private/anilist", null, {
       params: { user: username.value },
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("combine.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -93,13 +104,13 @@ const tagSearch = ref("");
 
 const allGenres = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
+  entries.value.forEach((entry) => entry.genres.forEach((genre) => set.add(genre)));
   return [...set].sort();
 });
 
 const allTags = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.tags?.forEach((tag) => set.add(tag.name)));
+  entries.value.forEach((entry) => entry.tags.forEach((tag) => set.add(tag.name)));
   return [...set].sort();
 });
 
@@ -119,18 +130,18 @@ const visibleTags = computed(() => {
 });
 
 const filteredEntries = computed(() => {
-  return entries.value.filter((e) => {
-    const genres = e.genres ?? [];
-    const tags = e.tags?.map((tag) => tag.name) ?? [];
+  return entries.value.filter((entry) => {
+    const genres = entry.genres;
+    const tags = entry.tags.map((tag) => tag.name);
 
-    for (const [g, s] of Object.entries(genreStates.value)) {
-      if (s === "include" && !genres.includes(g)) return false;
-      if (s === "exclude" && genres.includes(g)) return false;
+    for (const [genre, state] of Object.entries(genreStates.value)) {
+      if (state === "include" && !genres.includes(genre)) return false;
+      if (state === "exclude" && genres.includes(genre)) return false;
     }
 
-    for (const [tag, s] of Object.entries(tagStates.value)) {
-      if (s === "include" && !tags.includes(tag)) return false;
-      if (s === "exclude" && tags.includes(tag)) return false;
+    for (const [tag, state] of Object.entries(tagStates.value)) {
+      if (state === "include" && !tags.includes(tag)) return false;
+      if (state === "exclude" && tags.includes(tag)) return false;
     }
 
     return true;
@@ -139,20 +150,20 @@ const filteredEntries = computed(() => {
 
 const includedFilters = computed(() => [
   ...Object.entries(genreStates.value)
-    .filter(([, s]) => s === "include")
-    .map(([k]) => k),
+    .filter(([, state]) => state === "include")
+    .map(([key]) => key),
   ...Object.entries(tagStates.value)
-    .filter(([, s]) => s === "include")
-    .map(([k]) => k),
+    .filter(([, state]) => state === "include")
+    .map(([key]) => key),
 ]);
 
 const isCombinedMode = computed(() => includedFilters.value.length > 1);
 
-const gridStats = computed(() => {
+const gridStats = computed<GridCard[]>(() => {
   const map: Record<
     string,
     {
-      type: "genre" | "tag";
+      type: CardFilterType;
       count: number;
       scoreSum: number;
       scoreCount: number;
@@ -161,12 +172,12 @@ const gridStats = computed(() => {
     }
   > = {};
 
-  for (const e of filteredEntries.value) {
-    const minutes = (e.progress ?? 0) * (e.duration ?? 0);
+  for (const entry of filteredEntries.value) {
+    const minutes = (entry.progress ?? 0) * (entry.duration ?? 0);
 
     const keys = [
-      ...(e.genres ?? []).map((g) => ({ key: g, type: "genre" as const })),
-      ...(e.tags?.map((tag) => ({ key: tag.name, type: "tag" as const })) ?? []),
+      ...entry.genres.map((genre) => ({ key: genre, type: "genre" as const })),
+      ...entry.tags.map((tag) => ({ key: tag.name, type: "tag" as const })),
     ];
 
     for (const { key, type } of keys) {
@@ -184,39 +195,35 @@ const gridStats = computed(() => {
       map[key].count++;
       map[key].minutesWatched += minutes;
 
-      if (e.score) {
-        map[key].scoreSum += e.score;
+      if (entry.score > 0) {
+        map[key].scoreSum += entry.score;
         map[key].scoreCount++;
       }
 
-      const cover =
-        typeof e.coverImage === "string"
-          ? e.coverImage
-          : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
-
-      if (cover && !map[key].covers.some((c) => c.id === e.id)) {
+      const cover = entry.coverImage;
+      if (cover && !map[key].covers.some((c) => c.id === entry.id)) {
         map[key].covers.push({
-          id: e.id,
-          title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
+          id: entry.id,
+          title: entry.title.english ?? entry.title.romaji ?? t("common.unknown"),
           cover,
-          score: e.score ?? 0,
+          score: entry.score ?? 0,
           minutes,
         });
       }
     }
   }
 
-  return Object.entries(map).map(([key, g]) => ({
+  return Object.entries(map).map(([key, value]) => ({
     genre: key,
-    filterType: g.type,
-    count: g.count,
-    meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
-    minutesWatched: g.minutesWatched,
-    covers: g.covers.sort((a, b) => b.score - a.score || b.minutes - a.minutes),
+    filterType: value.type,
+    count: value.count,
+    meanScore: value.scoreCount ? Math.round((value.scoreSum / value.scoreCount) * 10) / 10 : 0,
+    minutesWatched: value.minutesWatched,
+    covers: value.covers.sort((a, b) => b.score - a.score || b.minutes - a.minutes),
   }));
 });
 
-const combinedGridCard = computed(() => {
+const combinedGridCard = computed<GridCard | null>(() => {
   if (!isCombinedMode.value) return null;
 
   let minutes = 0;
@@ -224,27 +231,23 @@ const combinedGridCard = computed(() => {
   let scoreCount = 0;
   const covers: Cover[] = [];
 
-  for (const e of filteredEntries.value) {
-    const m = (e.progress ?? 0) * (e.duration ?? 0);
-    minutes += m;
+  for (const entry of filteredEntries.value) {
+    const watchedMinutes = (entry.progress ?? 0) * (entry.duration ?? 0);
+    minutes += watchedMinutes;
 
-    if (e.score) {
-      scoreSum += e.score;
+    if (entry.score > 0) {
+      scoreSum += entry.score;
       scoreCount++;
     }
 
-    const cover =
-      typeof e.coverImage === "string"
-        ? e.coverImage
-        : e.coverImage?.extraLarge || e.coverImage?.large || e.coverImage?.medium;
-
-    if (cover && !covers.some((c) => c.id === e.id)) {
+    const cover = entry.coverImage;
+    if (cover && !covers.some((c) => c.id === entry.id)) {
       covers.push({
-        id: e.id,
-        title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
+        id: entry.id,
+        title: entry.title.english ?? entry.title.romaji ?? t("common.unknown"),
         cover,
-        score: e.score ?? 0,
-        minutes: m,
+        score: entry.score ?? 0,
+        minutes: watchedMinutes,
       });
     }
   }
@@ -258,19 +261,15 @@ const combinedGridCard = computed(() => {
   };
 });
 
-function sortGrid<T extends { count: number; minutesWatched: number }>(list: T[]) {
+function sortGrid(list: GridCard[]) {
   return [...list].sort((a, b) => {
     if (sortMode.value === "count") return b.count - a.count;
-    if (sortMode.value === "score") {
-      const aScore = (a as any).meanScore ?? 0;
-      const bScore = (b as any).meanScore ?? 0;
-      return bScore - aScore;
-    }
+    if (sortMode.value === "score") return b.meanScore - a.meanScore;
     return b.minutesWatched - a.minutesWatched;
   });
 }
 
-const displayedGrid = computed(() => {
+const displayedGrid = computed<GridCard[]>(() => {
   if (combinedGridCard.value) return [combinedGridCard.value];
 
   const sorted = sortGrid(gridStats.value);
@@ -279,24 +278,30 @@ const displayedGrid = computed(() => {
   return sorted.map((entry) => {
     if (!entry.covers.length) return entry;
 
-    const featured = entry.covers.find((c) => !used.has(c.id)) ?? entry.covers[0];
+    const featured = entry.covers.find((cover) => !used.has(cover.id)) ?? entry.covers[0];
     used.add(featured.id);
 
     return {
       ...entry,
-      covers: [featured, ...entry.covers.filter((c) => c.id !== featured.id)],
+      covers: [featured, ...entry.covers.filter((cover) => cover.id !== featured.id)],
     };
   });
 });
 
 const listAnime = computed(() =>
-  filteredEntries.value.map((e) => ({
-    id: e.id,
-    title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
-    cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
-    score: e.score,
+  filteredEntries.value.map((entry) => ({
+    id: entry.id,
+    title: entry.title.english ?? entry.title.romaji ?? t("common.unknown"),
+    cover: entry.coverImage,
+    score: entry.score,
   }))
 );
+
+const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
+const paginatedListAnime = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return listAnime.value.slice(start, start + pageSize);
+});
 
 function cycleState(map: Record<string, FilterState>, key: string) {
   if (!map[key]) map[key] = "include";
@@ -413,7 +418,7 @@ function anilistUrl(id: number) {
         :rank="i + 1"
         :data="g"
         target="/combine"
-        :filter="(g as any).filterType ? { key: (g as any).filterType } : undefined"
+        :filter="g.filterType ? { key: g.filterType } : undefined"
       />
     </div>
 
@@ -444,5 +449,7 @@ function anilistUrl(id: number) {
         </div>
       </div>
     </div>
+
+    <div v-if="error" class="text-red-400">{{ error }}</div>
   </div>
 </template>

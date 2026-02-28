@@ -58,8 +58,8 @@ async function loadAnime() {
 
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
     lastLoadedUser.value = currentUser;
-  } catch (e: any) {
-    error.value = e?.message ?? t("common.unknown");
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("dashboard.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -455,7 +455,7 @@ function getPercent(value: number) {
       <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
     </div>
 
-    <div v-else-if="error" class="text-red-400">{{ t("common.errorPrefix") }}: {{ error }}</div>
+    <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <div v-else class="space-y-6 rounded-2xl border border-[#1c3554] bg-[#07192d] p-5 text-[#d8e3f3]">
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">

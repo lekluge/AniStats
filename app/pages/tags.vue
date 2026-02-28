@@ -44,8 +44,8 @@ async function loadAnime() {
       params: { user: username.value },
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
-  } catch (e: any) {
-    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("tags.loadError")}`;
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("tags.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -233,14 +233,10 @@ const combinedStats = computed(() => {
   };
 });
 
-function sortTags<T extends { count: number; minutesWatched: number }>(list: T[]) {
+function sortTags<T extends { count: number; minutesWatched: number; meanScore: number }>(list: T[]) {
   return [...list].sort((a, b) => {
     if (tagSortMode.value === "count") return b.count - a.count;
-    if (tagSortMode.value === "score") {
-      const aScore = (a as any).meanScore ?? 0;
-      const bScore = (b as any).meanScore ?? 0;
-      return bScore - aScore;
-    }
+    if (tagSortMode.value === "score") return b.meanScore - a.meanScore;
     return b.minutesWatched - a.minutesWatched;
   });
 }
@@ -252,7 +248,7 @@ const displayedTags = computed(() => {
   const used = new Set<number>();
 
   return sorted.map((entry) => {
-    if (!entry.covers?.length) return entry;
+    if (!entry.covers.length) return entry;
 
     const featured = entry.covers.find((c) => !used.has(c.id)) ?? entry.covers[0];
     used.add(featured.id);

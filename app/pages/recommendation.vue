@@ -1,20 +1,12 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import type {
+  ApiGenreTagsResponse,
+  ApiRecommendationItem,
+  ApiRecommendationResponse,
+} from "~/types/api";
 
 const { t } = useLocale();
-
-type Recommendation = {
-  id: number;
-  titleEn: string | null;
-  titleRo: string | null;
-  cover: string | null;
-  format: "TV" | "MOVIE";
-  score: number;
-  genres: string[];
-  tags: string[];
-  matchedGenres: string[];
-  matchedTags: string[];
-};
 
 type LayoutMode = "grid" | "list";
 type Tab = "TV" | "MOVIE";
@@ -30,7 +22,10 @@ const layoutMode = ref<LayoutMode>("grid");
 const activeTab = ref<Tab>("TV");
 const titleMode = ref<TitleMode>("EN_FIRST");
 
-const items = ref<{ TV: Recommendation[]; MOVIE: Recommendation[] }>({ TV: [], MOVIE: [] });
+const items = ref<{ TV: ApiRecommendationItem[]; MOVIE: ApiRecommendationItem[] }>({
+  TV: [],
+  MOVIE: [],
+});
 
 const CURRENT_YEAR = new Date().getFullYear();
 const filterSeason = ref<string | null>(null);
@@ -51,9 +46,9 @@ definePageMeta({ title: "Recommendations", middleware: "auth" });
 
 async function loadGenreTags() {
   if (!username.value) return;
-  const res = await api.get("/api/private/genreTags");
+  const res = await api.get<ApiGenreTagsResponse>("/api/private/genreTags");
   allGenres.value = res.data.genres;
-  allTags.value = res.data.tags.map((tag: { name: string }) => tag.name);
+  allTags.value = res.data.tags.map((tag) => tag.name);
 }
 
 const filteredTags = computed(() => {
@@ -108,10 +103,10 @@ async function loadRecommendations() {
     if (includeTags.length) params.tags = includeTags.join(",");
     if (excludeTags.length) params.excludeTags = excludeTags.join(",");
 
-    const res = await api.get("/api/private/recommendation", { params });
+    const res = await api.get<ApiRecommendationResponse>("/api/private/recommendation", { params });
     items.value = res.data.items;
-  } catch (e: any) {
-    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("recommendation.loadError")}`;
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("recommendation.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -136,7 +131,7 @@ function toggleTitleMode() {
   titleMode.value = titleMode.value === "EN_FIRST" ? "RO_FIRST" : "EN_FIRST";
 }
 
-function getTitleLines(item: Recommendation): { primary: string; secondary: string | null } {
+function getTitleLines(item: ApiRecommendationItem): { primary: string; secondary: string | null } {
   const en = item.titleEn?.trim() || null;
   const ro = item.titleRo?.trim() || null;
 
@@ -303,7 +298,7 @@ function anilistUrl(id: number) {
       >
         <img v-if="a.cover" :src="a.cover" class="w-full aspect-2/3 object-cover" />
         <span
-          class="absolute top-2 right-2 z-10 text-xs font-medium bg-indigo-800 text-indigo-300 px-2 py-1 rounded-full backdrop-blur-sm"
+          class="absolute top-2 right-2 z-10 text-xs font-medium bg-indigo-800 text-indigo-100 px-2 py-1 rounded-full backdrop-blur-sm"
         >
           #{{ i + 1 }}
         </span>

@@ -1,20 +1,38 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import type {
+  ApiRelationChainItem,
+  ApiRelationGroup,
+  ApiRelationItem,
+  ApiRelationsResponse,
+  ApiUserListResponse,
+} from "~/types/api";
 
 const { t } = useLocale();
 
 const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
-const groups = ref<any[]>([]);
 const search = ref("");
+
+type RelationItemWithStatus = ApiRelationItem & { status?: string };
+type RelationChainWithStatus = Omit<ApiRelationChainItem, "related"> & {
+  status?: string;
+  related: RelationItemWithStatus[];
+};
+type RelationGroupWithStatus = Omit<ApiRelationGroup, "chain"> & {
+  rootStatus?: string;
+  chain: RelationChainWithStatus[];
+};
+
+const groups = ref<RelationGroupWithStatus[]>([]);
 
 definePageMeta({ title: "Relations", middleware: "auth" });
 
 function matchesQuery(query: string, en?: string | null, ro?: string | null) {
   if (!query) return true;
   const q = query.toLowerCase();
-  return (en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q));
+  return Boolean((en && en.toLowerCase().includes(q)) || (ro && ro.toLowerCase().includes(q)));
 }
 
 async function loadRelations() {
@@ -23,44 +41,45 @@ async function loadRelations() {
 
   try {
     if (!username.value) {
-      loading.value = false;
+      groups.value = [];
       return;
     }
 
-    const userRes = await api.get("/api/private/anilist-user-list", {
+    const userRes = await api.get<ApiUserListResponse>("/api/private/anilist-user-list", {
       params: { user: username.value },
     });
-    const statusMap: Record<number, string> = userRes.data?.statusMap ?? {};
+    const statusMap = userRes.data.statusMap ?? {};
 
-    const relRes = await api.get("/api/private/relations");
-    const allGroups = relRes.data?.groups ?? [];
+    const relRes = await api.get<ApiRelationsResponse>("/api/private/relations");
+    const allGroups = relRes.data.groups ?? [];
 
-    const visibleGroups = allGroups.filter((g: any) => {
-      if (statusMap[g.rootId]) return true;
+    const visibleGroups = allGroups.filter((group) => {
+      if (statusMap[group.rootId]) return true;
 
-      for (const c of g.chain) {
-        if (statusMap[c.id]) return true;
-        for (const r of c.related ?? []) {
-          if (statusMap[r.id]) return true;
+      for (const chainItem of group.chain) {
+        if (statusMap[chainItem.id]) return true;
+        for (const related of chainItem.related ?? []) {
+          if (statusMap[related.id]) return true;
         }
       }
+
       return false;
     });
 
-    groups.value = visibleGroups.map((g: any) => ({
-      ...g,
-      rootStatus: statusMap[g.rootId],
-      chain: g.chain.map((c: any) => ({
-        ...c,
-        status: statusMap[c.id],
-        related: (c.related ?? []).map((r: any) => ({
-          ...r,
-          status: statusMap[r.id],
+    groups.value = visibleGroups.map((group) => ({
+      ...group,
+      rootStatus: statusMap[group.rootId],
+      chain: group.chain.map((chainItem) => ({
+        ...chainItem,
+        status: statusMap[chainItem.id],
+        related: (chainItem.related ?? []).map((related) => ({
+          ...related,
+          status: statusMap[related.id],
         })),
       })),
     }));
-  } catch (e: any) {
-    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("relations.loadError")}`;
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("relations.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -73,11 +92,12 @@ const currentPage = ref(1);
 
 const filteredGroups = computed(() => {
   if (!search.value) return groups.value;
-  return groups.value.filter((g: any) => {
-    for (const c of g.chain) {
-      if (matchesQuery(search.value, c.titleEn, c.titleRo)) return true;
-      for (const r of c.related ?? []) {
-        if (matchesQuery(search.value, r.titleEn, r.titleRo)) return true;
+
+  return groups.value.filter((group) => {
+    for (const chainItem of group.chain) {
+      if (matchesQuery(search.value, chainItem.titleEn, chainItem.titleRo)) return true;
+      for (const related of chainItem.related ?? []) {
+        if (matchesQuery(search.value, related.titleEn, related.titleRo)) return true;
       }
     }
     return false;

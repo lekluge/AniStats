@@ -6,6 +6,18 @@ function isAppLocale(value: string | null): value is AppLocale {
   return value === "de" || value === "en";
 }
 
+function resolvePath(
+  table: Record<string, unknown>,
+  segments: string[]
+): string | null {
+  let current: unknown = table;
+  for (const segment of segments) {
+    if (typeof current !== "object" || current === null) return null;
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return typeof current === "string" ? current : null;
+}
+
 export function useLocale() {
   const localeCookie = useCookie<AppLocale>("anistats-locale", {
     default: () => "de",
@@ -38,17 +50,14 @@ export function useLocale() {
   }
 
   function t(key: string): string {
-    const langTable = translations[locale.value] as Record<string, any>;
-    const fallbackTable = translations.de as Record<string, any>;
+    const langTable = translations[locale.value] as Record<string, unknown>;
+    const fallbackTable = translations.de as Record<string, unknown>;
     const segments = key.split(".");
+    const localized = resolvePath(langTable, segments);
+    if (localized) return localized;
 
-    let current: any = langTable;
-    for (const segment of segments) current = current?.[segment];
-    if (typeof current === "string") return current;
-
-    current = fallbackTable;
-    for (const segment of segments) current = current?.[segment];
-    if (typeof current === "string") return current;
+    const fallback = resolvePath(fallbackTable, segments);
+    if (fallback) return fallback;
 
     return key;
   }

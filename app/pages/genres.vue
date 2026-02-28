@@ -49,8 +49,8 @@ async function loadAnime() {
       params: { user: username.value },
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
-  } catch (e: any) {
-    error.value = e?.message ?? `${t("common.errorPrefix")}: ${t("genres.loadError")}`;
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("genres.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -210,14 +210,10 @@ const combinedStats = computed(() => {
   };
 });
 
-function sortGenres<T extends { count: number; minutesWatched: number }>(list: T[]) {
+function sortGenres<T extends { count: number; minutesWatched: number; meanScore: number }>(list: T[]) {
   return [...list].sort((a, b) => {
     if (genreSortMode.value === "count") return b.count - a.count;
-    if (genreSortMode.value === "score") {
-      const aScore = a.hasOwnProperty("meanScore") ? (a as any).meanScore : 0;
-      const bScore = b.hasOwnProperty("meanScore") ? (b as any).meanScore : 0;
-      return bScore - aScore;
-    }
+    if (genreSortMode.value === "score") return b.meanScore - a.meanScore;
     return b.minutesWatched - a.minutesWatched;
   });
 }

@@ -2,6 +2,13 @@
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
+import type {
+  ApiAnilistResponse,
+  ApiRelationGroup,
+  ApiRelationItem,
+  ApiRelationsResponse,
+  CompareAnimeItem,
+} from "~/types/api";
 
 const { t } = useLocale();
 
@@ -20,7 +27,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 const entriesByUser = ref<Record<string, AnimeEntry[]>>({});
-const allAnime = ref<any[]>([]);
+const allAnime = ref<CompareAnimeItem[]>([]);
 
 const search = ref("");
 const seenFilter = ref<SeenFilter>("allUsers");
@@ -33,19 +40,30 @@ const tagStates = ref<Record<string, FilterState>>({});
 const tagMinRank = ref<Record<string, number>>({});
 const tagSearch = ref("");
 
-async function loadAllAnime() {
-  const res = await api.get("/api/private/relations");
+function getEntryTitle(entry: AnimeEntry): { en: string; ro: string; display: string } {
+  const en = entry.title.english ?? "";
+  const ro = entry.title.romaji ?? "";
+  return {
+    en,
+    ro,
+    display: en || ro || t("common.unknown"),
+  };
+}
 
-  allAnime.value = res.data.groups.flatMap((g: any) =>
-    g.chain.map((c: any) => ({
-      id: c.id,
-      titleEn: c.titleEn ?? "",
-      titleRo: c.titleRo ?? "",
-      title: c.titleEn ?? c.titleRo ?? t("common.unknown"),
-      cover: c.cover,
-      genres: c.genres ?? [],
-      tags: c.tags ?? [],
-      related: c.related ?? [],
+async function loadAllAnime() {
+  const res = await api.get<ApiRelationsResponse>("/api/private/relations");
+
+  allAnime.value = res.data.groups.flatMap((group: ApiRelationGroup) =>
+    group.chain.map((chainItem) => ({
+      id: chainItem.id,
+      titleEn: chainItem.titleEn ?? "",
+      titleRo: chainItem.titleRo ?? "",
+      title: chainItem.titleEn ?? chainItem.titleRo ?? t("common.unknown"),
+      cover: chainItem.cover,
+      genres: chainItem.genres ?? [],
+      tags: chainItem.tags ?? [],
+      related: chainItem.related ?? [],
+      users: {},
     }))
   );
 }
@@ -67,12 +85,16 @@ function removeUser(name: string) {
 
 async function loadSingleUser(username: string) {
   loading.value = true;
+  error.value = null;
+
   try {
-    const res = await api.post("/api/private/anilist", null, {
+    const res = await api.post<ApiAnilistResponse>("/api/private/anilist", null, {
       params: { user: username },
     });
 
     entriesByUser.value[username] = normalizeAnilist(res.data.data.MediaListCollection.lists);
+  } catch {
+    error.value = `${t("common.errorPrefix")}: ${t("compare.loadError")}`;
   } finally {
     loading.value = false;
   }
@@ -85,39 +107,43 @@ function tagBackground(tag: string) {
   return `linear-gradient(90deg, rgb(99 102 241) ${percent}%, rgb(24 24 27) ${percent}%)`;
 }
 
-const comparedAnime = computed(() => {
-  const map = new Map<number, any>();
+const comparedAnime = computed<CompareAnimeItem[]>(() => {
+  const map = new Map<number, CompareAnimeItem>();
 
   for (const user of users.value) {
-    for (const e of entriesByUser.value[user] ?? []) {
-      if (!map.has(e.id)) {
-        map.set(e.id, {
-          id: e.id,
-          titleEn: e.title?.english ?? "",
-          titleRo: e.title?.romaji ?? "",
-          title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
-          cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
+    for (const entry of entriesByUser.value[user] ?? []) {
+      if (!map.has(entry.id)) {
+        const title = getEntryTitle(entry);
+        map.set(entry.id, {
+          id: entry.id,
+          titleEn: title.en,
+          titleRo: title.ro,
+          title: title.display,
+          cover: entry.coverImage,
+          genres: [],
+          tags: [],
+          related: [],
           users: {},
         });
       }
-      map.get(e.id).users[user] = e;
+      map.get(entry.id)!.users[user] = entry;
     }
   }
 
   return [...map.values()];
 });
 
-const allComparedAnime = computed(() => {
-  const map = new Map<number, any>();
+const allComparedAnime = computed<CompareAnimeItem[]>(() => {
+  const map = new Map<number, CompareAnimeItem>();
 
-  for (const a of allAnime.value) {
-    map.set(a.id, { ...a, users: {} });
+  for (const anime of allAnime.value) {
+    map.set(anime.id, { ...anime, users: {} });
   }
 
   for (const user of users.value) {
-    for (const e of entriesByUser.value[user] ?? []) {
-      const entry = map.get(e.id);
-      if (entry) entry.users[user] = e;
+    for (const entry of entriesByUser.value[user] ?? []) {
+      const item = map.get(entry.id);
+      if (item) item.users[user] = entry;
     }
   }
 
@@ -129,21 +155,21 @@ const activeBase = computed(() =>
 );
 
 const allGenres = computed(() => {
-  const s = new Set<string>();
-  allAnime.value.forEach((a: any) => {
-    a.genres?.forEach((g: string) => s.add(g));
-    a.related?.forEach((r: any) => r.genres?.forEach((g: string) => s.add(g)));
+  const set = new Set<string>();
+  allAnime.value.forEach((anime) => {
+    anime.genres.forEach((genre) => set.add(genre));
+    anime.related.forEach((related) => related.genres.forEach((genre) => set.add(genre)));
   });
-  return [...s].sort();
+  return [...set].sort();
 });
 
 const allTags = computed(() => {
-  const s = new Set<string>();
-  allAnime.value.forEach((a: any) => {
-    a.tags?.forEach((tag: any) => s.add(tag.name));
-    a.related?.forEach((r: any) => r.tags?.forEach((tag: any) => s.add(tag.name)));
+  const set = new Set<string>();
+  allAnime.value.forEach((anime) => {
+    anime.tags.forEach((tag) => set.add(tag.name));
+    anime.related.forEach((related) => related.tags.forEach((tag) => set.add(tag.name)));
   });
-  return [...s].sort();
+  return [...set].sort();
 });
 
 const filteredTags = computed(() => {
@@ -164,47 +190,54 @@ const visibleTags = computed(() => {
 const filteredAnime = computed(() => {
   const q = search.value.toLowerCase();
 
-  return activeBase.value.filter((a: any) => {
-    if (q && !a.titleEn.toLowerCase().includes(q) && !a.titleRo.toLowerCase().includes(q)) return false;
+  return activeBase.value.filter((anime) => {
+    if (
+      q &&
+      !anime.titleEn.toLowerCase().includes(q) &&
+      !anime.titleRo.toLowerCase().includes(q)
+    ) {
+      return false;
+    }
 
     if (seenFilter.value === "allUsers") {
-      if (!users.value.every((u) => a.users[u]?.status === "COMPLETED")) return false;
+      if (!users.value.every((user) => anime.users[user]?.status === "COMPLETED")) return false;
     }
 
     if (seenFilter.value === "noneUsers") {
-      if (users.value.some((u) => a.users[u]?.status === "COMPLETED")) return false;
+      if (users.value.some((user) => anime.users[user]?.status === "COMPLETED")) return false;
     }
 
     const genres = new Set<string>();
-    const tagObjects: { name: string; rank?: number }[] = [];
+    const tagObjects: Array<{ name: string; rank?: number }> = [];
 
     if (seenFilter.value === "noneUsers") {
-      a.genres?.forEach((g: string) => genres.add(g));
-      a.tags?.forEach((tag: any) => tagObjects.push(tag));
+      anime.genres.forEach((genre) => genres.add(genre));
+      anime.tags.forEach((tag) => tagObjects.push(tag));
 
-      a.related?.forEach((r: any) => {
-        r.genres?.forEach((g: string) => genres.add(g));
-        r.tags?.forEach((tag: any) => tagObjects.push(tag));
+      anime.related.forEach((related: ApiRelationItem) => {
+        related.genres.forEach((genre) => genres.add(genre));
+        related.tags.forEach((tag) => tagObjects.push(tag));
       });
     } else {
-      Object.values(a.users).forEach((e: any) => {
-        e.genres?.forEach((g: string) => genres.add(g));
-        e.tags?.forEach((tag: any) => tagObjects.push(tag));
+      Object.values(anime.users).forEach((entry) => {
+        entry.genres.forEach((genre) => genres.add(genre));
+        entry.tags.forEach((tag) => tagObjects.push(tag));
       });
     }
 
-    for (const [g, s] of Object.entries(genreStates.value)) {
-      if (s === "include" && !genres.has(g)) return false;
-      if (s === "exclude" && genres.has(g)) return false;
+    for (const [genre, state] of Object.entries(genreStates.value)) {
+      if (state === "include" && !genres.has(genre)) return false;
+      if (state === "exclude" && genres.has(genre)) return false;
     }
 
-    for (const [tag, s] of Object.entries(tagStates.value)) {
+    for (const [tag, state] of Object.entries(tagStates.value)) {
       const minRank = tagMinRank.value[tag] ?? 0;
+      const matching = tagObjects.find(
+        (entry) => entry.name === tag && (entry.rank ?? 0) >= minRank
+      );
 
-      const matching = tagObjects.find((entry) => entry.name === tag && (entry.rank ?? 0) >= minRank);
-
-      if (s === "include" && !matching) return false;
-      if (s === "exclude" && matching) return false;
+      if (state === "include" && !matching) return false;
+      if (state === "exclude" && matching) return false;
     }
 
     return true;
