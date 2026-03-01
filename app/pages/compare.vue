@@ -11,6 +11,7 @@ import type {
 } from "~/types/api";
 
 const { t } = useLocale();
+const { theme } = useTheme();
 
 const anilistUser = useCookie<string>("anilist-user", { default: () => "" });
 
@@ -342,20 +343,27 @@ function statusLabel(status?: string) {
 }
 
 function statusBadgeClass(status?: string) {
-  if (!status) return "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
-  if (status === "COMPLETED") return "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30";
-  if (status === "CURRENT") return "bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30";
-  if (status === "PLANNING") return "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
-  if (status === "PAUSED") return "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30";
-  if (status === "DROPPED") return "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30";
-  if (status === "REPEATING") return "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30";
-  return "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
+  const isLight = theme.value === "light";
+  if (!status) return isLight ? "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300" : "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
+  if (status === "COMPLETED") return isLight ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300" : "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30";
+  if (status === "CURRENT") return isLight ? "bg-sky-100 text-sky-800 ring-1 ring-sky-300" : "bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30";
+  if (status === "PLANNING") return isLight ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300" : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
+  if (status === "PAUSED") return isLight ? "bg-orange-100 text-orange-800 ring-1 ring-orange-300" : "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30";
+  if (status === "DROPPED") return isLight ? "bg-rose-100 text-rose-800 ring-1 ring-rose-300" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30";
+  if (status === "REPEATING") return isLight ? "bg-violet-100 text-violet-800 ring-1 ring-violet-300" : "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30";
+  return isLight ? "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300" : "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
 }
 
 function formattedAverageScore(anime: CompareAnimeItem) {
   const value = averageScore(anime);
   return value > 0 ? value.toFixed(1) : "-";
 }
+
+const userChipStyle = computed(() => ({
+  background: "var(--surface-muted)",
+  borderColor: "var(--border-strong)",
+  color: "var(--text)",
+}));
 
 onMounted(async () => {
   await loadAllAnime();
@@ -407,10 +415,11 @@ watch(
         <div
           v-for="u in users"
           :key="u"
-          class="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/70 px-3 py-1 text-sm text-zinc-200"
+          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm"
+          :style="userChipStyle"
         >
           <span>{{ u }}</span>
-          <button @click="removeUser(u)" class="text-zinc-500 hover:text-rose-400">x</button>
+          <button @click="removeUser(u)" class="text-zinc-500 hover:text-rose-500">x</button>
         </div>
       </div>
     </section>
