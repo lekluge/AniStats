@@ -199,110 +199,114 @@ function toggleTagExpansion(itemId: number) {
       </div>
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <select v-model="filterSeason" class="ui-input">
-        <option :value="null">{{ t("common.seasonAll") }}</option>
-        <option value="SPRING">{{ t("common.spring") }}</option>
-        <option value="SUMMER">{{ t("common.summer") }}</option>
-        <option value="FALL">{{ t("common.fall") }}</option>
-        <option value="WINTER">{{ t("common.winter") }}</option>
-      </select>
+    <section class="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <select v-model="filterSeason" class="ui-input">
+          <option :value="null">{{ t("common.seasonAll") }}</option>
+          <option value="SPRING">{{ t("common.spring") }}</option>
+          <option value="SUMMER">{{ t("common.summer") }}</option>
+          <option value="FALL">{{ t("common.fall") }}</option>
+          <option value="WINTER">{{ t("common.winter") }}</option>
+        </select>
 
-      <input v-model.number="seasonYearMin" type="number" :placeholder="t('common.seasonYearMin')" class="ui-input" />
+        <input v-model.number="seasonYearMin" type="number" :placeholder="t('common.seasonYearMin')" class="ui-input" />
 
-      <input
-        v-model.number="seasonYearMax"
-        type="number"
-        :placeholder="`${t('common.seasonYearMax')} (${CURRENT_YEAR})`"
-        class="ui-input"
-      />
+        <input
+          v-model.number="seasonYearMax"
+          type="number"
+          :placeholder="`${t('common.seasonYearMax')} (${CURRENT_YEAR})`"
+          class="ui-input"
+        />
 
-      <input v-model.number="episodesMin" type="number" :placeholder="t('common.minEpisodes')" class="ui-input" />
+        <input v-model.number="episodesMin" type="number" :placeholder="t('common.minEpisodes')" class="ui-input" />
 
-      <input v-model.number="episodesMax" type="number" :placeholder="t('common.maxEpisodes')" class="ui-input" />
+        <input v-model.number="episodesMax" type="number" :placeholder="t('common.maxEpisodes')" class="ui-input" />
 
-      <input v-model.number="averageScoreMin" type="number" :placeholder="t('common.minAvgScore')" class="ui-input" />
-    </div>
+        <input v-model.number="averageScoreMin" type="number" :placeholder="t('common.minAvgScore')" class="ui-input" />
+      </div>
 
-    <div class="flex items-center gap-2">
-      <button
-        @click="includeUpcoming = !includeUpcoming; loadRecommendations();"
-        class="px-3 py-2 text-xs rounded border transition"
-        :class="
-          includeUpcoming
-            ? 'bg-indigo-600 text-white border-indigo-600'
-            : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-        "
-      >
-        {{ includeUpcoming ? t("common.includeUpcoming") : t("common.hideUpcoming") }}
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          @click="includeUpcoming = !includeUpcoming; loadRecommendations();"
+          class="px-3 py-2 text-xs rounded border transition"
+          :class="
+            includeUpcoming
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+          "
+        >
+          {{ includeUpcoming ? t("common.includeUpcoming") : t("common.hideUpcoming") }}
+        </button>
 
-      <span class="text-xs text-zinc-500">{{ t("recommendation.upcomingHint") }}</span>
-    </div>
+        <span class="text-xs text-zinc-500">{{ t("recommendation.upcomingHint") }}</span>
+      </div>
 
-    <div class="flex flex-wrap gap-2">
-      <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
-      <button
-        v-for="g in allGenres"
-        :key="g"
-        @click="cycleState(genreStates, g)"
-        class="px-3 py-1.5 text-xs rounded-full border"
-        :class="{
-          'bg-indigo-600 text-white': genreStates[g] === 'include',
-          'bg-red-600 text-white': genreStates[g] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !genreStates[g],
-        }"
-      >
-        {{ g }}
-      </button>
-    </div>
+      <div class="flex flex-wrap gap-2">
+        <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
+        <button
+          v-for="g in allGenres"
+          :key="g"
+          @click="cycleState(genreStates, g)"
+          class="px-3 py-1.5 text-xs rounded-full border"
+          :class="{
+            'bg-indigo-600 text-white': genreStates[g] === 'include',
+            'bg-red-600 text-white': genreStates[g] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !genreStates[g],
+          }"
+        >
+          {{ g }}
+        </button>
+      </div>
 
-    <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
+      <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
 
-    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
-      <button
-        v-for="tag in visibleTags"
-        :key="tag"
-        @click="cycleState(tagStates, tag)"
-        class="px-3 py-1.5 text-xs rounded-full border"
-        :class="{
-          'bg-indigo-600 text-white': tagStates[tag] === 'include',
-          'bg-red-600 text-white': tagStates[tag] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !tagStates[tag],
-        }"
-      >
-        {{ tag }}
-      </button>
-    </div>
+      <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
+        <button
+          v-for="tag in visibleTags"
+          :key="tag"
+          @click="cycleState(tagStates, tag)"
+          class="px-3 py-1.5 text-xs rounded-full border"
+          :class="{
+            'bg-indigo-600 text-white': tagStates[tag] === 'include',
+            'bg-red-600 text-white': tagStates[tag] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !tagStates[tag],
+          }"
+        >
+          {{ tag }}
+        </button>
+      </div>
 
-    <div class="flex gap-2">
-      <button
-        v-for="tab in ['TV', 'MOVIE']"
-        :key="tab"
-        @click="activeTab = tab as Tab"
-        class="px-4 py-2 rounded text-sm border"
-        :class="activeTab === tab ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-zinc-900 text-zinc-300 border-zinc-800'"
-      >
-        {{ tab }}
-      </button>
-    </div>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex gap-2">
+          <button
+            v-for="tab in ['TV', 'MOVIE']"
+            :key="tab"
+            @click="activeTab = tab as Tab"
+            class="px-4 py-2 rounded text-sm border"
+            :class="activeTab === tab ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-zinc-900 text-zinc-300 border-zinc-800'"
+          >
+            {{ tab }}
+          </button>
+        </div>
 
-    <div class="flex gap-2 justify-end">
-      <button
-        @click="layoutMode = 'grid'"
-        class="px-3 py-2 text-xs rounded border"
-        :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'"
-      >
-        {{ t("common.grid") }}
-      </button>
-      <button
-        @click="layoutMode = 'list'"
-        class="px-3 py-2 text-xs rounded border"
-        :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'"
-      >
-        {{ t("common.list") }}
-      </button>
-    </div>
+        <div class="flex gap-2">
+          <button
+            @click="layoutMode = 'grid'"
+            class="px-3 py-2 text-xs rounded border"
+            :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'"
+          >
+            {{ t("common.grid") }}
+          </button>
+          <button
+            @click="layoutMode = 'list'"
+            class="px-3 py-2 text-xs rounded border"
+            :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900'"
+          >
+            {{ t("common.list") }}
+          </button>
+        </div>
+      </div>
+    </section>
 
     <div v-if="loading" class="flex justify-center py-12">
       <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />

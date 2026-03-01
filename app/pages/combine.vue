@@ -400,74 +400,76 @@ function formatHours(minutes?: number) {
       </div>
     </div>
 
-    <div class="flex flex-wrap gap-2 justify-between items-center">
-      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <select v-model="listSortKey" class="ui-input text-sm">
-          <option value="score">{{ t("common.score") }}</option>
-          <option value="title">{{ t("common.title") }}</option>
-          <option value="time">{{ t("common.time") }}</option>
-          <option value="completedAt">{{ t("common.completedDate") }}</option>
-        </select>
+    <section class="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3">
+      <div class="flex flex-wrap gap-2 justify-between items-center">
+        <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <select v-model="listSortKey" class="ui-input text-sm">
+            <option value="score">{{ t("common.score") }}</option>
+            <option value="title">{{ t("common.title") }}</option>
+            <option value="time">{{ t("common.time") }}</option>
+            <option value="completedAt">{{ t("common.completedDate") }}</option>
+          </select>
+          <button
+            class="ui-btn text-xs"
+            @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
+          >
+            {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
+          </button>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            @click="layoutMode = 'grid'"
+            class="px-3 py-2 text-xs rounded border"
+            :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          >
+            {{ t("common.grid") }}
+          </button>
+          <button
+            @click="layoutMode = 'list'"
+            class="px-3 py-2 text-xs rounded border"
+            :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          >
+            {{ t("common.list") }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
         <button
-          class="ui-btn text-xs"
-          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
+          v-for="g in allGenres"
+          :key="g"
+          @click="cycleState(genreStates, g)"
+          class="px-3 py-2 text-xs rounded-full border"
+          :class="{
+            'bg-indigo-600 text-white': genreStates[g] === 'include',
+            'bg-red-600 text-white': genreStates[g] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !genreStates[g],
+          }"
         >
-          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
+          {{ g }}
         </button>
       </div>
 
-      <div class="flex gap-2">
+      <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
+
+      <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
         <button
-          @click="layoutMode = 'grid'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          v-for="tag in visibleTags"
+          :key="tag"
+          @click="cycleState(tagStates, tag)"
+          class="px-3 py-2 rounded-full text-xs border"
+          :class="{
+            'bg-indigo-600 text-white': tagStates[tag] === 'include',
+            'bg-red-600 text-white': tagStates[tag] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !tagStates[tag],
+          }"
         >
-          {{ t("common.grid") }}
-        </button>
-        <button
-          @click="layoutMode = 'list'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.list") }}
+          {{ tag }}
         </button>
       </div>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
-      <button
-        v-for="g in allGenres"
-        :key="g"
-        @click="cycleState(genreStates, g)"
-        class="px-3 py-2 text-xs rounded-full border"
-        :class="{
-          'bg-indigo-600 text-white': genreStates[g] === 'include',
-          'bg-red-600 text-white': genreStates[g] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !genreStates[g],
-        }"
-      >
-        {{ g }}
-      </button>
-    </div>
-
-    <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
-
-    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
-      <button
-        v-for="tag in visibleTags"
-        :key="tag"
-        @click="cycleState(tagStates, tag)"
-        class="px-3 py-2 rounded-full text-xs border"
-        :class="{
-          'bg-indigo-600 text-white': tagStates[tag] === 'include',
-          'bg-red-600 text-white': tagStates[tag] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !tagStates[tag],
-        }"
-      >
-        {{ tag }}
-      </button>
-    </div>
+    </section>
 
     <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard
