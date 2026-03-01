@@ -30,6 +30,7 @@ const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
+const activeEntries = computed(() => entries.value.filter((e) => e.status !== "PLANNING"));
 const layoutMode = ref<LayoutMode>("grid");
 const genreSortMode = ref<GenreSortMode>("count");
 
@@ -89,12 +90,12 @@ const genreStates = ref<Record<string, GenreState>>({});
 
 const allGenres = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
+  activeEntries.value.forEach((e) => e.genres?.forEach((g) => set.add(g)));
   return [...set].sort();
 });
 
 const filteredEntries = computed(() => {
-  return entries.value.filter((e) => {
+  return activeEntries.value.filter((e) => {
     const genres = e.genres ?? [];
 
     for (const [g, state] of Object.entries(genreStates.value)) {
