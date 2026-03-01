@@ -119,13 +119,16 @@ onUnmounted(() => {
   if (autoLoadTimer) clearTimeout(autoLoadTimer);
 });
 const completedEntries = computed(() => entries.value.filter((e) => e.status === "COMPLETED"));
+const watchedEntries = computed(() =>
+  entries.value.filter((e) => e.status === "COMPLETED" || e.status === "CURRENT" || e.status === "REPEATING" || e.status === "PAUSED" || e.status === "DROPPED")
+);
 
 const totalAnime = computed(() => completedEntries.value.length);
 const totalEpisodes = computed(() =>
-  completedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
+  watchedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
 );
 const totalMinutes = computed(() =>
-  completedEntries.value.reduce((sum, e) => {
+  watchedEntries.value.reduce((sum, e) => {
     if (!e.progress || !e.duration) return sum;
     return sum + e.progress * e.duration;
   }, 0)
@@ -276,7 +279,7 @@ function mapCountry(value?: string | null) {
 const formatOrder = ["TV", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC", "TV_SHORT"];
 const formatDistribution = computed(() => {
   const map: Record<string, number> = {};
-  for (const e of entries.value) {
+  for (const e of completedEntries.value) {
     const key = (e.format || "UNKNOWN").toUpperCase();
     map[key] = (map[key] || 0) + 1;
   }
@@ -301,7 +304,7 @@ const statusLabels = computed<Record<string, string>>(() => ({
 }));
 const statusDistribution = computed(() => {
   const map: Record<string, number> = {};
-  for (const e of entries.value) {
+  for (const e of completedEntries.value) {
     map[e.status] = (map[e.status] || 0) + 1;
   }
   return Object.entries(map).map(([name, value]) => ({ name: statusLabels.value[name] ?? name, value }));
@@ -309,7 +312,7 @@ const statusDistribution = computed(() => {
 
 const countryDistribution = computed(() => {
   const map: Record<string, number> = {};
-  for (const e of entries.value) {
+  for (const e of completedEntries.value) {
     const key = mapCountry(e.countryOfOrigin);
     map[key] = (map[key] || 0) + 1;
   }
@@ -389,7 +392,7 @@ const episodeDist = computed(() => {
   const map = new Map<string, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
   for (const b of episodeBins) map.set(b.label, { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 });
 
-  for (const e of entries.value) {
+  for (const e of completedEntries.value) {
     const ep = e.episodes ?? null;
     const bucket = episodeBins.find((b) => b.match(ep))?.label ?? t("common.unknown");
     const cur = map.get(bucket)!;
@@ -412,7 +415,7 @@ const episodeOption = computed(() =>
 
 const releaseYearDist = computed(() => {
   const map = new Map<number, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
-  for (const e of entries.value) {
+  for (const e of completedEntries.value) {
     const year = e.seasonYear;
     if (!year) continue;
     const cur = map.get(year) ?? { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 };
@@ -437,7 +440,7 @@ const releaseOption = computed(() =>
 
 const watchYearDist = computed(() => {
   const map = new Map<number, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
-  for (const e of entries.value) {
+  for (const e of completedEntries.value) {
     const year = e.completedAt?.year;
     if (!year) continue;
     const cur = map.get(year) ?? { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 };
@@ -460,12 +463,38 @@ const watchOption = computed(() =>
   makeLineOption(watchYearDist.value.labels, watchYearDist.value.values, metricLabel(watchMetric.value))
 );
 
-function getPercent(value: number) {
-  if (!totalAnime.value) return "0%";
-  const raw = (value / totalAnime.value) * 100;
-  if (raw > 0 && raw < 0.1) return "<0.1%";
-  return `${raw.toFixed(1)}%`;
+function buildPercentLabels(rows: Array<{ name: string; value: number }>) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  if (!total) {
+    return Object.fromEntries(rows.map((row) => [row.name, "0.0%"])) as Record<string, string>;
+  }
+
+  const scaled = rows.map((row) => {
+    const exactTenths = (row.value / total) * 1000;
+    const baseTenths = Math.floor(exactTenths);
+    return {
+      name: row.name,
+      baseTenths,
+      remainder: exactTenths - baseTenths,
+    };
+  });
+
+  let missingTenths = 1000 - scaled.reduce((sum, row) => sum + row.baseTenths, 0);
+  scaled.sort((a, b) => b.remainder - a.remainder);
+
+  for (let i = 0; i < scaled.length && missingTenths > 0; i++) {
+    scaled[i].baseTenths += 1;
+    missingTenths -= 1;
+  }
+
+  return Object.fromEntries(
+    scaled.map((row) => [row.name, `${(row.baseTenths / 10).toFixed(1)}%`])
+  ) as Record<string, string>;
 }
+
+const formatPercentLabels = computed(() => buildPercentLabels(formatDistribution.value));
+const statusPercentLabels = computed(() => buildPercentLabels(statusDistribution.value));
+const countryPercentLabels = computed(() => buildPercentLabels(countryDistribution.value));
 </script>
 
 <template>
@@ -509,7 +538,7 @@ function getPercent(value: number) {
             <div class="space-y-2 text-sm">
               <div v-for="row in formatDistribution" :key="row.name" class="dashboard-legend-row">
                 <span>{{ row.name }}</span>
-                <span class="dashboard-percent">{{ getPercent(row.value) }}</span>
+                <span class="text-[#b8c8db]">{{ formatPercentLabels[row.name] }}</span>
               </div>
             </div>
           </div>
@@ -524,7 +553,7 @@ function getPercent(value: number) {
             <div class="space-y-2 text-sm">
               <div v-for="row in statusDistribution" :key="row.name" class="dashboard-legend-row">
                 <span>{{ row.name }}</span>
-                <span class="dashboard-percent">{{ getPercent(row.value) }}</span>
+                <span class="text-[#b8c8db]">{{ statusPercentLabels[row.name] }}</span>
               </div>
             </div>
           </div>
@@ -539,7 +568,7 @@ function getPercent(value: number) {
             <div class="space-y-2 text-sm">
               <div v-for="row in countryDistribution" :key="row.name" class="dashboard-legend-row">
                 <span>{{ row.name }}</span>
-                <span class="dashboard-percent">{{ getPercent(row.value) }}</span>
+                <span class="text-[#b8c8db]">{{ countryPercentLabels[row.name] }}</span>
               </div>
             </div>
           </div>

@@ -11,6 +11,7 @@ import type {
 } from "~/types/api";
 
 const { t } = useLocale();
+const { theme } = useTheme();
 
 const anilistUser = useCookie<string>("anilist-user", { default: () => "" });
 
@@ -330,6 +331,40 @@ function setSeenFilter(value: SeenFilter) {
   seenFilter.value = value;
 }
 
+function statusLabel(status?: string) {
+  if (!status) return t("compare.notSeen");
+  if (status === "COMPLETED") return t("compare.seen");
+  if (status === "CURRENT") return t("dashboard.watching");
+  if (status === "PLANNING") return t("dashboard.planning");
+  if (status === "PAUSED") return t("dashboard.paused");
+  if (status === "DROPPED") return t("dashboard.dropped");
+  if (status === "REPEATING") return t("dashboard.repeating");
+  return status;
+}
+
+function statusBadgeClass(status?: string) {
+  const isLight = theme.value === "light";
+  if (!status) return isLight ? "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300" : "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
+  if (status === "COMPLETED") return isLight ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300" : "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30";
+  if (status === "CURRENT") return isLight ? "bg-sky-100 text-sky-800 ring-1 ring-sky-300" : "bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30";
+  if (status === "PLANNING") return isLight ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300" : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
+  if (status === "PAUSED") return isLight ? "bg-orange-100 text-orange-800 ring-1 ring-orange-300" : "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30";
+  if (status === "DROPPED") return isLight ? "bg-rose-100 text-rose-800 ring-1 ring-rose-300" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30";
+  if (status === "REPEATING") return isLight ? "bg-violet-100 text-violet-800 ring-1 ring-violet-300" : "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30";
+  return isLight ? "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300" : "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
+}
+
+function formattedAverageScore(anime: CompareAnimeItem) {
+  const value = averageScore(anime);
+  return value > 0 ? value.toFixed(1) : "-";
+}
+
+const userChipStyle = computed(() => ({
+  background: "var(--surface-muted)",
+  borderColor: "var(--border-strong)",
+  color: "var(--text)",
+}));
+
 onMounted(async () => {
   await loadAllAnime();
 
@@ -367,7 +402,7 @@ watch(
       <h1 class="text-3xl font-bold">{{ t("compare.title") }}</h1>
     </div>
 
-    <div class="space-y-2">
+    <section class="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 space-y-3">
       <input
         v-model="userInput"
         @keydown.space.prevent="addUser"
@@ -380,90 +415,95 @@ watch(
         <div
           v-for="u in users"
           :key="u"
-          class="ui-chip flex items-center gap-2 py-1"
+          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm"
+          :style="userChipStyle"
         >
-          {{ u }}
-          <button @click="removeUser(u)" class="text-zinc-500 hover:text-red-400">x</button>
+          <span>{{ u }}</span>
+          <button @click="removeUser(u)" class="text-zinc-500 hover:text-rose-500">x</button>
         </div>
       </div>
-    </div>
+    </section>
 
-    <input v-model="search" :placeholder="t('common.animeSearchPlaceholder')" class="ui-input w-full px-4" />
+    <section class="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3">
+      <input v-model="search" :placeholder="t('common.animeSearchPlaceholder')" class="ui-input w-full px-4" />
 
-    <div class="flex flex-col sm:flex-row gap-2">
-      <button
-        v-for="f in ['allUsers', 'all', 'noneUsers']"
-        :key="f"
-        @click="setSeenFilter(f as SeenFilter)"
-        class="px-3 py-2 sm:py-1 text-xs rounded border w-full sm:w-auto transition"
-        :class="
-          seenFilter === f
-            ? 'bg-indigo-600 text-white border-indigo-600'
-            : 'bg-zinc-900 text-zinc-300 border-zinc-700'
-        "
-      >
-        {{
-          f === "allUsers"
-            ? t("compare.seenAllUsers")
-            : f === "all"
-              ? t("compare.seenAnyUser")
-              : t("compare.seenNone")
-        }}
-      </button>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
-      <button
-        v-for="g in allGenres"
-        :key="g"
-        @click="cycleState(genreStates, g)"
-        class="px-3 py-2 sm:py-1.5 text-xs rounded-full border"
-        :class="{
-          'bg-indigo-600 text-white': genreStates[g] === 'include',
-          'bg-red-600 text-white': genreStates[g] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !genreStates[g],
-        }"
-      >
-        {{ g }}
-      </button>
-    </div>
-
-    <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
-
-    <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
-      <div v-for="tag in visibleTags" :key="tag" class="relative">
-        <input
-          v-if="tagStates[tag] === 'include'"
-          type="range"
-          min="0"
-          max="100"
-          step="5"
-          :value="tagMinRank[tag] ?? 0"
-          @input="tagMinRank[tag] = Number(($event.target as HTMLInputElement).value)"
-          @mousedown.stop
-          @pointerdown.stop
-          @click.stop
-          class="absolute inset-0 opacity-0 cursor-ew-resize"
-        />
-
+      <div class="flex flex-col sm:flex-row gap-2">
         <button
-          @click="cycleState(tagStates, tag)"
-          class="px-3 py-2 text-xs rounded-full border transition select-none"
-          :style="{ background: tagBackground(tag) }"
-          :class="{
-            'text-white border-indigo-500': tagStates[tag] === 'include',
-            'bg-red-600 text-white border-red-600': tagStates[tag] === 'exclude',
-            'bg-zinc-900 text-zinc-300 border-zinc-700': !tagStates[tag],
-          }"
+          v-for="f in ['allUsers', 'all', 'noneUsers']"
+          :key="f"
+          @click="setSeenFilter(f as SeenFilter)"
+          class="px-3 py-2 sm:py-1.5 text-xs rounded-md border w-full sm:w-auto transition"
+          :class="
+            seenFilter === f
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-zinc-900 text-zinc-300 border-zinc-700'
+          "
         >
-          {{ tag }}
-          <span v-if="tagStates[tag] === 'include'" class="ml-1 text-[10px] opacity-80">
-            {{ tagMinRank[tag] ?? 0 }}%
-          </span>
+          {{
+            f === "allUsers"
+              ? t("compare.seenAllUsers")
+              : f === "all"
+                ? t("compare.seenAnyUser")
+                : t("compare.seenNone")
+          }}
         </button>
       </div>
-    </div>
+
+      <div class="space-y-2">
+        <h2 class="text-sm font-semibold text-zinc-300">{{ t("nav.genres") }}</h2>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="g in allGenres"
+            :key="g"
+            @click="cycleState(genreStates, g)"
+            class="px-3 py-1.5 text-xs rounded-full border"
+            :class="{
+              'bg-indigo-600 text-white border-indigo-500': genreStates[g] === 'include',
+              'bg-red-600 text-white border-red-500': genreStates[g] === 'exclude',
+              'bg-zinc-900 text-zinc-300 border-zinc-700': !genreStates[g],
+            }"
+          >
+            {{ g }}
+          </button>
+        </div>
+      </div>
+
+      <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
+
+      <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
+        <div v-for="tag in visibleTags" :key="tag" class="relative">
+          <input
+            v-if="tagStates[tag] === 'include'"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            :value="tagMinRank[tag] ?? 0"
+            @input="tagMinRank[tag] = Number(($event.target as HTMLInputElement).value)"
+            @mousedown.stop
+            @pointerdown.stop
+            @click.stop
+            class="absolute inset-0 opacity-0 cursor-ew-resize"
+          />
+
+          <button
+            @click="cycleState(tagStates, tag)"
+            class="px-3 py-2 text-xs rounded-full border transition select-none"
+            :style="{ background: tagBackground(tag) }"
+            :class="{
+              'text-white border-indigo-500': tagStates[tag] === 'include',
+              'bg-red-600 text-white border-red-600': tagStates[tag] === 'exclude',
+              'bg-zinc-900 text-zinc-300 border-zinc-700': !tagStates[tag],
+            }"
+          >
+            {{ tag }}
+            <span v-if="tagStates[tag] === 'include'" class="ml-1 text-[10px] opacity-80">
+              {{ tagMinRank[tag] ?? 0 }}%
+            </span>
+          </button>
+        </div>
+      </div>
+    </section>
 
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div class="text-sm text-zinc-400">{{ animeCount }} {{ t("compare.animeFound") }}</div>
@@ -500,27 +540,37 @@ watch(
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-else class="space-y-3">
+    <div v-else class="space-y-4">
       <div
         v-for="a in paginatedAnime"
         :key="a.id"
-        class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 space-y-3"
+        class="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.15)] space-y-3"
       >
-        <div class="flex gap-3 items-start">
-          <img v-if="a.cover" :src="a.cover" class="h-16 aspect-2/3 rounded object-cover shrink-0" />
+        <div class="flex gap-3 items-start justify-between">
+          <div class="flex gap-3 min-w-0">
+            <img v-if="a.cover" :src="a.cover" class="h-20 aspect-2/3 rounded-lg object-cover shrink-0" />
 
-          <div class="flex-1 min-w-0">
-            <a
-              :href="anilistUrl(a.id)"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="font-medium wrap-break-word hover:underline hover:text-indigo-400"
-            >
-              {{ a.title }}
-            </a>
+            <div class="flex-1 min-w-0">
+              <a
+                :href="anilistUrl(a.id)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-medium wrap-break-word hover:underline hover:text-indigo-400"
+              >
+                {{ a.title }}
+              </a>
 
-            <div v-if="a.titleEn && a.titleRo && a.titleEn !== a.titleRo" class="text-xs text-zinc-500">
-              {{ a.titleRo }}
+              <div v-if="a.titleEn && a.titleRo && a.titleEn !== a.titleRo" class="text-xs text-zinc-500">
+                {{ a.titleRo }}
+              </div>
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                <span class="inline-flex rounded-md px-2 py-0.5 text-[11px] bg-zinc-800/70 text-zinc-300">
+                  {{ t("common.popularity") }}: {{ popularityCount(a) }}
+                </span>
+                <span class="inline-flex rounded-md px-2 py-0.5 text-[11px] bg-zinc-800/70 text-zinc-300">
+                  {{ t("common.score") }}: {{ formattedAverageScore(a) }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -529,30 +579,17 @@ watch(
           <div
             v-for="u in users"
             :key="u"
-            class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-2 text-sm"
+            class="rounded-xl border border-zinc-800 bg-zinc-950/35 p-2.5 text-sm"
           >
-            <div class="text-xs text-zinc-400 mb-1">{{ u }}</div>
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <div class="text-xs text-zinc-400 truncate">{{ u }}</div>
+              <span class="inline-flex rounded-md px-2 py-0.5 text-[11px]" :class="statusBadgeClass(a.users[u]?.status)">
+                {{ statusLabel(a.users[u]?.status) }}
+              </span>
+            </div>
 
             <template v-if="a.users[u]">
-              <div v-if="a.users[u].status === 'COMPLETED'" class="text-green-400">
-                {{ t("compare.seen") }}
-              </div>
-              <div
-                v-else
-                :class="{
-                  'text-blue-400': a.users[u].status === 'CURRENT',
-                  'text-yellow-400': a.users[u].status === 'PLANNING',
-                  'text-orange-400': a.users[u].status === 'PAUSED',
-                  'text-red-400': a.users[u].status === 'DROPPED',
-                }"
-              >
-                {{ a.users[u].status }}
-              </div>
               <div class="text-xs text-zinc-400">{{ t("common.score") }}: {{ a.users[u].score || "-" }}</div>
-            </template>
-
-            <template v-else>
-              <div class="text-zinc-500">{{ t("compare.notSeen") }}</div>
             </template>
           </div>
         </div>

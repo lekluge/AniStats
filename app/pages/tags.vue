@@ -21,6 +21,7 @@ const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
+const activeEntries = computed(() => entries.value.filter((e) => e.status !== "PLANNING"));
 const layoutMode = ref<LayoutMode>("grid");
 const listSortKey = ref<ListSortKey>("score");
 const listSortDirection = ref<SortDirection>("desc");
@@ -83,7 +84,7 @@ const showAllTags = ref(false);
 
 const allTags = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((e) => e.tags?.forEach((tag) => set.add(tag.name)));
+  activeEntries.value.forEach((e) => e.tags?.forEach((tag) => set.add(tag.name)));
   return [...set].sort();
 });
 
@@ -111,7 +112,7 @@ const visibleTags = computed(() => {
 });
 
 const filteredEntries = computed(() => {
-  return entries.value.filter((e) => {
+  return activeEntries.value.filter((e) => {
     const tags = e.tags?.map((tag) => tag.name) ?? [];
 
     for (const [tag, state] of Object.entries(tagStates.value)) {
