@@ -43,6 +43,7 @@ const allGenres = ref<string[]>([]);
 const allTags = ref<string[]>([]);
 const expandedTagCards = ref<Record<number, boolean>>({});
 const MAX_VISIBLE_TAGS = 8;
+const GRID_VISIBLE_TAGS = 4;
 
 definePageMeta({ title: "Recommendations", middleware: "auth" });
 
@@ -166,6 +167,19 @@ function hiddenTagCount(item: ApiRecommendationItem) {
 
 function toggleTagExpansion(itemId: number) {
   expandedTagCards.value[itemId] = !expandedTagCards.value[itemId];
+}
+
+function visibleGridTags(item: ApiRecommendationItem) {
+  if (expandedTagCards.value[item.id]) return item.tags;
+  return item.tags.slice(0, GRID_VISIBLE_TAGS);
+}
+
+function hasHiddenGridTags(item: ApiRecommendationItem) {
+  return item.tags.length > GRID_VISIBLE_TAGS;
+}
+
+function hiddenGridTagCount(item: ApiRecommendationItem) {
+  return Math.max(item.tags.length - GRID_VISIBLE_TAGS, 0);
 }
 </script>
 
@@ -314,55 +328,66 @@ function toggleTagExpansion(itemId: number) {
 
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-else-if="layoutMode === 'grid'" class="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-3 lg:grid-cols-4">
+    <div v-else-if="layoutMode === 'grid'" class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
       <div
         v-for="(a, i) in currentItems"
         :key="a.id"
-        class="relative w-full rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+        class="ui-card relative h-full overflow-hidden p-3"
       >
-        <img v-if="a.cover" :src="a.cover" class="w-full aspect-[3/4] object-cover" />
         <span
-          class="absolute top-2 right-2 z-10 text-xs font-medium bg-indigo-800 text-indigo-100 px-2 py-1 rounded-full backdrop-blur-sm"
+          class="absolute right-3 top-3 inline-flex items-center rounded-full border border-indigo-500/40 bg-indigo-600/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-400"
         >
           #{{ i + 1 }}
         </span>
-        <div class="p-3 space-y-1.5">
-          <a :href="anilistUrl(a.id)" target="_blank" class="block hover:underline hover:text-indigo-400">
-            <div class="font-semibold leading-snug">{{ getTitleLines(a).primary }}</div>
-            <div v-if="getTitleLines(a).secondary" class="text-sm text-zinc-400 leading-snug">
-              {{ getTitleLines(a).secondary }}
+        <div class="flex gap-3 items-center">
+          <img v-if="a.cover" :src="a.cover" class="h-24 aspect-2/3 rounded-lg object-cover shrink-0" />
+
+          <div class="min-w-0 flex-1">
+            <a :href="anilistUrl(a.id)" target="_blank" class="block pr-12 hover:underline hover:text-indigo-400">
+              <div class="text-sm font-semibold leading-tight wrap-break-word">{{ getTitleLines(a).primary }}</div>
+              <div v-if="getTitleLines(a).secondary" class="mt-0.5 text-xs text-zinc-500 leading-snug">
+                {{ getTitleLines(a).secondary }}
+              </div>
+            </a>
+
+            <div class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              <span class="rounded-md border border-zinc-700/80 bg-zinc-900/40 px-1.5 py-0.5 text-zinc-300">
+                {{ t("recommendation.matchScore") }}: <span class="font-semibold">{{ a.score }}</span>
+              </span>
+              <span class="rounded-md border border-zinc-700/80 bg-zinc-900/40 px-1.5 py-0.5 text-zinc-400">
+                {{ activeTab }}
+              </span>
             </div>
-          </a>
 
-          <div class="flex flex-wrap gap-1">
-            <span
-              v-for="g in a.genres"
-              :key="g"
-              class="px-2 py-0.5 text-xs rounded bg-indigo-600/20 text-indigo-300"
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span
+                v-for="g in a.genres.slice(0, 3)"
+                :key="g"
+                class="px-2 py-0.5 text-[11px] rounded bg-indigo-600/20 text-indigo-300"
+              >
+                <a :href="`https://anilist.co/search/anime/${encodeURIComponent(g)}`" target="_blank" rel="noopener noreferrer">{{ g }}</a>
+              </span>
+              <span
+                v-for="tag in visibleGridTags(a)"
+                :key="tag"
+                class="px-2 py-0.5 text-[11px] rounded bg-zinc-700/40 text-zinc-300"
+              >
+                <a :href="`https://anilist.co/search/anime/${encodeURIComponent(tag)}`" target="_blank" rel="noopener noreferrer">{{ tag }}</a>
+              </span>
+            </div>
+
+            <button
+              v-if="hasHiddenGridTags(a)"
+              @click="toggleTagExpansion(a.id)"
+              class="ui-btn mt-2 px-2 py-1 text-[11px]"
             >
-              <a :href="`https://anilist.co/search/anime/${encodeURIComponent(g)}`" target="_blank" rel="noopener noreferrer">{{ g }}</a>
-            </span>
-            <span
-              v-for="tag in visibleItemTags(a)"
-              :key="tag"
-              class="px-2 py-0.5 text-xs rounded bg-zinc-700/40 text-zinc-300"
-            >
-              <a :href="`https://anilist.co/search/anime/${encodeURIComponent(tag)}`" target="_blank" rel="noopener noreferrer">{{ tag }}</a>
-            </span>
+              {{
+                expandedTagCards[a.id]
+                  ? t("common.showLess")
+                  : `${t("common.readMore")} (+${hiddenGridTagCount(a)})`
+              }}
+            </button>
           </div>
-          <button
-            v-if="hasHiddenTags(a)"
-            @click="toggleTagExpansion(a.id)"
-            class="ui-btn mt-1 px-2 py-1 text-[11px]"
-          >
-            {{
-              expandedTagCards[a.id]
-                ? t("common.showLess")
-                : `${t("common.readMore")} (+${hiddenTagCount(a)})`
-            }}
-          </button>
-
-          <div class="text-xs text-zinc-400">{{ t("recommendation.matchScore") }}: {{ a.score }}</div>
         </div>
       </div>
     </div>
