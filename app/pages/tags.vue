@@ -10,23 +10,20 @@ const route = useRoute();
 
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
-const paginatedListAnime = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return listAnime.value.slice(start, start + pageSize);
-});
 
 type TagCover = { id: number; title: string; cover: string };
 type LayoutMode = "grid" | "list";
 type TagState = "include" | "exclude";
-type TagSortMode = "count" | "minutes" | "score";
+type ListSortKey = "title" | "score" | "time" | "completedAt";
+type SortDirection = "asc" | "desc";
 
 const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
-const tagSortMode = ref<TagSortMode>("count");
+const listSortKey = ref<ListSortKey>("score");
+const listSortDirection = ref<SortDirection>("desc");
 
 definePageMeta({ title: "Tags", middleware: "auth" });
 
@@ -142,6 +139,7 @@ const normalTagStats = computed(() => {
       scoreSum: number;
       scoreCount: number;
       minutesWatched: number;
+      latestCompletedAtTs: number;
       covers: TagCover[];
     }
   > = {};
@@ -158,12 +156,14 @@ const normalTagStats = computed(() => {
           scoreSum: 0,
           scoreCount: 0,
           minutesWatched: 0,
+          latestCompletedAtTs: 0,
           covers: [],
         };
       }
 
       map[name].count++;
       map[name].minutesWatched += minutes;
+      map[name].latestCompletedAtTs = Math.max(map[name].latestCompletedAtTs, fuzzyDateToTs(e.completedAt));
 
       if (e.score && e.score > 0) {
         map[name].scoreSum += e.score;
@@ -190,6 +190,7 @@ const normalTagStats = computed(() => {
     count: entry.count,
     meanScore: entry.scoreCount ? Math.round((entry.scoreSum / entry.scoreCount) * 10) / 10 : 0,
     minutesWatched: entry.minutesWatched,
+    latestCompletedAtTs: entry.latestCompletedAtTs,
     covers: entry.covers,
   }));
 });
@@ -200,10 +201,12 @@ const combinedStats = computed(() => {
   let minutes = 0;
   let scoreSum = 0;
   let scoreCount = 0;
+  let latestCompletedAtTs = 0;
   const covers: TagCover[] = [];
 
   for (const e of filteredEntries.value) {
     minutes += (e.progress ?? 0) * (e.duration ?? 0);
+    latestCompletedAtTs = Math.max(latestCompletedAtTs, fuzzyDateToTs(e.completedAt));
 
     if (e.score && e.score > 0) {
       scoreSum += e.score;
@@ -229,15 +232,25 @@ const combinedStats = computed(() => {
     count: filteredEntries.value.length,
     meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
+    latestCompletedAtTs,
     covers,
   };
 });
 
-function sortTags<T extends { count: number; minutesWatched: number; meanScore: number }>(list: T[]) {
+function sortTags<T extends { genre: string; meanScore: number; minutesWatched: number; latestCompletedAtTs: number }>(list: T[]) {
   return [...list].sort((a, b) => {
-    if (tagSortMode.value === "count") return b.count - a.count;
-    if (tagSortMode.value === "score") return b.meanScore - a.meanScore;
-    return b.minutesWatched - a.minutesWatched;
+    if (listSortKey.value === "title") {
+      return compareValues(a.genre, b.genre, listSortDirection.value);
+    }
+
+    if (listSortKey.value === "score") {
+      return compareValues(a.meanScore, b.meanScore, listSortDirection.value);
+    }
+    if (listSortKey.value === "time") {
+      return compareValues(a.minutesWatched, b.minutesWatched, listSortDirection.value);
+    }
+
+    return compareValues(a.latestCompletedAtTs, b.latestCompletedAtTs, listSortDirection.value);
   });
 }
 
@@ -266,8 +279,37 @@ const listAnime = computed(() =>
     title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
     cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
+    minutes: (e.progress ?? 0) * (e.duration ?? 0),
+    completedAtTs: fuzzyDateToTs(e.completedAt),
   }))
 );
+
+const sortedListAnime = computed(() => {
+  return [...listAnime.value].sort((a, b) => {
+    if (listSortKey.value === "title") {
+      return compareValues(a.title, b.title, listSortDirection.value);
+    }
+
+    if (listSortKey.value === "score") {
+      return compareValues(a.score ?? 0, b.score ?? 0, listSortDirection.value);
+    }
+    if (listSortKey.value === "time") {
+      return compareValues(a.minutes ?? 0, b.minutes ?? 0, listSortDirection.value);
+    }
+
+    return compareValues(a.completedAtTs ?? 0, b.completedAtTs ?? 0, listSortDirection.value);
+  });
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedListAnime.value.length / pageSize)));
+const paginatedListAnime = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return sortedListAnime.value.slice(start, start + pageSize);
+});
+
+watch(totalPages, (next) => {
+  if (currentPage.value > next) currentPage.value = next;
+});
 
 function toggleTag(tag: string) {
   const current = tagStates.value[tag];
@@ -279,6 +321,27 @@ function toggleTag(tag: string) {
 
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
+}
+
+function fuzzyDateToTs(date?: AnimeEntry["completedAt"]) {
+  if (!date?.year) return 0;
+  const month = Math.max((date.month ?? 1) - 1, 0);
+  const day = Math.max(date.day ?? 1, 1);
+  return Date.UTC(date.year, month, day);
+}
+
+function compareValues(a: number | string, b: number | string, direction: SortDirection) {
+  if (typeof a === "string" && typeof b === "string") {
+    const cmp = a.localeCompare(b, undefined, { sensitivity: "base" });
+    return direction === "asc" ? cmp : -cmp;
+  }
+
+  const cmp = Number(a) - Number(b);
+  return direction === "asc" ? cmp : -cmp;
+}
+
+function formatHours(minutes?: number) {
+  return ((minutes ?? 0) / 60).toFixed(1);
 }
 </script>
 
@@ -302,27 +365,18 @@ function anilistUrl(id: number) {
     </div>
 
     <div class="flex flex-wrap gap-2 justify-between items-center">
-      <div class="flex gap-2">
+      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <select v-model="listSortKey" class="ui-input text-sm">
+          <option value="score">{{ t("common.score") }}</option>
+          <option value="title">{{ t("common.title") }}</option>
+          <option value="time">{{ t("common.time") }}</option>
+          <option value="completedAt">{{ t("common.completedDate") }}</option>
+        </select>
         <button
-          @click="tagSortMode = 'count'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="tagSortMode === 'count' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          class="ui-btn text-xs"
+          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
         >
-          {{ t("common.count") }}
-        </button>
-        <button
-          @click="tagSortMode = 'score'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="tagSortMode === 'score' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.score") }}
-        </button>
-        <button
-          @click="tagSortMode = 'minutes'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="tagSortMode === 'minutes' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.hours") }}
+          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
         </button>
       </div>
 
@@ -400,7 +454,9 @@ function anilistUrl(id: number) {
           <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>
-          <span class="text-xs text-zinc-400">{{ a.score || "-" }}</span>
+          <span class="text-xs text-zinc-400">
+            {{ t("common.score") }}: {{ a.score || "-" }} | {{ t("common.time") }}: {{ formatHours(a.minutes) }}h
+          </span>
         </div>
       </div>
     </div>
