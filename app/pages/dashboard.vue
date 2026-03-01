@@ -34,10 +34,38 @@ const episodeMetric = ref<MetricMode>("titles");
 const releaseMetric = ref<MetricMode>("titles");
 const watchMetric = ref<MetricMode>("titles");
 
-const CHART_BG = "#13233a";
-const CHART_FG = "#8fa4bf";
-const CHART_LINE = "#7f92aa";
-const CHART_BAR = "#95a8bf";
+const { theme } = useTheme();
+const chartPalette = computed(() => {
+  if (theme.value === "dark") {
+    return {
+      text: "#8fa4bf",
+      textStrong: "#b7c6d9",
+      axis: "#2a3f5c",
+      split: "#20354f",
+      tooltipBg: "#0d1a2c",
+      tooltipBorder: "#243854",
+      tooltipText: "#eaf0f8",
+      line: "#7f92aa",
+      bar: "#95a8bf",
+      area: "rgba(127,146,170,0.14)",
+      panelBg: "#13233a",
+    };
+  }
+
+  return {
+    text: "#5f6c7b",
+    textStrong: "#2a3d52",
+    axis: "#c8d5e6",
+    split: "#dbe5f0",
+    tooltipBg: "#ffffff",
+    tooltipBorder: "#dbe5f0",
+    tooltipText: "#1f2a37",
+    line: "#2f8fdb",
+    bar: "#3db4f2",
+    area: "rgba(61,180,242,0.16)",
+    panelBg: "#f8fbff",
+  };
+});
 
 async function loadAnime() {
   loading.value = true;
@@ -116,7 +144,7 @@ const totalPlannedDays = computed(() => {
   return Number((plannedMinutes / 60 / 24).toFixed(1));
 });
 
-const scoredEntries = computed(() =>completedEntries.value.filter((e) => Number(e.score ?? 0) > 0));
+const scoredEntries = computed(() => completedEntries.value.filter((e) => Number(e.score ?? 0) > 0));
 const meanScore = computed(() => {
   if (!scoredEntries.value.length) return 0;
   const sum = scoredEntries.value.reduce((acc, e) => acc + Number(e.score), 0);
@@ -152,65 +180,67 @@ function computeMetricValue(
 }
 
 function makeBarOption(labels: string[], values: number[], labelName: string) {
+  const palette = chartPalette.value;
   return {
     backgroundColor: "transparent",
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "shadow" },
-      backgroundColor: "#0d1a2c",
-      borderColor: "#243854",
-      textStyle: { color: "#eaf0f8" },
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
+      textStyle: { color: palette.tooltipText },
     },
     grid: { left: 24, right: 16, top: 20, bottom: 36, containLabel: true },
     xAxis: {
       type: "category",
       data: labels,
-      axisLabel: { color: CHART_FG, fontWeight: 600 },
-      axisLine: { lineStyle: { color: "#2a3f5c" } },
+      axisLabel: { color: palette.text, fontWeight: 600 },
+      axisLine: { lineStyle: { color: palette.axis } },
       axisTick: { show: false },
     },
     yAxis: {
       type: "value",
       name: labelName,
-      nameTextStyle: { color: CHART_FG },
-      axisLabel: { color: CHART_FG },
-      splitLine: { lineStyle: { color: "#20354f" } },
+      nameTextStyle: { color: palette.text },
+      axisLabel: { color: palette.text },
+      splitLine: { lineStyle: { color: palette.split } },
     },
     series: [
       {
         type: "bar",
         data: values,
         barMaxWidth: 42,
-        itemStyle: { color: CHART_BAR, borderRadius: [6, 6, 0, 0] },
-        label: { show: true, position: "top", color: "#b7c6d9", fontWeight: 600 },
+        itemStyle: { color: palette.bar, borderRadius: [6, 6, 0, 0] },
+        label: { show: true, position: "top", color: palette.textStrong, fontWeight: 600 },
       },
     ],
   };
 }
 
 function makeLineOption(labels: string[], values: number[], labelName: string) {
+  const palette = chartPalette.value;
   return {
     backgroundColor: "transparent",
     tooltip: {
       trigger: "axis",
-      backgroundColor: "#0d1a2c",
-      borderColor: "#243854",
-      textStyle: { color: "#eaf0f8" },
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
+      textStyle: { color: palette.tooltipText },
     },
     grid: { left: 24, right: 16, top: 20, bottom: 36, containLabel: true },
     xAxis: {
       type: "category",
       data: labels,
-      axisLabel: { color: CHART_FG, fontWeight: 600 },
-      axisLine: { lineStyle: { color: "#2a3f5c" } },
+      axisLabel: { color: palette.text, fontWeight: 600 },
+      axisLine: { lineStyle: { color: palette.axis } },
       axisTick: { show: false },
     },
     yAxis: {
       type: "value",
       name: labelName,
-      nameTextStyle: { color: CHART_FG },
-      axisLabel: { color: CHART_FG },
-      splitLine: { lineStyle: { color: "#20354f" } },
+      nameTextStyle: { color: palette.text },
+      axisLabel: { color: palette.text },
+      splitLine: { lineStyle: { color: palette.split } },
     },
     series: [
       {
@@ -219,10 +249,10 @@ function makeLineOption(labels: string[], values: number[], labelName: string) {
         smooth: true,
         symbol: "circle",
         symbolSize: 8,
-        lineStyle: { color: CHART_LINE, width: 3 },
-        itemStyle: { color: CHART_LINE },
-        areaStyle: { color: "rgba(127,146,170,0.14)" },
-        label: { show: true, position: "top", color: "#b7c6d9", fontWeight: 600 },
+        lineStyle: { color: palette.line, width: 3 },
+        itemStyle: { color: palette.line },
+        areaStyle: { color: palette.area },
+        label: { show: true, position: "top", color: palette.textStrong, fontWeight: 600 },
       },
     ],
   };
@@ -287,6 +317,7 @@ const countryDistribution = computed(() => {
 });
 
 function makeDonutOption(rows: Array<{ name: string; value: number }>) {
+  const palette = chartPalette.value;
   const pieRows = rows.filter((r) => r.value > 0);
   const hasSingleSlice = pieRows.length <= 1;
 
@@ -294,9 +325,9 @@ function makeDonutOption(rows: Array<{ name: string; value: number }>) {
     backgroundColor: "transparent",
     tooltip: {
       trigger: "item",
-      backgroundColor: "#0d1a2c",
-      borderColor: "#243854",
-      textStyle: { color: "#eaf0f8" },
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
+      textStyle: { color: palette.tooltipText },
     },
     legend: { show: false },
     series: [
@@ -308,7 +339,7 @@ function makeDonutOption(rows: Array<{ name: string; value: number }>) {
         label: { show: false },
         itemStyle: {
           borderWidth: hasSingleSlice ? 0 : 2,
-          borderColor: CHART_BG,
+          borderColor: palette.panelBg,
         },
       },
     ],
@@ -460,67 +491,67 @@ function getPercent(value: number) {
 
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-else class="space-y-6 rounded-2xl border border-[#1c3554] bg-[#07192d] p-5 text-[#d8e3f3]">
+    <div v-else class="dashboard-shell">
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div v-for="item in overviewStats" :key="item.label" class="rounded-xl border border-[#1e3858] bg-[#0e2239] px-4 py-3">
+        <div v-for="item in overviewStats" :key="item.label" class="dashboard-kpi">
           <div class="text-3xl font-bold tracking-tight">{{ item.value }}</div>
-          <div class="text-sm text-[#8fa4bf]">{{ item.label }}</div>
+          <div class="dashboard-kpi-label">{{ item.label }}</div>
         </div>
       </div>
 
       <div class="grid gap-4 xl:grid-cols-3">
-        <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+        <section class="dashboard-panel">
           <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.formatDistribution") }}</h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
               <VChart :style="{ height: '130px', width: '130px' }" :option="formatOption" autoresize />
             </ClientOnly>
             <div class="space-y-2 text-sm">
-              <div v-for="row in formatDistribution" :key="row.name" class="flex items-center justify-between rounded-lg bg-[#233a57] px-3 py-1.5">
+              <div v-for="row in formatDistribution" :key="row.name" class="dashboard-legend-row">
                 <span>{{ row.name }}</span>
-                <span class="text-[#b8c8db]">{{ getPercent(row.value) }}</span>
+                <span class="dashboard-percent">{{ getPercent(row.value) }}</span>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+        <section class="dashboard-panel">
           <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.statusDistribution") }}</h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
               <VChart :style="{ height: '130px', width: '130px' }" :option="statusOption" autoresize />
             </ClientOnly>
             <div class="space-y-2 text-sm">
-              <div v-for="row in statusDistribution" :key="row.name" class="flex items-center justify-between rounded-lg bg-[#233a57] px-3 py-1.5">
+              <div v-for="row in statusDistribution" :key="row.name" class="dashboard-legend-row">
                 <span>{{ row.name }}</span>
-                <span class="text-[#b8c8db]">{{ getPercent(row.value) }}</span>
+                <span class="dashboard-percent">{{ getPercent(row.value) }}</span>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+        <section class="dashboard-panel">
           <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.countryDistribution") }}</h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
               <VChart :style="{ height: '130px', width: '130px' }" :option="countryOption" autoresize />
             </ClientOnly>
             <div class="space-y-2 text-sm">
-              <div v-for="row in countryDistribution" :key="row.name" class="flex items-center justify-between rounded-lg bg-[#233a57] px-3 py-1.5">
+              <div v-for="row in countryDistribution" :key="row.name" class="dashboard-legend-row">
                 <span>{{ row.name }}</span>
-                <span class="text-[#b8c8db]">{{ getPercent(row.value) }}</span>
+                <span class="dashboard-percent">{{ getPercent(row.value) }}</span>
               </div>
             </div>
           </div>
         </section>
       </div>
 
-      <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+      <section class="dashboard-panel">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-xl font-semibold">{{ t("dashboard.scoreChart") }}</h2>
-          <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="scoreMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="scoreMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+          <div class="dashboard-toggle">
+            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="scoreMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="scoreMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -528,13 +559,13 @@ function getPercent(value: number) {
         </ClientOnly>
       </section>
 
-      <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+      <section class="dashboard-panel">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-xl font-semibold">{{ t("dashboard.episodeCount") }}</h2>
-          <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="episodeMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
+          <div class="dashboard-toggle">
+            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="episodeMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="episodeMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'score' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="episodeMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -542,13 +573,13 @@ function getPercent(value: number) {
         </ClientOnly>
       </section>
 
-      <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+      <section class="dashboard-panel">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-xl font-semibold">{{ t("dashboard.releaseYear") }}</h2>
-          <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="releaseMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
+          <div class="dashboard-toggle">
+            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="releaseMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="releaseMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'score' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="releaseMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -556,13 +587,13 @@ function getPercent(value: number) {
         </ClientOnly>
       </section>
 
-      <section class="rounded-xl border border-[#1e3858] bg-[#13233a] p-4">
+      <section class="dashboard-panel">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-xl font-semibold">{{ t("dashboard.watchYear") }}</h2>
-          <div class="flex rounded-full bg-[#0d1d32] p-1 text-sm">
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'titles' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'hours' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'score' ? 'bg-[#7f92aa] text-[#0e2136]' : 'text-[#8fa4bf]'" @click="watchMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
+          <div class="dashboard-toggle">
+            <button class="rounded-full px-3 py-1" :class="watchMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="watchMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="watchMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="watchMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button class="rounded-full px-3 py-1" :class="watchMetric === 'score' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="watchMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
           </div>
         </div>
         <ClientOnly>
@@ -572,3 +603,65 @@ function getPercent(value: number) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.dashboard-shell {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dashboard-kpi {
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.dashboard-kpi-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.dashboard-panel {
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.dashboard-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0.5rem;
+  background: var(--surface-muted);
+  padding: 0.375rem 0.75rem;
+}
+
+.dashboard-percent {
+  color: var(--text-soft);
+}
+
+.dashboard-toggle {
+  display: flex;
+  border-radius: 9999px;
+  background: var(--surface-muted);
+  padding: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.dashboard-toggle-btn {
+  color: var(--text-muted);
+}
+
+.dashboard-toggle-btn-active {
+  background: var(--primary);
+  color: #fff;
+}
+</style>
