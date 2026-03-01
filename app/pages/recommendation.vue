@@ -310,19 +310,19 @@ function toggleTagExpansion(itemId: number) {
 
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-else-if="layoutMode === 'grid'" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div v-else-if="layoutMode === 'grid'" class="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-3 lg:grid-cols-4">
       <div
         v-for="(a, i) in currentItems"
         :key="a.id"
-        class="relative mx-auto w-full max-w-[360px] rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+        class="relative w-full rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
       >
-        <img v-if="a.cover" :src="a.cover" class="w-full aspect-2/3 object-cover" />
+        <img v-if="a.cover" :src="a.cover" class="w-full aspect-[3/4] object-cover" />
         <span
           class="absolute top-2 right-2 z-10 text-xs font-medium bg-indigo-800 text-indigo-100 px-2 py-1 rounded-full backdrop-blur-sm"
         >
           #{{ i + 1 }}
         </span>
-        <div class="p-4 space-y-2">
+        <div class="p-3 space-y-1.5">
           <a :href="anilistUrl(a.id)" target="_blank" class="block hover:underline hover:text-indigo-400">
             <div class="font-semibold leading-snug">{{ getTitleLines(a).primary }}</div>
             <div v-if="getTitleLines(a).secondary" class="text-sm text-zinc-400 leading-snug">
