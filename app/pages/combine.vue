@@ -38,6 +38,7 @@ const username = useAnilistUser();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
+const activeEntries = computed(() => entries.value.filter((entry) => entry.status !== "PLANNING"));
 const layoutMode = ref<LayoutMode>("grid");
 const sortMode = ref<CombineSortMode>("count");
 
@@ -104,13 +105,13 @@ const tagSearch = ref("");
 
 const allGenres = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((entry) => entry.genres.forEach((genre) => set.add(genre)));
+  activeEntries.value.forEach((entry) => entry.genres.forEach((genre) => set.add(genre)));
   return [...set].sort();
 });
 
 const allTags = computed(() => {
   const set = new Set<string>();
-  entries.value.forEach((entry) => entry.tags.forEach((tag) => set.add(tag.name)));
+  activeEntries.value.forEach((entry) => entry.tags.forEach((tag) => set.add(tag.name)));
   return [...set].sort();
 });
 
@@ -130,7 +131,7 @@ const visibleTags = computed(() => {
 });
 
 const filteredEntries = computed(() => {
-  return entries.value.filter((entry) => {
+  return activeEntries.value.filter((entry) => {
     const genres = entry.genres;
     const tags = entry.tags.map((tag) => tag.name);
 
