@@ -22,8 +22,9 @@ type Cover = {
 
 type LayoutMode = "grid" | "list";
 type FilterState = "include" | "exclude";
-type CombineSortMode = "count" | "minutes" | "score";
 type CardFilterType = "genre" | "tag";
+type ListSortKey = "title" | "score" | "time" | "completedAt";
+type SortDirection = "asc" | "desc";
 
 type GridCard = {
   genre: string;
@@ -31,6 +32,7 @@ type GridCard = {
   count: number;
   meanScore: number;
   minutesWatched: number;
+  latestCompletedAtTs: number;
   covers: Cover[];
 };
 
@@ -39,7 +41,8 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
-const sortMode = ref<CombineSortMode>("count");
+const listSortKey = ref<ListSortKey>("score");
+const listSortDirection = ref<SortDirection>("desc");
 
 definePageMeta({ title: "Combine", middleware: "auth" });
 
@@ -168,6 +171,7 @@ const gridStats = computed<GridCard[]>(() => {
       scoreSum: number;
       scoreCount: number;
       minutesWatched: number;
+      latestCompletedAtTs: number;
       covers: Cover[];
     }
   > = {};
@@ -188,12 +192,17 @@ const gridStats = computed<GridCard[]>(() => {
           scoreSum: 0,
           scoreCount: 0,
           minutesWatched: 0,
+          latestCompletedAtTs: 0,
           covers: [],
         };
       }
 
       map[key].count++;
       map[key].minutesWatched += minutes;
+      map[key].latestCompletedAtTs = Math.max(
+        map[key].latestCompletedAtTs,
+        fuzzyDateToTs(entry.completedAt)
+      );
 
       if (entry.score > 0) {
         map[key].scoreSum += entry.score;
@@ -219,6 +228,7 @@ const gridStats = computed<GridCard[]>(() => {
     count: value.count,
     meanScore: value.scoreCount ? Math.round((value.scoreSum / value.scoreCount) * 10) / 10 : 0,
     minutesWatched: value.minutesWatched,
+    latestCompletedAtTs: value.latestCompletedAtTs,
     covers: value.covers.sort((a, b) => b.score - a.score || b.minutes - a.minutes),
   }));
 });
@@ -229,11 +239,13 @@ const combinedGridCard = computed<GridCard | null>(() => {
   let minutes = 0;
   let scoreSum = 0;
   let scoreCount = 0;
+  let latestCompletedAtTs = 0;
   const covers: Cover[] = [];
 
   for (const entry of filteredEntries.value) {
     const watchedMinutes = (entry.progress ?? 0) * (entry.duration ?? 0);
     minutes += watchedMinutes;
+    latestCompletedAtTs = Math.max(latestCompletedAtTs, fuzzyDateToTs(entry.completedAt));
 
     if (entry.score > 0) {
       scoreSum += entry.score;
@@ -257,15 +269,25 @@ const combinedGridCard = computed<GridCard | null>(() => {
     count: filteredEntries.value.length,
     meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
+    latestCompletedAtTs,
     covers,
   };
 });
 
 function sortGrid(list: GridCard[]) {
   return [...list].sort((a, b) => {
-    if (sortMode.value === "count") return b.count - a.count;
-    if (sortMode.value === "score") return b.meanScore - a.meanScore;
-    return b.minutesWatched - a.minutesWatched;
+    if (listSortKey.value === "title") {
+      return compareValues(a.genre, b.genre, listSortDirection.value);
+    }
+
+    if (listSortKey.value === "score") {
+      return compareValues(a.meanScore, b.meanScore, listSortDirection.value);
+    }
+    if (listSortKey.value === "time") {
+      return compareValues(a.minutesWatched, b.minutesWatched, listSortDirection.value);
+    }
+
+    return compareValues(a.latestCompletedAtTs, b.latestCompletedAtTs, listSortDirection.value);
   });
 }
 
@@ -294,13 +316,36 @@ const listAnime = computed(() =>
     title: entry.title.english ?? entry.title.romaji ?? t("common.unknown"),
     cover: entry.coverImage,
     score: entry.score,
+    minutes: (entry.progress ?? 0) * (entry.duration ?? 0),
+    completedAtTs: fuzzyDateToTs(entry.completedAt),
   }))
 );
 
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
+const sortedListAnime = computed(() => {
+  return [...listAnime.value].sort((a, b) => {
+    if (listSortKey.value === "title") {
+      return compareValues(a.title, b.title, listSortDirection.value);
+    }
+
+    if (listSortKey.value === "score") {
+      return compareValues(a.score ?? 0, b.score ?? 0, listSortDirection.value);
+    }
+    if (listSortKey.value === "time") {
+      return compareValues(a.minutes ?? 0, b.minutes ?? 0, listSortDirection.value);
+    }
+
+    return compareValues(a.completedAtTs ?? 0, b.completedAtTs ?? 0, listSortDirection.value);
+  });
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedListAnime.value.length / pageSize)));
 const paginatedListAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
-  return listAnime.value.slice(start, start + pageSize);
+  return sortedListAnime.value.slice(start, start + pageSize);
+});
+
+watch(totalPages, (next) => {
+  if (currentPage.value > next) currentPage.value = next;
 });
 
 function cycleState(map: Record<string, FilterState>, key: string) {
@@ -311,6 +356,27 @@ function cycleState(map: Record<string, FilterState>, key: string) {
 
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
+}
+
+function fuzzyDateToTs(date?: AnimeEntry["completedAt"]) {
+  if (!date?.year) return 0;
+  const month = Math.max((date.month ?? 1) - 1, 0);
+  const day = Math.max(date.day ?? 1, 1);
+  return Date.UTC(date.year, month, day);
+}
+
+function compareValues(a: number | string, b: number | string, direction: SortDirection) {
+  if (typeof a === "string" && typeof b === "string") {
+    const cmp = a.localeCompare(b, undefined, { sensitivity: "base" });
+    return direction === "asc" ? cmp : -cmp;
+  }
+
+  const cmp = Number(a) - Number(b);
+  return direction === "asc" ? cmp : -cmp;
+}
+
+function formatHours(minutes?: number) {
+  return ((minutes ?? 0) / 60).toFixed(1);
 }
 </script>
 
@@ -334,27 +400,18 @@ function anilistUrl(id: number) {
     </div>
 
     <div class="flex flex-wrap gap-2 justify-between items-center">
-      <div class="flex gap-2">
+      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <select v-model="listSortKey" class="ui-input text-sm">
+          <option value="score">{{ t("common.score") }}</option>
+          <option value="title">{{ t("common.title") }}</option>
+          <option value="time">{{ t("common.time") }}</option>
+          <option value="completedAt">{{ t("common.completedDate") }}</option>
+        </select>
         <button
-          @click="sortMode = 'count'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="sortMode === 'count' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          class="ui-btn text-xs"
+          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
         >
-          {{ t("common.count") }}
-        </button>
-        <button
-          @click="sortMode = 'score'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="sortMode === 'score' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.score") }}
-        </button>
-        <button
-          @click="sortMode = 'minutes'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="sortMode === 'minutes' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.hours") }}
+          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
         </button>
       </div>
 
@@ -445,7 +502,9 @@ function anilistUrl(id: number) {
           <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>
-          <span class="text-xs text-zinc-400">{{ a.score || "-" }}</span>
+          <span class="text-xs text-zinc-400">
+            {{ t("common.score") }}: {{ a.score || "-" }} | {{ t("common.time") }}: {{ formatHours(a.minutes) }}h
+          </span>
         </div>
       </div>
     </div>

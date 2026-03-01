@@ -19,8 +19,7 @@ type GenreCover = {
 
 type LayoutMode = "grid" | "list";
 type GenreState = "include" | "exclude";
-type GenreSortMode = "count" | "minutes" | "score";
-type ListSortKey = "title" | "score" | "completedAt";
+type ListSortKey = "title" | "score" | "time" | "completedAt";
 type SortDirection = "asc" | "desc";
 
 const username = useAnilistUser();
@@ -28,7 +27,6 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
-const genreSortMode = ref<GenreSortMode>("count");
 const listSortKey = ref<ListSortKey>("score");
 const listSortDirection = ref<SortDirection>("desc");
 
@@ -120,6 +118,7 @@ const normalGenreStats = computed(() => {
       scoreSum: number;
       scoreCount: number;
       minutesWatched: number;
+      latestCompletedAtTs: number;
       covers: GenreCover[];
     }
   > = {};
@@ -134,12 +133,14 @@ const normalGenreStats = computed(() => {
           scoreSum: 0,
           scoreCount: 0,
           minutesWatched: 0,
+          latestCompletedAtTs: 0,
           covers: [],
         };
       }
 
       map[genre].count++;
       map[genre].minutesWatched += minutes;
+      map[genre].latestCompletedAtTs = Math.max(map[genre].latestCompletedAtTs, fuzzyDateToTs(e.completedAt));
 
       if (e.score && e.score > 0) {
         map[genre].scoreSum += e.score;
@@ -166,6 +167,7 @@ const normalGenreStats = computed(() => {
     count: g.count,
     meanScore: g.scoreCount ? Math.round((g.scoreSum / g.scoreCount) * 10) / 10 : 0,
     minutesWatched: g.minutesWatched,
+    latestCompletedAtTs: g.latestCompletedAtTs,
     covers: g.covers,
   }));
 });
@@ -176,10 +178,12 @@ const combinedStats = computed(() => {
   let minutes = 0;
   let scoreSum = 0;
   let scoreCount = 0;
+  let latestCompletedAtTs = 0;
   const covers: GenreCover[] = [];
 
   for (const e of filteredEntries.value) {
     minutes += (e.progress ?? 0) * (e.duration ?? 0);
+    latestCompletedAtTs = Math.max(latestCompletedAtTs, fuzzyDateToTs(e.completedAt));
 
     if (e.score && e.score > 0) {
       scoreSum += e.score;
@@ -205,15 +209,25 @@ const combinedStats = computed(() => {
     count: filteredEntries.value.length,
     meanScore: scoreCount ? Math.round(scoreSum / scoreCount) : 0,
     minutesWatched: minutes,
+    latestCompletedAtTs,
     covers,
   };
 });
 
-function sortGenres<T extends { count: number; minutesWatched: number; meanScore: number }>(list: T[]) {
+function sortGenres<T extends { genre: string; meanScore: number; minutesWatched: number; latestCompletedAtTs: number }>(list: T[]) {
   return [...list].sort((a, b) => {
-    if (genreSortMode.value === "count") return b.count - a.count;
-    if (genreSortMode.value === "score") return b.meanScore - a.meanScore;
-    return b.minutesWatched - a.minutesWatched;
+    if (listSortKey.value === "title") {
+      return compareValues(a.genre, b.genre, listSortDirection.value);
+    }
+
+    if (listSortKey.value === "score") {
+      return compareValues(a.meanScore, b.meanScore, listSortDirection.value);
+    }
+    if (listSortKey.value === "time") {
+      return compareValues(a.minutesWatched, b.minutesWatched, listSortDirection.value);
+    }
+
+    return compareValues(a.latestCompletedAtTs, b.latestCompletedAtTs, listSortDirection.value);
   });
 }
 
@@ -242,6 +256,7 @@ const listAnime = computed(() =>
     title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
     cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
+    minutes: (e.progress ?? 0) * (e.duration ?? 0),
     completedAtTs: fuzzyDateToTs(e.completedAt),
   }))
 );
@@ -254,6 +269,9 @@ const sortedListAnime = computed(() => {
 
     if (listSortKey.value === "score") {
       return compareValues(a.score ?? 0, b.score ?? 0, listSortDirection.value);
+    }
+    if (listSortKey.value === "time") {
+      return compareValues(a.minutes ?? 0, b.minutes ?? 0, listSortDirection.value);
     }
 
     return compareValues(a.completedAtTs ?? 0, b.completedAtTs ?? 0, listSortDirection.value);
@@ -297,6 +315,10 @@ function compareValues(a: number | string, b: number | string, direction: SortDi
   const cmp = Number(a) - Number(b);
   return direction === "asc" ? cmp : -cmp;
 }
+
+function formatHours(minutes?: number) {
+  return ((minutes ?? 0) / 60).toFixed(1);
+}
 </script>
 
 <template>
@@ -319,27 +341,18 @@ function compareValues(a: number | string, b: number | string, direction: SortDi
     </div>
 
     <div class="flex flex-wrap gap-2 justify-between items-center">
-      <div class="flex gap-2">
+      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <select v-model="listSortKey" class="ui-input text-sm">
+          <option value="score">{{ t("common.score") }}</option>
+          <option value="title">{{ t("common.title") }}</option>
+          <option value="time">{{ t("common.time") }}</option>
+          <option value="completedAt">{{ t("common.completedDate") }}</option>
+        </select>
         <button
-          @click="genreSortMode = 'count'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="genreSortMode === 'count' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          class="ui-btn text-xs"
+          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
         >
-          {{ t("common.count") }}
-        </button>
-        <button
-          @click="genreSortMode = 'score'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="genreSortMode === 'score' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.score") }}
-        </button>
-        <button
-          @click="genreSortMode = 'minutes'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="genreSortMode === 'minutes' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.hours") }}
+          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
         </button>
       </div>
 
@@ -394,20 +407,6 @@ function compareValues(a: number | string, b: number | string, direction: SortDi
     </div>
 
     <div v-else>
-      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <select v-model="listSortKey" class="ui-input text-sm">
-          <option value="score">{{ t("common.score") }}</option>
-          <option value="title">{{ t("common.title") }}</option>
-          <option value="completedAt">{{ t("common.completedDate") }}</option>
-        </select>
-        <button
-          class="ui-btn text-xs"
-          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
-        >
-          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
-        </button>
-      </div>
-
       <div class="flex items-center justify-between text-sm mb-2">
         <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
           &larr; {{ t("common.back") }}
@@ -429,7 +428,9 @@ function compareValues(a: number | string, b: number | string, direction: SortDi
           <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>
-          <span class="text-xs text-zinc-400">{{ a.score || "-" }}</span>
+          <span class="text-xs text-zinc-400">
+            {{ t("common.score") }}: {{ a.score || "-" }} | {{ t("common.time") }}: {{ formatHours(a.minutes) }}h
+          </span>
         </div>
       </div>
     </div>
