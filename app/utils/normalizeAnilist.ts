@@ -30,8 +30,50 @@ function isPresent<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
+function hasDateValue(date: FuzzyDate | null | undefined): boolean {
+  return Boolean(date?.year || date?.month || date?.day);
+}
+
+function mergeTags(a: AnimeTag[], b: AnimeTag[]): AnimeTag[] {
+  const tagMap = new Map<string, number>();
+
+  for (const tag of [...a, ...b]) {
+    const prev = tagMap.get(tag.name);
+    if (typeof prev === "number") {
+      tagMap.set(tag.name, Math.max(prev, tag.rank));
+    } else {
+      tagMap.set(tag.name, tag.rank);
+    }
+  }
+
+  return [...tagMap.entries()].map(([name, rank]) => ({ name, rank }));
+}
+
+function mergeEntry(existing: AnimeEntry, incoming: AnimeEntry): AnimeEntry {
+  return {
+    ...existing,
+    status: existing.status || incoming.status,
+    score: Math.max(existing.score ?? 0, incoming.score ?? 0),
+    progress: Math.max(existing.progress ?? 0, incoming.progress ?? 0),
+    episodes: Math.max(existing.episodes ?? 0, incoming.episodes ?? 0) || null,
+    duration: Math.max(existing.duration ?? 0, incoming.duration ?? 0) || null,
+    format: existing.format ?? incoming.format ?? null,
+    countryOfOrigin: existing.countryOfOrigin ?? incoming.countryOfOrigin ?? null,
+    genres: [...new Set([...existing.genres, ...incoming.genres])],
+    seasonYear: existing.seasonYear ?? incoming.seasonYear ?? null,
+    title: {
+      romaji: existing.title.romaji ?? incoming.title.romaji ?? null,
+      english: existing.title.english ?? incoming.title.english ?? null,
+    },
+    tags: mergeTags(existing.tags, incoming.tags),
+    startedAt: hasDateValue(existing.startedAt) ? existing.startedAt : incoming.startedAt,
+    completedAt: hasDateValue(existing.completedAt) ? existing.completedAt : incoming.completedAt,
+    coverImage: existing.coverImage ?? incoming.coverImage ?? null,
+  };
+}
+
 export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
-  const result: AnimeEntry[] = [];
+  const deduped = new Map<number, AnimeEntry>();
 
   for (const list of lists ?? []) {
     for (const entry of list.entries ?? []) {
@@ -49,7 +91,7 @@ export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
         }))
         .filter((tag) => tag.name.length > 0);
 
-      result.push({
+      const normalized: AnimeEntry = {
         id: media.id,
         status: entry.status ?? "",
         score: typeof entry.score === "number" ? entry.score : 0,
@@ -65,9 +107,12 @@ export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
         startedAt: entry.startedAt ?? null,
         completedAt: entry.completedAt ?? null,
         coverImage: media.coverImage?.large ?? media.coverImage?.extraLarge ?? null,
-      });
+      };
+
+      const existing = deduped.get(normalized.id);
+      deduped.set(normalized.id, existing ? mergeEntry(existing, normalized) : normalized);
     }
   }
 
-  return result;
+  return [...deduped.values()];
 }
