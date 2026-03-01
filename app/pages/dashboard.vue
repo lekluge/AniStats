@@ -90,11 +90,14 @@ watch(
 onUnmounted(() => {
   if (autoLoadTimer) clearTimeout(autoLoadTimer);
 });
+const completedEntries = computed(() => entries.value.filter((e) => e.status === "COMPLETED"));
 
-const totalAnime = computed(() => entries.value.length);
-const totalEpisodes = computed(() => entries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0));
+const totalAnime = computed(() => completedEntries.value.length);
+const totalEpisodes = computed(() =>
+  completedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
+);
 const totalMinutes = computed(() =>
-  entries.value.reduce((sum, e) => {
+  completedEntries.value.reduce((sum, e) => {
     if (!e.progress || !e.duration) return sum;
     return sum + e.progress * e.duration;
   }, 0)
@@ -113,7 +116,7 @@ const totalPlannedDays = computed(() => {
   return Number((plannedMinutes / 60 / 24).toFixed(1));
 });
 
-const scoredEntries = computed(() => entries.value.filter((e) => Number(e.score ?? 0) > 0));
+const scoredEntries = computed(() =>completedEntries.value.filter((e) => Number(e.score ?? 0) > 0));
 const meanScore = computed(() => {
   if (!scoredEntries.value.length) return 0;
   const sum = scoredEntries.value.reduce((acc, e) => acc + Number(e.score), 0);
