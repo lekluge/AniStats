@@ -34,6 +34,8 @@ export const translations = {
       filterOpenList: "Filter and open list view",
       avgScore: "Avg Score",
       time: "Time",
+      readMore: "Read more",
+      showLess: "Show less",
     },
     nav: {
       appName: "AniList Stats",
@@ -218,6 +220,8 @@ export const translations = {
       filterOpenList: "Filter setzen und Listenansicht öffnen",
       avgScore: "Durchschnitt",
       time: "Zeit",
+      readMore: "Mehr anzeigen",
+      showLess: "Weniger anzeigen",
     },
     nav: {
       appName: "AniList Stats",
