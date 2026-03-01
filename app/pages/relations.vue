@@ -9,6 +9,7 @@ import type {
 } from "~/types/api";
 
 const { t } = useLocale();
+const { theme } = useTheme();
 
 const username = useAnilistUser();
 const loading = ref(false);
@@ -116,38 +117,66 @@ watch(totalPages, (next) => {
 });
 
 function statusBadgeClass(status?: string) {
+  const isLight = theme.value === "light";
   switch (status) {
     case "COMPLETED":
-      return "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30";
+      return isLight
+        ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300"
+        : "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30";
     case "CURRENT":
-      return "bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30";
+      return isLight
+        ? "bg-sky-100 text-sky-800 ring-1 ring-sky-300"
+        : "bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30";
     case "PLANNING":
-      return "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
+      return isLight
+        ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300"
+        : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
     case "PAUSED":
-      return "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30";
+      return isLight
+        ? "bg-orange-100 text-orange-800 ring-1 ring-orange-300"
+        : "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30";
     case "DROPPED":
-      return "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30";
+      return isLight
+        ? "bg-rose-100 text-rose-800 ring-1 ring-rose-300"
+        : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30";
     case "REPEATING":
-      return "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30";
+      return isLight
+        ? "bg-violet-100 text-violet-800 ring-1 ring-violet-300"
+        : "bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30";
     default:
-      return "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
+      return isLight
+        ? "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300"
+        : "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
   }
 }
 
 function relationTypeClass(type?: string) {
+  const isLight = theme.value === "light";
   switch ((type ?? "").toUpperCase()) {
     case "SEQUEL":
-      return "bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/30";
+      return isLight
+        ? "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-300"
+        : "bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/30";
     case "PREQUEL":
-      return "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30";
+      return isLight
+        ? "bg-cyan-100 text-cyan-800 ring-1 ring-cyan-300"
+        : "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30";
     case "SIDE_STORY":
-      return "bg-fuchsia-500/15 text-fuchsia-300 ring-1 ring-fuchsia-500/30";
+      return isLight
+        ? "bg-fuchsia-100 text-fuchsia-800 ring-1 ring-fuchsia-300"
+        : "bg-fuchsia-500/15 text-fuchsia-300 ring-1 ring-fuchsia-500/30";
     case "ALTERNATIVE":
-      return "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
+      return isLight
+        ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300"
+        : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30";
     case "SPIN_OFF":
-      return "bg-lime-500/15 text-lime-300 ring-1 ring-lime-500/30";
+      return isLight
+        ? "bg-lime-100 text-lime-800 ring-1 ring-lime-300"
+        : "bg-lime-500/15 text-lime-300 ring-1 ring-lime-500/30";
     default:
-      return "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
+      return isLight
+        ? "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300"
+        : "bg-zinc-500/10 text-zinc-300 ring-1 ring-zinc-500/20";
   }
 }
 
