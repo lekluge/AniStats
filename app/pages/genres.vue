@@ -341,60 +341,62 @@ function formatHours(minutes?: number) {
       </div>
     </div>
 
-    <div class="flex flex-wrap gap-2 justify-between items-center">
-      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <select v-model="listSortKey" class="ui-input text-sm">
-          <option value="score">{{ t("common.score") }}</option>
-          <option value="title">{{ t("common.title") }}</option>
-          <option value="time">{{ t("common.time") }}</option>
-          <option value="completedAt">{{ t("common.completedDate") }}</option>
-        </select>
-        <button
-          class="ui-btn text-xs"
-          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
-        >
-          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
-        </button>
+    <section class="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3">
+      <div class="flex flex-wrap gap-2 justify-between items-center">
+        <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <select v-model="listSortKey" class="ui-input text-sm">
+            <option value="score">{{ t("common.score") }}</option>
+            <option value="title">{{ t("common.title") }}</option>
+            <option value="time">{{ t("common.time") }}</option>
+            <option value="completedAt">{{ t("common.completedDate") }}</option>
+          </select>
+          <button
+            class="ui-btn text-xs"
+            @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
+          >
+            {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
+          </button>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            @click="layoutMode = 'grid'"
+            class="px-3 py-2 text-xs rounded border"
+            :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          >
+            {{ t("common.grid") }}
+          </button>
+          <button
+            @click="layoutMode = 'list'"
+            class="px-3 py-2 text-xs rounded border"
+            :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          >
+            {{ t("common.list") }}
+          </button>
+        </div>
       </div>
 
-      <div class="flex gap-2">
+      <div v-if="!loading && !error" class="flex flex-wrap gap-2">
         <button
-          @click="layoutMode = 'grid'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+          v-for="g in allGenres"
+          :key="g"
+          @click="toggleGenre(g)"
+          class="px-3 py-2 rounded-full text-xs border"
+          :class="{
+            'bg-indigo-600 text-white': genreStates[g] === 'include',
+            'bg-red-600 text-white': genreStates[g] === 'exclude',
+            'bg-zinc-900 text-zinc-300': !genreStates[g],
+          }"
         >
-          {{ t("common.grid") }}
-        </button>
-        <button
-          @click="layoutMode = 'list'"
-          class="px-3 py-2 text-xs rounded border"
-          :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-        >
-          {{ t("common.list") }}
+          {{ g }}
         </button>
       </div>
-    </div>
+    </section>
 
     <div v-if="loading" class="flex items-center justify-center py-12">
       <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
-
-    <div v-else class="flex flex-wrap gap-2">
-      <button
-        v-for="g in allGenres"
-        :key="g"
-        @click="toggleGenre(g)"
-        class="px-3 py-2 rounded-full text-xs border"
-        :class="{
-          'bg-indigo-600 text-white': genreStates[g] === 'include',
-          'bg-red-600 text-white': genreStates[g] === 'exclude',
-          'bg-zinc-900 text-zinc-300': !genreStates[g],
-        }"
-      >
-        {{ g }}
-      </button>
-    </div>
 
     <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard

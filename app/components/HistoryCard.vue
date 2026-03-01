@@ -41,6 +41,11 @@ const completedText = computed(() => {
   return c ? `${t("history.completed")}: ${c}` : null;
 });
 
+const startedText = computed(() => {
+  const s = fmtYmd(props.data.startedAt ?? null);
+  return s ? `${s}` : null;
+});
+
 const spanText = computed(() => {
   const s = toDate(props.data.startedAt ?? null);
   const e = toDate(props.data.completedAt ?? null);
@@ -54,34 +59,41 @@ function anilistUrl(id: number) {
 </script>
 
 <template>
-  <div class="ui-card relative overflow-hidden p-4">
-    <div class="mb-3 pr-10">
-      <a
-        :href="anilistUrl(data.id)"
-        target="_blank"
-        class="block text-base font-semibold leading-tight wrap-break-word hover:text-indigo-400"
-        :title="data.title"
-      >
-        {{ data.title }}
-      </a>
+  <div class="ui-card relative h-full overflow-hidden p-3">
+    <span
+      class="absolute right-3 top-3 inline-flex items-center rounded-full border border-indigo-500/40 bg-indigo-600/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-400"
+    >
+      #{{ rank }}
+    </span>
 
-      <div v-if="completedText" class="mt-1 text-xs text-zinc-400">{{ completedText }}</div>
-    </div>
-
-    <div class="flex gap-3 items-center">
+    <div class="flex gap-3 items-start">
       <img
         v-if="data.cover"
         :src="data.cover"
-        class="h-24 aspect-2/3 rounded-xl object-cover"
+        class="h-24 aspect-2/3 rounded-lg object-cover shrink-0"
         :alt="data.title"
         loading="lazy"
       />
 
-      <div class="flex-1">
-        <div class="grid grid-cols-1 gap-2 text-sm">
-          <div class="rounded-lg bg-zinc-800/60 p-2 text-center">
-            <div class="text-xs text-zinc-400">{{ t("history.span") }}</div>
-            <div class="font-semibold">{{ spanText }}</div>
+      <div class="min-w-0 flex-1">
+        <a
+          :href="anilistUrl(data.id)"
+          target="_blank"
+          class="block pr-12 text-sm font-semibold leading-tight wrap-break-word hover:text-indigo-400"
+          :title="data.title"
+        >
+          {{ data.title }}
+        </a>
+
+        <div class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+          <div v-if="completedText" class="rounded-md border border-zinc-700/80 bg-zinc-900/40 px-1.5 py-0.5 text-zinc-400">
+            {{ completedText }}
+          </div>
+          <div v-if="startedText" class="rounded-md border border-zinc-700/80 bg-zinc-900/40 px-1.5 py-0.5 text-zinc-400">
+            Start: {{ startedText }}
+          </div>
+          <div class="rounded-md border border-zinc-700/80 bg-zinc-900/40 px-1.5 py-0.5 text-zinc-300">
+            {{ t("history.span") }}: <span class="font-semibold">{{ spanText }}</span>
           </div>
         </div>
       </div>
