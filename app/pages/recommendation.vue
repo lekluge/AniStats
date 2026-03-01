@@ -41,6 +41,8 @@ const tagSearch = ref("");
 
 const allGenres = ref<string[]>([]);
 const allTags = ref<string[]>([]);
+const expandedTagCards = ref<Record<number, boolean>>({});
+const MAX_VISIBLE_TAGS = 8;
 
 definePageMeta({ title: "Recommendations", middleware: "auth" });
 
@@ -105,6 +107,7 @@ async function loadRecommendations() {
 
     const res = await api.get<ApiRecommendationResponse>("/api/private/recommendation", { params });
     items.value = res.data.items;
+    expandedTagCards.value = {};
   } catch {
     error.value = `${t("common.errorPrefix")}: ${t("recommendation.loadError")}`;
   } finally {
@@ -146,6 +149,23 @@ function getTitleLines(item: ApiRecommendationItem): { primary: string; secondar
 
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
+}
+
+function visibleItemTags(item: ApiRecommendationItem) {
+  if (expandedTagCards.value[item.id]) return item.tags;
+  return item.tags.slice(0, MAX_VISIBLE_TAGS);
+}
+
+function hasHiddenTags(item: ApiRecommendationItem) {
+  return item.tags.length > MAX_VISIBLE_TAGS;
+}
+
+function hiddenTagCount(item: ApiRecommendationItem) {
+  return Math.max(item.tags.length - MAX_VISIBLE_TAGS, 0);
+}
+
+function toggleTagExpansion(itemId: number) {
+  expandedTagCards.value[itemId] = !expandedTagCards.value[itemId];
 }
 </script>
 
@@ -290,11 +310,11 @@ function anilistUrl(id: number) {
 
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-else-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div v-else-if="layoutMode === 'grid'" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       <div
         v-for="(a, i) in currentItems"
         :key="a.id"
-        class="relative rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+        class="relative mx-auto w-full max-w-[360px] rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
       >
         <img v-if="a.cover" :src="a.cover" class="w-full aspect-2/3 object-cover" />
         <span
@@ -319,13 +339,24 @@ function anilistUrl(id: number) {
               <a :href="`https://anilist.co/search/anime/${encodeURIComponent(g)}`" target="_blank" rel="noopener noreferrer">{{ g }}</a>
             </span>
             <span
-              v-for="tag in a.tags"
+              v-for="tag in visibleItemTags(a)"
               :key="tag"
               class="px-2 py-0.5 text-xs rounded bg-zinc-700/40 text-zinc-300"
             >
               <a :href="`https://anilist.co/search/anime/${encodeURIComponent(tag)}`" target="_blank" rel="noopener noreferrer">{{ tag }}</a>
             </span>
           </div>
+          <button
+            v-if="hasHiddenTags(a)"
+            @click="toggleTagExpansion(a.id)"
+            class="ui-btn mt-1 px-2 py-1 text-[11px]"
+          >
+            {{
+              expandedTagCards[a.id]
+                ? t("common.showLess")
+                : `${t("common.readMore")} (+${hiddenTagCount(a)})`
+            }}
+          </button>
 
           <div class="text-xs text-zinc-400">{{ t("recommendation.matchScore") }}: {{ a.score }}</div>
         </div>
