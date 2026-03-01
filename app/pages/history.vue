@@ -8,6 +8,7 @@ const { t } = useLocale()
 type LayoutMode = "grid" | "list"
 type AniDate = { year?: number; month?: number; day?: number }
 type SeasonKey = "WINTER" | "SPRING" | "SUMMER" | "FALL"
+type SortDirection = "asc" | "desc"
 
 type HistoryEntry = {
   id: number
@@ -25,6 +26,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 const layoutMode = ref<LayoutMode>("list")
+const durationSortDirection = ref<SortDirection>("desc")
 
 const selectedYear = ref<number>(new Date().getFullYear())
 const selectedSeason = ref<SeasonKey | null>(null)
@@ -32,11 +34,30 @@ const selectedSeason = ref<SeasonKey | null>(null)
 const pageSize = 50
 const currentPage = ref(1)
 
-const totalPages = computed(() => Math.max(1, Math.ceil(results.value.length / pageSize)))
+function durationDays(entry: HistoryEntry) {
+  const s = toDate(entry.startedAt ?? null)
+  const e = toDate(entry.completedAt ?? null)
+  if (!s || !e) return -1
+  return Math.max(1, Math.ceil((e.getTime() - s.getTime()) / 86400000))
+}
+
+const durationSortedResults = computed(() => {
+  return [...results.value].sort((a, b) => {
+    const da = durationDays(a)
+    const db = durationDays(b)
+    return durationSortDirection.value === "asc" ? da - db : db - da
+  })
+})
+
+const timelineSortedResults = computed(() =>
+  [...results.value].sort((a, b) => completedKey(b) - completedKey(a))
+)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(timelineSortedResults.value.length / pageSize)))
 
 const paginatedResults = computed(() => {
   const s = (currentPage.value - 1) * pageSize
-  return results.value.slice(s, s + pageSize)
+  return timelineSortedResults.value.slice(s, s + pageSize)
 })
 
 function pad2(n: number) {
@@ -123,6 +144,10 @@ watch(
   }
 )
 
+watch(durationSortDirection, () => {
+  currentPage.value = 1
+})
+
 onMounted(() => {
   const cur = currentSeasonFromDate(new Date())
   selectedYear.value = cur.year
@@ -133,7 +158,7 @@ onMounted(() => {
 })
 
 const cardData = computed(() =>
-  results.value.map((a) => ({
+  durationSortedResults.value.map((a) => ({
     id: a.id,
     title: a.titleEn ?? a.titleRo ?? t("common.unknown"),
     cover: a.cover ?? null,
@@ -190,105 +215,119 @@ const timelineGroups = computed(() => {
     </div>
 
     <section class="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3">
-      <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-        <input v-model="start" type="date" class="ui-input w-full sm:w-40" />
-        <input v-model="end" type="date" class="ui-input w-full sm:w-40" />
-        <button
-          class="ui-btn ui-btn-primary w-full sm:w-auto"
-          :disabled="loading || !start || !end"
-          :title="t('common.optionalAutoload')"
-          @click="loadHistory"
-        >
-          {{ t("common.load") }}
-        </button>
-      </div>
-
-      <div class="flex flex-col gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="flex items-center gap-2">
+      <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div class="flex-1 space-y-3">
+          <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <input v-model="start" type="date" class="ui-input w-full sm:w-40" />
+            <input v-model="end" type="date" class="ui-input w-full sm:w-40" />
             <button
-              class="px-3 py-2 text-xs rounded border bg-zinc-900 text-zinc-300"
-              :disabled="loading"
-              @click="shiftYear(-1)"
+              class="ui-btn ui-btn-primary w-full sm:w-auto"
+              :disabled="loading || !start || !end"
+              :title="t('common.optionalAutoload')"
+              @click="loadHistory"
             >
-              &larr;
+              {{ t("common.load") }}
             </button>
+          </div>
 
-            <div class="px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-900 text-zinc-200">
-              {{ selectedYear }}
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2">
+              <button
+                class="px-3 py-2 text-xs rounded border bg-zinc-900 text-zinc-300"
+                :disabled="loading"
+                @click="shiftYear(-1)"
+              >
+                &larr;
+              </button>
+
+              <div class="px-3 py-2 text-xs rounded border border-zinc-800 bg-zinc-900 text-zinc-200">
+                {{ selectedYear }}
+              </div>
+
+              <button
+                class="px-3 py-2 text-xs rounded border bg-zinc-900 text-zinc-300"
+                :disabled="loading"
+                @click="shiftYear(1)"
+              >
+                &rarr;
+              </button>
             </div>
 
-            <button
-              class="px-3 py-2 text-xs rounded border bg-zinc-900 text-zinc-300"
-              :disabled="loading"
-              @click="shiftYear(1)"
-            >
-              &rarr;
-            </button>
+            <div class="h-4 w-px bg-zinc-800 hidden sm:block" />
+
+            <div class="flex flex-wrap gap-2">
+              <button
+                class="px-3 py-2 text-xs rounded border"
+                :class="selectedSeason === 'WINTER' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+                :disabled="loading"
+                @click="applySeason('WINTER')"
+              >
+                {{ t("common.winter") }}
+              </button>
+
+              <button
+                class="px-3 py-2 text-xs rounded border"
+                :class="selectedSeason === 'SPRING' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+                :disabled="loading"
+                @click="applySeason('SPRING')"
+              >
+                {{ t("common.spring") }}
+              </button>
+
+              <button
+                class="px-3 py-2 text-xs rounded border"
+                :class="selectedSeason === 'SUMMER' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+                :disabled="loading"
+                @click="applySeason('SUMMER')"
+              >
+                {{ t("common.summer") }}
+              </button>
+
+              <button
+                class="px-3 py-2 text-xs rounded border"
+                :class="selectedSeason === 'FALL' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+                :disabled="loading"
+                @click="applySeason('FALL')"
+              >
+                {{ t("common.fall") }}
+              </button>
+            </div>
           </div>
 
-          <div class="h-4 w-px bg-zinc-800 hidden sm:block" />
-
-          <div class="flex flex-wrap gap-2">
-            <button
-              class="px-3 py-2 text-xs rounded border"
-              :class="selectedSeason === 'WINTER' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-              :disabled="loading"
-              @click="applySeason('WINTER')"
-            >
-              {{ t("common.winter") }}
-            </button>
-
-            <button
-              class="px-3 py-2 text-xs rounded border"
-              :class="selectedSeason === 'SPRING' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-              :disabled="loading"
-              @click="applySeason('SPRING')"
-            >
-              {{ t("common.spring") }}
-            </button>
-
-            <button
-              class="px-3 py-2 text-xs rounded border"
-              :class="selectedSeason === 'SUMMER' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-              :disabled="loading"
-              @click="applySeason('SUMMER')"
-            >
-              {{ t("common.summer") }}
-            </button>
-
-            <button
-              class="px-3 py-2 text-xs rounded border"
-              :class="selectedSeason === 'FALL' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-              :disabled="loading"
-              @click="applySeason('FALL')"
-            >
-              {{ t("common.fall") }}
-            </button>
+          <div class="text-xs text-zinc-500">
+            {{ t("history.presetInfo") }}
           </div>
         </div>
 
-        <div class="text-xs text-zinc-500">
-          {{ t("history.presetInfo") }}
+        <div class="flex flex-col gap-2 xl:items-end">
+          <div class="flex items-center gap-2">
+            <button
+              class="px-3 py-2 text-xs rounded border"
+              :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+              @click="layoutMode = 'grid'"
+            >
+              {{ t("common.grid") }}
+            </button>
+
+            <button
+              class="px-3 py-2 text-xs rounded border"
+              :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
+              @click="layoutMode = 'list'"
+            >
+              {{ t("common.list") }}
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-zinc-500">{{ t("common.time") }}</span>
+            <button
+              class="px-3 py-2 text-xs rounded border"
+              @click="durationSortDirection = durationSortDirection === 'asc' ? 'desc' : 'asc'"
+            >
+              {{ durationSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div class="flex gap-2">
-        <button
-          class="px-3 py-2 text-xs rounded border"
-          :class="layoutMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-          @click="layoutMode = 'grid'"
-        >
-          {{ t("common.grid") }}
-        </button>
-
-        <button
-          class="px-3 py-2 text-xs rounded border"
-          :class="layoutMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-zinc-900 text-zinc-300'"
-          @click="layoutMode = 'list'"
-        >
-          {{ t("common.list") }}
-        </button>
       </div>
     </section>
 
