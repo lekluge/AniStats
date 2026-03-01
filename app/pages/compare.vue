@@ -108,7 +108,7 @@ function tagBackground(tag: string) {
   if (tagStates.value[tag] !== "include") return "";
 
   const percent = tagMinRank.value[tag] ?? 0;
-  return `linear-gradient(90deg, rgb(99 102 241) ${percent}%, rgb(24 24 27) ${percent}%)`;
+  return `linear-gradient(90deg, var(--primary) ${percent}%, var(--surface-muted) ${percent}%)`;
 }
 
 const comparedAnime = computed<CompareAnimeItem[]>(() => {
@@ -380,10 +380,10 @@ watch(
         <div
           v-for="u in users"
           :key="u"
-          class="flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-zinc-800 border border-zinc-700"
+          class="ui-chip flex items-center gap-2 py-1"
         >
           {{ u }}
-          <button @click="removeUser(u)" class="text-zinc-400 hover:text-red-400">x</button>
+          <button @click="removeUser(u)" class="text-zinc-500 hover:text-red-400">x</button>
         </div>
       </div>
     </div>
