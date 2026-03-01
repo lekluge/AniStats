@@ -16,6 +16,8 @@ const anilistUser = useCookie<string>("anilist-user", { default: () => "" });
 
 type SeenFilter = "all" | "allUsers" | "noneUsers";
 type FilterState = "include" | "exclude";
+type CompareSortKey = "title" | "score" | "popularity" | "completedAt";
+type SortDirection = "asc" | "desc";
 
 definePageMeta({ title: "Compare", middleware: "auth" });
 
@@ -34,6 +36,8 @@ const seenFilter = ref<SeenFilter>("allUsers");
 
 const pageSize = 50;
 const currentPage = ref(1);
+const sortKey = ref<CompareSortKey>("popularity");
+const sortDirection = ref<SortDirection>("desc");
 
 const genreStates = ref<Record<string, FilterState>>({});
 const tagStates = ref<Record<string, FilterState>>({});
@@ -244,11 +248,70 @@ const filteredAnime = computed(() => {
   });
 });
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredAnime.value.length / pageSize)));
+function fuzzyDateToTs(date?: AnimeEntry["completedAt"]) {
+  if (!date?.year) return 0;
+  const month = Math.max((date.month ?? 1) - 1, 0);
+  const day = Math.max(date.day ?? 1, 1);
+  return Date.UTC(date.year, month, day);
+}
+
+function compareValues(a: number | string, b: number | string, direction: SortDirection) {
+  if (typeof a === "string" && typeof b === "string") {
+    const cmp = a.localeCompare(b, undefined, { sensitivity: "base" });
+    return direction === "asc" ? cmp : -cmp;
+  }
+
+  const cmp = Number(a) - Number(b);
+  return direction === "asc" ? cmp : -cmp;
+}
+
+function averageScore(anime: CompareAnimeItem) {
+  const values = Object.values(anime.users)
+    .map((entry) => Number(entry.score ?? 0))
+    .filter((value) => value > 0);
+
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function popularityCount(anime: CompareAnimeItem) {
+  return Object.keys(anime.users).length;
+}
+
+function latestCompletedAt(anime: CompareAnimeItem) {
+  return Object.values(anime.users).reduce((max, entry) => {
+    const ts = fuzzyDateToTs(entry.completedAt);
+    return Math.max(max, ts);
+  }, 0);
+}
+
+const sortedAnime = computed(() => {
+  return [...filteredAnime.value].sort((a, b) => {
+    if (sortKey.value === "title") {
+      return compareValues(a.title, b.title, sortDirection.value);
+    }
+
+    if (sortKey.value === "score") {
+      return compareValues(averageScore(a), averageScore(b), sortDirection.value);
+    }
+
+    if (sortKey.value === "popularity") {
+      return compareValues(popularityCount(a), popularityCount(b), sortDirection.value);
+    }
+
+    return compareValues(latestCompletedAt(a), latestCompletedAt(b), sortDirection.value);
+  });
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedAnime.value.length / pageSize)));
 
 const paginatedAnime = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
-  return filteredAnime.value.slice(start, start + pageSize);
+  return sortedAnime.value.slice(start, start + pageSize);
+});
+
+watch(totalPages, (next) => {
+  if (currentPage.value > next) currentPage.value = next;
 });
 
 const animeCount = computed(() => filteredAnime.value.length);
@@ -402,7 +465,23 @@ watch(
       </div>
     </div>
 
-    <div class="text-sm text-zinc-400">{{ animeCount }} {{ t("compare.animeFound") }}</div>
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="text-sm text-zinc-400">{{ animeCount }} {{ t("compare.animeFound") }}</div>
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <select v-model="sortKey" class="ui-input text-sm">
+          <option value="popularity">{{ t("common.popularity") }}</option>
+          <option value="score">{{ t("common.score") }}</option>
+          <option value="completedAt">{{ t("common.completedDate") }}</option>
+          <option value="title">{{ t("common.title") }}</option>
+        </select>
+        <button
+          class="ui-btn text-xs"
+          @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'"
+        >
+          {{ sortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
+        </button>
+      </div>
+    </div>
 
     <div class="flex items-center justify-between text-sm">
       <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
