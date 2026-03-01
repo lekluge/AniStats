@@ -3,7 +3,18 @@
     <header class="sticky top-0 z-50 border-b border-zinc-800/70 bg-zinc-950/95 backdrop-blur-xl">
       <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
         <NuxtLink :to="user ? '/dashboard' : '/'" class="flex items-center gap-3" @click="closeMenu">
-          <img src="/logo.png" :alt="t('nav.appName')" class="h-8 w-auto" />
+          <img
+            src="/logo.png"
+            :alt="t('nav.appName')"
+            class="h-8 w-auto"
+            :style="
+              theme === 'light'
+                ? {
+                    filter: 'drop-shadow(0 0 0.6px rgba(15, 23, 42, 0.45))',
+                  }
+                : undefined
+            "
+          />
           <div class="hidden sm:block leading-tight">
             <div class="text-sm font-semibold text-slate-800">{{ t("nav.appName") }}</div>
             <div class="text-xs text-zinc-500">{{ t("nav.insightsDashboard") }}</div>
