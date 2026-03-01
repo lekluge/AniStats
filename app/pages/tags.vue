@@ -10,16 +10,13 @@ const route = useRoute();
 
 const pageSize = 50;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(listAnime.value.length / pageSize)));
-const paginatedListAnime = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return listAnime.value.slice(start, start + pageSize);
-});
 
 type TagCover = { id: number; title: string; cover: string };
 type LayoutMode = "grid" | "list";
 type TagState = "include" | "exclude";
 type TagSortMode = "count" | "minutes" | "score";
+type ListSortKey = "title" | "score" | "completedAt";
+type SortDirection = "asc" | "desc";
 
 const username = useAnilistUser();
 const loading = ref(false);
@@ -27,6 +24,8 @@ const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const layoutMode = ref<LayoutMode>("grid");
 const tagSortMode = ref<TagSortMode>("count");
+const listSortKey = ref<ListSortKey>("score");
+const listSortDirection = ref<SortDirection>("desc");
 
 definePageMeta({ title: "Tags", middleware: "auth" });
 
@@ -266,8 +265,33 @@ const listAnime = computed(() =>
     title: e.title?.english ?? e.title?.romaji ?? t("common.unknown"),
     cover: typeof e.coverImage === "string" ? e.coverImage : e.coverImage?.medium,
     score: e.score,
+    completedAtTs: fuzzyDateToTs(e.completedAt),
   }))
 );
+
+const sortedListAnime = computed(() => {
+  return [...listAnime.value].sort((a, b) => {
+    if (listSortKey.value === "title") {
+      return compareValues(a.title, b.title, listSortDirection.value);
+    }
+
+    if (listSortKey.value === "score") {
+      return compareValues(a.score ?? 0, b.score ?? 0, listSortDirection.value);
+    }
+
+    return compareValues(a.completedAtTs ?? 0, b.completedAtTs ?? 0, listSortDirection.value);
+  });
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedListAnime.value.length / pageSize)));
+const paginatedListAnime = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return sortedListAnime.value.slice(start, start + pageSize);
+});
+
+watch(totalPages, (next) => {
+  if (currentPage.value > next) currentPage.value = next;
+});
 
 function toggleTag(tag: string) {
   const current = tagStates.value[tag];
@@ -279,6 +303,23 @@ function toggleTag(tag: string) {
 
 function anilistUrl(id: number) {
   return `https://anilist.co/anime/${id}`;
+}
+
+function fuzzyDateToTs(date?: AnimeEntry["completedAt"]) {
+  if (!date?.year) return 0;
+  const month = Math.max((date.month ?? 1) - 1, 0);
+  const day = Math.max(date.day ?? 1, 1);
+  return Date.UTC(date.year, month, day);
+}
+
+function compareValues(a: number | string, b: number | string, direction: SortDirection) {
+  if (typeof a === "string" && typeof b === "string") {
+    const cmp = a.localeCompare(b, undefined, { sensitivity: "base" });
+    return direction === "asc" ? cmp : -cmp;
+  }
+
+  const cmp = Number(a) - Number(b);
+  return direction === "asc" ? cmp : -cmp;
 }
 </script>
 
@@ -379,6 +420,20 @@ function anilistUrl(id: number) {
     </div>
 
     <div v-else-if="!loading && !error">
+      <div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <select v-model="listSortKey" class="ui-input text-sm">
+          <option value="score">{{ t("common.score") }}</option>
+          <option value="title">{{ t("common.title") }}</option>
+          <option value="completedAt">{{ t("common.completedDate") }}</option>
+        </select>
+        <button
+          class="ui-btn text-xs"
+          @click="listSortDirection = listSortDirection === 'asc' ? 'desc' : 'asc'"
+        >
+          {{ listSortDirection === "asc" ? t("common.sortAsc") : t("common.sortDesc") }}
+        </button>
+      </div>
+
       <div class="flex items-center justify-between text-sm mb-2">
         <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
           &larr; {{ t("common.back") }}
