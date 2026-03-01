@@ -150,6 +150,9 @@ input[type="number"] {
 .bg-zinc-950\/80,
 .bg-zinc-950\/90,
 .bg-zinc-950\/95,
+.bg-zinc-950\/45,
+.bg-zinc-950\/40,
+.bg-zinc-950\/35,
 .bg-zinc-900,
 .bg-zinc-900\/30,
 .bg-zinc-900\/40,
@@ -165,8 +168,10 @@ input[type="number"] {
 }
 
 .border-zinc-800,
+.border-zinc-800\/80,
 .border-zinc-800\/70,
-.border-zinc-700 {
+.border-zinc-700,
+.border-zinc-700\/80 {
   border-color: var(--border) !important;
 }
 
