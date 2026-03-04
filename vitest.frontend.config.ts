@@ -6,6 +6,6 @@ export default defineVitestConfig({
     include: ["tests/frontend/**/*.test.ts"],
     environment: "nuxt",
     globals: true,
+    silent: true,
   },
 });
-
