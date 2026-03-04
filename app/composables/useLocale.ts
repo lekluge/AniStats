@@ -18,6 +18,14 @@ function resolvePath(
   return typeof current === "string" ? current : null;
 }
 
+function getStorage(): Storage | null {
+  if (!process.client) return null;
+  if (typeof localStorage === "undefined") return null;
+  if (typeof localStorage.getItem !== "function") return null;
+  if (typeof localStorage.setItem !== "function") return null;
+  return localStorage;
+}
+
 export function useLocale() {
   const localeCookie = useCookie<AppLocale>("anistats-locale", {
     default: () => "en",
@@ -27,7 +35,13 @@ export function useLocale() {
 
   function initLocale() {
     if (!process.client || initialized.value) return;
-    const fromStorage = localStorage.getItem(STORAGE_KEY);
+    const storage = getStorage();
+    if (!storage) {
+      locale.value = localeCookie.value ?? "en";
+      initialized.value = true;
+      return;
+    }
+    const fromStorage = storage.getItem(STORAGE_KEY);
     if (isAppLocale(fromStorage)) {
       locale.value = fromStorage;
       localeCookie.value = fromStorage;
@@ -40,9 +54,8 @@ export function useLocale() {
   function setLocale(next: AppLocale) {
     locale.value = next;
     localeCookie.value = next;
-    if (process.client) {
-      localStorage.setItem(STORAGE_KEY, next);
-    }
+    const storage = getStorage();
+    if (storage) storage.setItem(STORAGE_KEY, next);
   }
 
   function toggleLocale() {
