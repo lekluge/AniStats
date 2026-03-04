@@ -28,6 +28,10 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const lastLoadedUser = ref("");
+const anilistStats = ref<{ episodesWatched: number | null; minutesWatched: number | null }>({
+  episodesWatched: null,
+  minutesWatched: null,
+});
 
 const scoreMetric = ref<MetricMode>("titles");
 const episodeMetric = ref<MetricMode>("titles");
@@ -75,6 +79,7 @@ async function loadAnime() {
     const currentUser = username.value.trim();
     if (!currentUser) {
       entries.value = [];
+      anilistStats.value = { episodesWatched: null, minutesWatched: null };
       lastLoadedUser.value = "";
       loading.value = false;
       return;
@@ -85,9 +90,18 @@ async function loadAnime() {
     });
 
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
+    anilistStats.value = {
+      episodesWatched: Number.isFinite(Number(res.data.data.stats?.episodesWatched))
+        ? Number(res.data.data.stats.episodesWatched)
+        : null,
+      minutesWatched: Number.isFinite(Number(res.data.data.stats?.minutesWatched))
+        ? Number(res.data.data.stats.minutesWatched)
+        : null,
+    };
     lastLoadedUser.value = currentUser;
   } catch {
     error.value = `${t("common.errorPrefix")}: ${t("dashboard.loadError")}`;
+    anilistStats.value = { episodesWatched: null, minutesWatched: null };
   } finally {
     loading.value = false;
   }
@@ -100,6 +114,7 @@ watch(
     const trimmed = (nextUser ?? "").trim();
     if (!trimmed) {
       entries.value = [];
+      anilistStats.value = { episodesWatched: null, minutesWatched: null };
       error.value = null;
       lastLoadedUser.value = "";
       return;
@@ -125,13 +140,17 @@ const watchedEntries = computed(() =>
 
 const totalAnime = computed(() => completedEntries.value.length);
 const totalEpisodes = computed(() =>
-  watchedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
+  typeof anilistStats.value.episodesWatched === "number"
+    ? anilistStats.value.episodesWatched
+    : watchedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
 );
 const totalMinutes = computed(() =>
-  watchedEntries.value.reduce((sum, e) => {
-    if (!e.progress || !e.duration) return sum;
-    return sum + e.progress * e.duration;
-  }, 0)
+  typeof anilistStats.value.minutesWatched === "number"
+    ? anilistStats.value.minutesWatched
+    : watchedEntries.value.reduce((sum, e) => {
+      if (!e.progress || !e.duration) return sum;
+      return sum + e.progress * e.duration;
+    }, 0)
 );
 const totalDaysWatched = computed(() => Number((totalMinutes.value / 60 / 24).toFixed(1)));
 
