@@ -2,88 +2,86 @@ import { prisma } from "../../../utils/prisma";
 import { createError } from "h3";
 import crypto from "crypto";
 import { anilistRequest } from "../../../services/anilist/anilistClient";
-import type { AniListCollection, AniUserMediaEntry } from "../../types/api/anilist";
+import type {
+  AniListCollection,
+  AniUserMediaEntry,
+} from "../../types/api/anilist";
 import type { AnimeWithGenresTags } from "../../types/api/private";
 
 interface NormalizedAniUserMediaEntry {
-  status: string | null
-  score: number | null
-  progress: number | null
-  completedAt: AniUserMediaEntry["completedAt"]
-  startedAt: AniUserMediaEntry["startedAt"]
+  status: string | null;
+  score: number | null;
+  progress: number | null;
+  completedAt: AniUserMediaEntry["completedAt"];
+  startedAt: AniUserMediaEntry["startedAt"];
   media: {
-    id: number
-    season: string | null
-    seasonYear: number | null
-    duration: number | null
-    episodes: number | null
-    countryOfOrigin: string | null
-  }
+    id: number;
+    season: string | null;
+    seasonYear: number | null;
+    duration: number | null;
+    episodes: number | null;
+    countryOfOrigin: string | null;
+  };
 }
 
 interface NormalizedAniList {
-  entries: NormalizedAniUserMediaEntry[]
+  entries: NormalizedAniUserMediaEntry[];
 }
-
 type AniDashboardStats = {
-  episodesWatched: number | null
-  minutesWatched: number | null
-}
+  episodesWatched: number | null;
+  minutesWatched: number | null;
+};
 
 type AniDashboardQueryResponse = AniListCollection<AniUserMediaEntry> & {
   User?: {
     statistics?: {
       anime?: {
-        episodesWatched?: number | null
-        minutesWatched?: number | null
-      } | null
-    } | null
-  } | null
-}
-
+        episodesWatched?: number | null;
+        minutesWatched?: number | null;
+      } | null;
+    } | null;
+  } | null;
+};
 function isPresent<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined
+  return value !== null && value !== undefined;
 }
 
 function isNormalizedEntry(
-  value: AniUserMediaEntry | null | undefined
+  value: AniUserMediaEntry | null | undefined,
 ): value is NormalizedAniUserMediaEntry {
-  if (!isPresent(value) || !isPresent(value.media)) return false
-  return typeof value.media.id === "number"
+  if (!isPresent(value) || !isPresent(value.media)) return false;
+  return typeof value.media.id === "number";
 }
 
 function normalizeAniLists(
-  response: AniListCollection<AniUserMediaEntry>
+  response: AniListCollection<AniUserMediaEntry>,
 ): NormalizedAniList[] {
   const lists = response.MediaListCollection
-    ? response.MediaListCollection.lists ?? []
-    : []
+    ? (response.MediaListCollection.lists ?? [])
+    : [];
 
   return lists.filter(isPresent).map((list) => ({
-    entries: (list.entries ?? [])
-      .filter(isNormalizedEntry)
-      .map((entry) => ({
-        status: entry.status ?? null,
-        score: entry.score ?? null,
-        progress: entry.progress ?? null,
-        completedAt: entry.completedAt ?? null,
-        startedAt: entry.startedAt ?? null,
-        media: {
-          id: entry.media.id,
-          season: entry.media.season ?? null,
-          seasonYear: entry.media.seasonYear ?? null,
-          duration: entry.media.duration ?? null,
-          episodes: entry.media.episodes ?? null,
-          countryOfOrigin: entry.media.countryOfOrigin ?? null,
-        },
-      })),
-  }))
+    entries: (list.entries ?? []).filter(isNormalizedEntry).map((entry) => ({
+      status: entry.status ?? null,
+      score: entry.score ?? null,
+      progress: entry.progress ?? null,
+      completedAt: entry.completedAt ?? null,
+      startedAt: entry.startedAt ?? null,
+      media: {
+        id: entry.media.id,
+        season: entry.media.season ?? null,
+        seasonYear: entry.media.seasonYear ?? null,
+        duration: entry.media.duration ?? null,
+        episodes: entry.media.episodes ?? null,
+        countryOfOrigin: entry.media.countryOfOrigin ?? null,
+      },
+    })),
+  }));
 }
 
 export default defineEventHandler(async (event) => {
   const { user } = getQuery(event);
   const userName = String(user || "").trim();
-  
 
   if (!userName) {
     throw createError({ statusCode: 400, statusMessage: "Missing ?user=" });
@@ -130,15 +128,15 @@ export default defineEventHandler(async (event) => {
   const stats: AniDashboardStats = {
     episodesWatched: res.User?.statistics?.anime?.episodesWatched ?? null,
     minutesWatched: res.User?.statistics?.anime?.minutesWatched ?? null,
-  }
+  };
 
-  const lists = normalizeAniLists(res)
+  const lists = normalizeAniLists(res);
   /* -----------------------------
    * 2. IDs sammeln
    * ----------------------------- */
   const mediaIds: number[] = lists
     .flatMap((l) => l.entries)
-    .map((e) => e.media.id)
+    .map((e) => e.media.id);
 
   const uniqueIds = [...new Set(mediaIds)].sort((a, b) => a - b);
 
@@ -149,10 +147,7 @@ export default defineEventHandler(async (event) => {
 
   const cacheKey =
     "anime-meta:" +
-    crypto
-      .createHash("sha1")
-      .update(uniqueIds.join(","))
-      .digest("hex");
+    crypto.createHash("sha1").update(uniqueIds.join(",")).digest("hex");
 
   let animeRows = await storage.getItem<AnimeWithGenresTags[]>(cacheKey);
 
