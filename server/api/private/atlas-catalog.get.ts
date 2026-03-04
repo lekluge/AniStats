@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
       }))
       .filter((row) => row.genres.length > 0 || row.tags.length > 0);
 
-    await storage.setItem(ATLAS_CATALOG_CACHE_KEY, items, { ttl: 60 * 60 * 8 });
+    await storage.setItem(ATLAS_CATALOG_CACHE_KEY, items, { ttl: 60 * 60 * 48 }); // Cache for 48 hours
   }
 
   return {
