@@ -6,10 +6,22 @@ import type { AnimeEntry } from "~/types/anime";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { PieChart, LineChart, BarChart } from "echarts/charts";
-import { TooltipComponent, LegendComponent, GridComponent } from "echarts/components";
+import {
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+} from "echarts/components";
 import VChart from "vue-echarts";
 
-use([CanvasRenderer, PieChart, LineChart, BarChart, TooltipComponent, LegendComponent, GridComponent]);
+use([
+  CanvasRenderer,
+  PieChart,
+  LineChart,
+  BarChart,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+]);
 
 type MetricMode = "titles" | "hours" | "score";
 
@@ -28,6 +40,13 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const entries = ref<AnimeEntry[]>([]);
 const lastLoadedUser = ref("");
+const anilistStats = ref<{
+  episodesWatched: number | null;
+  minutesWatched: number | null;
+}>({
+  episodesWatched: null,
+  minutesWatched: null,
+});
 
 const scoreMetric = ref<MetricMode>("titles");
 const episodeMetric = ref<MetricMode>("titles");
@@ -75,6 +94,7 @@ async function loadAnime() {
     const currentUser = username.value.trim();
     if (!currentUser) {
       entries.value = [];
+      anilistStats.value = { episodesWatched: null, minutesWatched: null };
       lastLoadedUser.value = "";
       loading.value = false;
       return;
@@ -85,9 +105,22 @@ async function loadAnime() {
     });
 
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
+    anilistStats.value = {
+      episodesWatched: Number.isFinite(
+        Number(res.data.data.stats?.episodesWatched),
+      )
+        ? Number(res.data.data.stats.episodesWatched)
+        : null,
+      minutesWatched: Number.isFinite(
+        Number(res.data.data.stats?.minutesWatched),
+      )
+        ? Number(res.data.data.stats.minutesWatched)
+        : null,
+    };
     lastLoadedUser.value = currentUser;
   } catch {
     error.value = `${t("common.errorPrefix")}: ${t("dashboard.loadError")}`;
+    anilistStats.value = { episodesWatched: null, minutesWatched: null };
   } finally {
     loading.value = false;
   }
@@ -100,6 +133,7 @@ watch(
     const trimmed = (nextUser ?? "").trim();
     if (!trimmed) {
       entries.value = [];
+      anilistStats.value = { episodesWatched: null, minutesWatched: null };
       error.value = null;
       lastLoadedUser.value = "";
       return;
@@ -112,28 +146,43 @@ watch(
       if (!loading.value) loadAnime();
     }, 350);
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 onUnmounted(() => {
   if (autoLoadTimer) clearTimeout(autoLoadTimer);
 });
-const completedEntries = computed(() => entries.value.filter((e) => e.status === "COMPLETED"));
+const completedEntries = computed(() =>
+  entries.value.filter((e) => e.status === "COMPLETED"),
+);
 const watchedEntries = computed(() =>
-  entries.value.filter((e) => e.status === "COMPLETED" || e.status === "CURRENT" || e.status === "REPEATING" || e.status === "PAUSED" || e.status === "DROPPED")
+  entries.value.filter(
+    (e) =>
+      e.status === "COMPLETED" ||
+      e.status === "CURRENT" ||
+      e.status === "REPEATING" ||
+      e.status === "PAUSED" ||
+      e.status === "DROPPED",
+  ),
 );
 
 const totalAnime = computed(() => completedEntries.value.length);
 const totalEpisodes = computed(() =>
-  watchedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
+  typeof anilistStats.value.episodesWatched === "number"
+    ? anilistStats.value.episodesWatched
+    : watchedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
 );
 const totalMinutes = computed(() =>
-  watchedEntries.value.reduce((sum, e) => {
-    if (!e.progress || !e.duration) return sum;
-    return sum + e.progress * e.duration;
-  }, 0)
+  typeof anilistStats.value.minutesWatched === "number"
+    ? anilistStats.value.minutesWatched
+    : watchedEntries.value.reduce((sum, e) => {
+      if (!e.progress || !e.duration) return sum;
+      return sum + e.progress * e.duration;
+    }, 0)
 );
-const totalDaysWatched = computed(() => Number((totalMinutes.value / 60 / 24).toFixed(1)));
+const totalDaysWatched = computed(() =>
+  Number((totalMinutes.value / 60 / 24).toFixed(1)),
+);
 
 const totalPlannedDays = computed(() => {
   const plannedMinutes = entries.value.reduce((sum, e) => {
@@ -147,7 +196,9 @@ const totalPlannedDays = computed(() => {
   return Number((plannedMinutes / 60 / 24).toFixed(1));
 });
 
-const scoredEntries = computed(() => completedEntries.value.filter((e) => Number(e.score ?? 0) > 0));
+const scoredEntries = computed(() =>
+  completedEntries.value.filter((e) => Number(e.score ?? 0) > 0),
+);
 const meanScore = computed(() => {
   if (!scoredEntries.value.length) return 0;
   const sum = scoredEntries.value.reduce((acc, e) => acc + Number(e.score), 0);
@@ -158,8 +209,10 @@ const scoreStdDev = computed(() => {
   if (scoredEntries.value.length <= 1) return 0;
   const mean = meanScore.value;
   const variance =
-    scoredEntries.value.reduce((acc, e) => acc + (Number(e.score) - mean) ** 2, 0) /
-    scoredEntries.value.length;
+    scoredEntries.value.reduce(
+      (acc, e) => acc + (Number(e.score) - mean) ** 2,
+      0,
+    ) / scoredEntries.value.length;
   return Number(Math.sqrt(variance).toFixed(1));
 });
 
@@ -173,8 +226,13 @@ const overviewStats = computed(() => [
 ]);
 
 function computeMetricValue(
-  bucket: { titles: number; hours: number; scoreSum: number; scoredTitles: number },
-  mode: MetricMode
+  bucket: {
+    titles: number;
+    hours: number;
+    scoreSum: number;
+    scoredTitles: number;
+  },
+  mode: MetricMode,
 ) {
   if (mode === "titles") return bucket.titles;
   if (mode === "hours") return Number(bucket.hours.toFixed(1));
@@ -214,7 +272,12 @@ function makeBarOption(labels: string[], values: number[], labelName: string) {
         data: values,
         barMaxWidth: 42,
         itemStyle: { color: palette.bar, borderRadius: [6, 6, 0, 0] },
-        label: { show: true, position: "top", color: palette.textStrong, fontWeight: 600 },
+        label: {
+          show: true,
+          position: "top",
+          color: palette.textStrong,
+          fontWeight: 600,
+        },
       },
     ],
   };
@@ -255,7 +318,12 @@ function makeLineOption(labels: string[], values: number[], labelName: string) {
         lineStyle: { color: palette.line, width: 3 },
         itemStyle: { color: palette.line },
         areaStyle: { color: palette.area },
-        label: { show: true, position: "top", color: palette.textStrong, fontWeight: 600 },
+        label: {
+          show: true,
+          position: "top",
+          color: palette.textStrong,
+          fontWeight: 600,
+        },
       },
     ],
   };
@@ -276,7 +344,15 @@ function mapCountry(value?: string | null) {
   return key;
 }
 
-const formatOrder = ["TV", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC", "TV_SHORT"];
+const formatOrder = [
+  "TV",
+  "MOVIE",
+  "OVA",
+  "ONA",
+  "SPECIAL",
+  "MUSIC",
+  "TV_SHORT",
+];
 const formatDistribution = computed(() => {
   const map: Record<string, number> = {};
   for (const e of completedEntries.value) {
@@ -307,7 +383,10 @@ const statusDistribution = computed(() => {
   for (const e of completedEntries.value) {
     map[e.status] = (map[e.status] || 0) + 1;
   }
-  return Object.entries(map).map(([name, value]) => ({ name: statusLabels.value[name] ?? name, value }));
+  return Object.entries(map).map(([name, value]) => ({
+    name: statusLabels.value[name] ?? name,
+    value,
+  }));
 });
 
 const countryDistribution = computed(() => {
@@ -338,7 +417,9 @@ function makeDonutOption(rows: Array<{ name: string; value: number }>) {
         type: "pie",
         radius: ["62%", "82%"],
         center: ["50%", "50%"],
-        data: pieRows.length ? pieRows : [{ name: t("common.unknown"), value: 1 }],
+        data: pieRows.length
+          ? pieRows
+          : [{ name: t("common.unknown"), value: 1 }],
         label: { show: false },
         itemStyle: {
           borderWidth: hasSingleSlice ? 0 : 2,
@@ -351,17 +432,30 @@ function makeDonutOption(rows: Array<{ name: string; value: number }>) {
 
 const formatOption = computed(() => makeDonutOption(formatDistribution.value));
 const statusOption = computed(() => makeDonutOption(statusDistribution.value));
-const countryOption = computed(() => makeDonutOption(countryDistribution.value));
+const countryOption = computed(() =>
+  makeDonutOption(countryDistribution.value),
+);
 
 const scoreDist = computed(() => {
-  const maxScore = scoredEntries.value.reduce((m, e) => Math.max(m, Number(e.score || 0)), 0);
+  const maxScore = scoredEntries.value.reduce(
+    (m, e) => Math.max(m, Number(e.score || 0)),
+    0,
+  );
   const useTenScale = maxScore <= 10;
 
-  const buckets = new Map<number, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
+  const buckets = new Map<
+    number,
+    { titles: number; hours: number; scoreSum: number; scoredTitles: number }
+  >();
   for (const e of scoredEntries.value) {
     const raw = Number(e.score || 0);
     const key = useTenScale ? Math.round(raw) : Math.round(raw / 10);
-    const cur = buckets.get(key) ?? { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 };
+    const cur = buckets.get(key) ?? {
+      titles: 0,
+      hours: 0,
+      scoreSum: 0,
+      scoredTitles: 0,
+    };
     cur.titles += 1;
     cur.hours += ((e.progress ?? 0) * (e.duration ?? 20)) / 60;
     cur.scoreSum += raw;
@@ -375,26 +469,52 @@ const scoreDist = computed(() => {
   return { labels, values };
 });
 
-const scoreOption = computed(() => makeBarOption(scoreDist.value.labels, scoreDist.value.values, metricLabel(scoreMetric.value)));
+const scoreOption = computed(() =>
+  makeBarOption(
+    scoreDist.value.labels,
+    scoreDist.value.values,
+    metricLabel(scoreMetric.value),
+  ),
+);
 
 const episodeBins = [
   { label: "1", match: (n: number | null) => n === 1 },
   { label: "2-6", match: (n: number | null) => n !== null && n >= 2 && n <= 6 },
-  { label: "7-16", match: (n: number | null) => n !== null && n >= 7 && n <= 16 },
-  { label: "17-28", match: (n: number | null) => n !== null && n >= 17 && n <= 28 },
-  { label: "29-55", match: (n: number | null) => n !== null && n >= 29 && n <= 55 },
-  { label: "56-100", match: (n: number | null) => n !== null && n >= 56 && n <= 100 },
+  {
+    label: "7-16",
+    match: (n: number | null) => n !== null && n >= 7 && n <= 16,
+  },
+  {
+    label: "17-28",
+    match: (n: number | null) => n !== null && n >= 17 && n <= 28,
+  },
+  {
+    label: "29-55",
+    match: (n: number | null) => n !== null && n >= 29 && n <= 55,
+  },
+  {
+    label: "56-100",
+    match: (n: number | null) => n !== null && n >= 56 && n <= 100,
+  },
   { label: "101+", match: (n: number | null) => n !== null && n >= 101 },
-  { label: t("common.unknown"), match: (n: number | null) => n === null || n === 0 },
+  {
+    label: t("common.unknown"),
+    match: (n: number | null) => n === null || n === 0,
+  },
 ];
 
 const episodeDist = computed(() => {
-  const map = new Map<string, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
-  for (const b of episodeBins) map.set(b.label, { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 });
+  const map = new Map<
+    string,
+    { titles: number; hours: number; scoreSum: number; scoredTitles: number }
+  >();
+  for (const b of episodeBins)
+    map.set(b.label, { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 });
 
   for (const e of completedEntries.value) {
     const ep = e.episodes ?? null;
-    const bucket = episodeBins.find((b) => b.match(ep))?.label ?? t("common.unknown");
+    const bucket =
+      episodeBins.find((b) => b.match(ep))?.label ?? t("common.unknown");
     const cur = map.get(bucket)!;
     cur.titles += 1;
     cur.hours += ((e.progress ?? 0) * (e.duration ?? 20)) / 60;
@@ -405,20 +525,34 @@ const episodeDist = computed(() => {
   }
 
   const labels = episodeBins.map((b) => b.label);
-  const values = labels.map((l) => computeMetricValue(map.get(l)!, episodeMetric.value));
+  const values = labels.map((l) =>
+    computeMetricValue(map.get(l)!, episodeMetric.value),
+  );
   return { labels, values };
 });
 
 const episodeOption = computed(() =>
-  makeBarOption(episodeDist.value.labels, episodeDist.value.values, metricLabel(episodeMetric.value))
+  makeBarOption(
+    episodeDist.value.labels,
+    episodeDist.value.values,
+    metricLabel(episodeMetric.value),
+  ),
 );
 
 const releaseYearDist = computed(() => {
-  const map = new Map<number, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
+  const map = new Map<
+    number,
+    { titles: number; hours: number; scoreSum: number; scoredTitles: number }
+  >();
   for (const e of completedEntries.value) {
     const year = e.seasonYear;
     if (!year) continue;
-    const cur = map.get(year) ?? { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 };
+    const cur = map.get(year) ?? {
+      titles: 0,
+      hours: 0,
+      scoreSum: 0,
+      scoredTitles: 0,
+    };
     cur.titles += 1;
     cur.hours += ((e.progress ?? 0) * (e.duration ?? 20)) / 60;
     if (Number(e.score || 0) > 0) {
@@ -430,20 +564,34 @@ const releaseYearDist = computed(() => {
 
   const rows = [...map.entries()].sort((a, b) => a[0] - b[0]);
   const labels = rows.map(([year]) => String(year));
-  const values = rows.map(([, v]) => computeMetricValue(v, releaseMetric.value));
+  const values = rows.map(([, v]) =>
+    computeMetricValue(v, releaseMetric.value),
+  );
   return { labels, values };
 });
 
 const releaseOption = computed(() =>
-  makeLineOption(releaseYearDist.value.labels, releaseYearDist.value.values, metricLabel(releaseMetric.value))
+  makeLineOption(
+    releaseYearDist.value.labels,
+    releaseYearDist.value.values,
+    metricLabel(releaseMetric.value),
+  ),
 );
 
 const watchYearDist = computed(() => {
-  const map = new Map<number, { titles: number; hours: number; scoreSum: number; scoredTitles: number }>();
+  const map = new Map<
+    number,
+    { titles: number; hours: number; scoreSum: number; scoredTitles: number }
+  >();
   for (const e of completedEntries.value) {
     const year = e.completedAt?.year;
     if (!year) continue;
-    const cur = map.get(year) ?? { titles: 0, hours: 0, scoreSum: 0, scoredTitles: 0 };
+    const cur = map.get(year) ?? {
+      titles: 0,
+      hours: 0,
+      scoreSum: 0,
+      scoredTitles: 0,
+    };
     cur.titles += 1;
     cur.hours += ((e.progress ?? 0) * (e.duration ?? 20)) / 60;
     if (Number(e.score || 0) > 0) {
@@ -460,13 +608,20 @@ const watchYearDist = computed(() => {
 });
 
 const watchOption = computed(() =>
-  makeLineOption(watchYearDist.value.labels, watchYearDist.value.values, metricLabel(watchMetric.value))
+  makeLineOption(
+    watchYearDist.value.labels,
+    watchYearDist.value.values,
+    metricLabel(watchMetric.value),
+  ),
 );
 
 function buildPercentLabels(rows: Array<{ name: string; value: number }>) {
   const total = rows.reduce((sum, row) => sum + row.value, 0);
   if (!total) {
-    return Object.fromEntries(rows.map((row) => [row.name, "0.0%"])) as Record<string, string>;
+    return Object.fromEntries(rows.map((row) => [row.name, "0.0%"])) as Record<
+      string,
+      string
+    >;
   }
 
   const scaled = rows.map((row) => {
@@ -479,7 +634,8 @@ function buildPercentLabels(rows: Array<{ name: string; value: number }>) {
     };
   });
 
-  let missingTenths = 1000 - scaled.reduce((sum, row) => sum + row.baseTenths, 0);
+  let missingTenths =
+    1000 - scaled.reduce((sum, row) => sum + row.baseTenths, 0);
   scaled.sort((a, b) => b.remainder - a.remainder);
 
   for (let i = 0; i < scaled.length && missingTenths > 0; i++) {
@@ -488,13 +644,19 @@ function buildPercentLabels(rows: Array<{ name: string; value: number }>) {
   }
 
   return Object.fromEntries(
-    scaled.map((row) => [row.name, `${(row.baseTenths / 10).toFixed(1)}%`])
+    scaled.map((row) => [row.name, `${(row.baseTenths / 10).toFixed(1)}%`]),
   ) as Record<string, string>;
 }
 
-const formatPercentLabels = computed(() => buildPercentLabels(formatDistribution.value));
-const statusPercentLabels = computed(() => buildPercentLabels(statusDistribution.value));
-const countryPercentLabels = computed(() => buildPercentLabels(countryDistribution.value));
+const formatPercentLabels = computed(() =>
+  buildPercentLabels(formatDistribution.value),
+);
+const statusPercentLabels = computed(() =>
+  buildPercentLabels(statusDistribution.value),
+);
+const countryPercentLabels = computed(() =>
+  buildPercentLabels(countryDistribution.value),
+);
 </script>
 
 <template>
@@ -510,19 +672,31 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
           @keydown.enter.prevent="loadAnime"
           @keydown.space.prevent="loadAnime"
         />
-        <button @click="loadAnime" class="ui-btn ui-btn-primary" :disabled="loading">{{ t("common.load") }}</button>
+        <button
+          @click="loadAnime"
+          class="ui-btn ui-btn-primary"
+          :disabled="loading"
+        >
+          {{ t("common.load") }}
+        </button>
       </div>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500" />
+      <div
+        class="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-500"
+      />
     </div>
 
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <div v-else class="dashboard-shell">
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div v-for="item in overviewStats" :key="item.label" class="dashboard-kpi">
+        <div
+          v-for="item in overviewStats"
+          :key="item.label"
+          class="dashboard-kpi"
+        >
           <div class="text-3xl font-bold tracking-tight">{{ item.value }}</div>
           <div class="dashboard-kpi-label">{{ item.label }}</div>
         </div>
@@ -530,45 +704,81 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
 
       <div class="grid gap-4 xl:grid-cols-3">
         <section class="dashboard-panel">
-          <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.formatDistribution") }}</h2>
+          <h2 class="mb-3 text-xl font-semibold">
+            {{ t("dashboard.formatDistribution") }}
+          </h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
-              <VChart :style="{ height: '130px', width: '130px' }" :option="formatOption" autoresize />
+              <VChart
+                :style="{ height: '130px', width: '130px' }"
+                :option="formatOption"
+                autoresize
+              />
             </ClientOnly>
             <div class="space-y-2 text-sm">
-              <div v-for="row in formatDistribution" :key="row.name" class="dashboard-legend-row">
+              <div
+                v-for="row in formatDistribution"
+                :key="row.name"
+                class="dashboard-legend-row"
+              >
                 <span>{{ row.name }}</span>
-                <span class="text-[#b8c8db]">{{ formatPercentLabels[row.name] }}</span>
+                <span class="text-[#b8c8db]">{{
+                  formatPercentLabels[row.name]
+                }}</span>
               </div>
             </div>
           </div>
         </section>
 
         <section class="dashboard-panel">
-          <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.statusDistribution") }}</h2>
+          <h2 class="mb-3 text-xl font-semibold">
+            {{ t("dashboard.statusDistribution") }}
+          </h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
-              <VChart :style="{ height: '130px', width: '130px' }" :option="statusOption" autoresize />
+              <VChart
+                :style="{ height: '130px', width: '130px' }"
+                :option="statusOption"
+                autoresize
+              />
             </ClientOnly>
             <div class="space-y-2 text-sm">
-              <div v-for="row in statusDistribution" :key="row.name" class="dashboard-legend-row">
+              <div
+                v-for="row in statusDistribution"
+                :key="row.name"
+                class="dashboard-legend-row"
+              >
                 <span>{{ row.name }}</span>
-                <span class="text-[#b8c8db]">{{ statusPercentLabels[row.name] }}</span>
+                <span class="text-[#b8c8db]">{{
+                  statusPercentLabels[row.name]
+                }}</span>
               </div>
             </div>
           </div>
         </section>
 
         <section class="dashboard-panel">
-          <h2 class="mb-3 text-xl font-semibold">{{ t("dashboard.countryDistribution") }}</h2>
+          <h2 class="mb-3 text-xl font-semibold">
+            {{ t("dashboard.countryDistribution") }}
+          </h2>
           <div class="grid grid-cols-[130px_1fr] gap-4 items-center">
             <ClientOnly>
-              <VChart :style="{ height: '130px', width: '130px' }" :option="countryOption" autoresize />
+              <VChart
+                :style="{ height: '130px', width: '130px' }"
+                :option="countryOption"
+                autoresize
+              />
             </ClientOnly>
             <div class="space-y-2 text-sm">
-              <div v-for="row in countryDistribution" :key="row.name" class="dashboard-legend-row">
+              <div
+                v-for="row in countryDistribution"
+                :key="row.name"
+                class="dashboard-legend-row"
+              >
                 <span>{{ row.name }}</span>
-                <span class="text-[#b8c8db]">{{ countryPercentLabels[row.name] }}</span>
+                <span class="text-[#b8c8db]">{{
+                  countryPercentLabels[row.name]
+                }}</span>
               </div>
             </div>
           </div>
@@ -579,40 +789,136 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-xl font-semibold">{{ t("dashboard.scoreChart") }}</h2>
           <div class="dashboard-toggle">
-            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="scoreMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="scoreMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="scoreMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                scoreMetric === 'titles'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="scoreMetric = 'titles'"
+            >
+              {{ t("dashboard.titlesWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                scoreMetric === 'hours'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="scoreMetric = 'hours'"
+            >
+              {{ t("dashboard.hoursWatched") }}
+            </button>
           </div>
         </div>
         <ClientOnly>
-          <VChart :style="{ height: '280px', width: '100%' }" :option="scoreOption" autoresize />
+          <VChart
+            :style="{ height: '280px', width: '100%' }"
+            :option="scoreOption"
+            autoresize
+          />
         </ClientOnly>
       </section>
 
       <section class="dashboard-panel">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-xl font-semibold">{{ t("dashboard.episodeCount") }}</h2>
+          <h2 class="text-xl font-semibold">
+            {{ t("dashboard.episodeCount") }}
+          </h2>
           <div class="dashboard-toggle">
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="episodeMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="episodeMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="episodeMetric === 'score' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="episodeMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                episodeMetric === 'titles'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="episodeMetric = 'titles'"
+            >
+              {{ t("dashboard.titlesWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                episodeMetric === 'hours'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="episodeMetric = 'hours'"
+            >
+              {{ t("dashboard.hoursWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                episodeMetric === 'score'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="episodeMetric = 'score'"
+            >
+              {{ t("dashboard.meanScoreTab") }}
+            </button>
           </div>
         </div>
         <ClientOnly>
-          <VChart :style="{ height: '280px', width: '100%' }" :option="episodeOption" autoresize />
+          <VChart
+            :style="{ height: '280px', width: '100%' }"
+            :option="episodeOption"
+            autoresize
+          />
         </ClientOnly>
       </section>
 
       <section class="dashboard-panel">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-xl font-semibold">{{ t("dashboard.releaseYear") }}</h2>
+          <h2 class="text-xl font-semibold">
+            {{ t("dashboard.releaseYear") }}
+          </h2>
           <div class="dashboard-toggle">
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="releaseMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="releaseMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="releaseMetric === 'score' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="releaseMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                releaseMetric === 'titles'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="releaseMetric = 'titles'"
+            >
+              {{ t("dashboard.titlesWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                releaseMetric === 'hours'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="releaseMetric = 'hours'"
+            >
+              {{ t("dashboard.hoursWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                releaseMetric === 'score'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="releaseMetric = 'score'"
+            >
+              {{ t("dashboard.meanScoreTab") }}
+            </button>
           </div>
         </div>
         <ClientOnly>
-          <VChart :style="{ height: '280px', width: '100%' }" :option="releaseOption" autoresize />
+          <VChart
+            :style="{ height: '280px', width: '100%' }"
+            :option="releaseOption"
+            autoresize
+          />
         </ClientOnly>
       </section>
 
@@ -620,13 +926,47 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-xl font-semibold">{{ t("dashboard.watchYear") }}</h2>
           <div class="dashboard-toggle">
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'titles' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="watchMetric = 'titles'">{{ t("dashboard.titlesWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'hours' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="watchMetric = 'hours'">{{ t("dashboard.hoursWatched") }}</button>
-            <button class="rounded-full px-3 py-1" :class="watchMetric === 'score' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'" @click="watchMetric = 'score'">{{ t("dashboard.meanScoreTab") }}</button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                watchMetric === 'titles'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="watchMetric = 'titles'"
+            >
+              {{ t("dashboard.titlesWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                watchMetric === 'hours'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="watchMetric = 'hours'"
+            >
+              {{ t("dashboard.hoursWatched") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="
+                watchMetric === 'score'
+                  ? 'dashboard-toggle-btn-active'
+                  : 'dashboard-toggle-btn'
+              "
+              @click="watchMetric = 'score'"
+            >
+              {{ t("dashboard.meanScoreTab") }}
+            </button>
           </div>
         </div>
         <ClientOnly>
-          <VChart :style="{ height: '280px', width: '100%' }" :option="watchOption" autoresize />
+          <VChart
+            :style="{ height: '280px', width: '100%' }"
+            :option="watchOption"
+            autoresize
+          />
         </ClientOnly>
       </section>
     </div>
