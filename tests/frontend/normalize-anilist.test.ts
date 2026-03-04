@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAnilist } from "~/utils/normalizeAnilist";
+import { normalizeAnilist } from "../../app/utils/normalizeAnilist";
 
 describe("normalizeAnilist", () => {
   it("deduplicates duplicate media across lists", () => {

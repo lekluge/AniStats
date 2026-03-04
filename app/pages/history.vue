@@ -374,7 +374,12 @@ const timelineGroups = computed(() => {
               :key="a.id"
               class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
             >
-              <img v-if="a.cover" :src="a.cover" class="h-14 aspect-2/3 rounded object-cover" />
+              <ImageWithLoader
+                v-if="a.cover"
+                :src="a.cover"
+                :alt="a.titleEn ?? a.titleRo ?? t('common.unknown')"
+                class="h-14 aspect-2/3 rounded"
+              />
 
               <div class="min-w-0 flex-1">
                 <a :href="anilistUrl(a.id)" target="_blank" class="block hover:underline hover:text-indigo-400">

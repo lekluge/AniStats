@@ -340,7 +340,7 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
           #{{ i + 1 }}
         </span>
         <div class="flex gap-3 items-center">
-          <img v-if="a.cover" :src="a.cover" class="h-24 aspect-2/3 rounded-lg object-cover shrink-0" />
+          <ImageWithLoader v-if="a.cover" :src="a.cover" :alt="a.titleEn ?? a.titleRo ?? ''" class="h-24 aspect-2/3 rounded-lg shrink-0" />
 
           <div class="min-w-0 flex-1">
             <a :href="anilistUrl(a.id)" target="_blank" class="block pr-12 hover:underline hover:text-indigo-400">
@@ -398,7 +398,7 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
         :key="a.id"
         class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
       >
-        <img v-if="a.cover" :src="a.cover" class="h-14 aspect-2/3 rounded object-cover shrink-0" />
+        <ImageWithLoader v-if="a.cover" :src="a.cover" :alt="a.titleEn ?? a.titleRo ?? ''" class="h-14 aspect-2/3 rounded shrink-0" />
 
         <div class="flex-1 min-w-0">
           <a :href="anilistUrl(a.id)" target="_blank" class="block hover:underline hover:text-indigo-400">

@@ -120,6 +120,19 @@
     <main class="mx-auto w-full max-w-7xl px-4 py-8 lg:px-6">
       <slot />
     </main>
+
+    <div class="mx-auto w-full max-w-7xl px-4 pb-5 lg:px-6">
+      <div
+        class="rounded-lg border px-3 py-2 text-[11px] leading-snug"
+        :style="{
+          background: 'var(--surface-soft)',
+          borderColor: 'var(--border)',
+          color: 'var(--text-muted)',
+        }"
+      >
+        {{ t("common.unofficialNotice") }}
+      </div>
+    </div>
   </div>
 </template>
 

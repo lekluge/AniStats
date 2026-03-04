@@ -42,6 +42,7 @@ export const translations = {
       sortDesc: "Descending",
       readMore: "Read more",
       showLess: "Show less",
+      unofficialNotice: "AniStats is an unofficial app and is not affiliated with AniList or AniChart.",
     },
     nav: {
       appName: "AniList Stats",
@@ -234,6 +235,7 @@ export const translations = {
       sortDesc: "Absteigend",
       readMore: "Mehr anzeigen",
       showLess: "Weniger anzeigen",
+      unofficialNotice: "AniStats ist eine inoffizielle App und steht in keiner Verbindung zu AniList oder AniChart.",
     },
     nav: {
       appName: "AniList Stats",

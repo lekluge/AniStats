@@ -287,10 +287,11 @@ function watchedInGroup(group: RelationGroupWithStatus) {
 
                 <div class="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-3">
                   <div class="flex items-start gap-3">
-                    <img
+                    <ImageWithLoader
                       v-if="item.cover"
                       :src="item.cover"
-                      class="h-16 aspect-[2/3] rounded-md object-cover shadow shrink-0"
+                      :alt="displayTitle(item.titleEn, item.titleRo)"
+                      class="h-16 aspect-[2/3] rounded-md shadow shrink-0"
                     />
 
                     <div class="min-w-0 flex-1">
@@ -317,10 +318,11 @@ function watchedInGroup(group: RelationGroupWithStatus) {
                       target="_blank"
                       class="flex items-start gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/45 p-2 hover:border-indigo-500/50"
                     >
-                      <img
+                      <ImageWithLoader
                         v-if="r.cover"
                         :src="r.cover"
-                        class="h-12 aspect-[2/3] rounded object-cover opacity-90 shrink-0"
+                        :alt="displayTitle(r.titleEn, r.titleRo)"
+                        class="h-12 aspect-[2/3] rounded opacity-90 shrink-0"
                       />
 
                       <div class="min-w-0 flex-1">
