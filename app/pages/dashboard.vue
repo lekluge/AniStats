@@ -10,14 +10,6 @@ import { TooltipComponent, LegendComponent, GridComponent, VisualMapComponent } 
 import VChart from "vue-echarts";
 
 use([CanvasRenderer, PieChart, LineChart, BarChart, ScatterChart, TooltipComponent, LegendComponent, GridComponent, VisualMapComponent]);
-import { PieChart, LineChart, BarChart } from "echarts/charts";
-import {
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-} from "echarts/components";
-import VChart from "vue-echarts";
-
 use([
   CanvasRenderer,
   PieChart,
@@ -986,15 +978,6 @@ const atlasOption = computed(() => {
 });
 
 const formatOrder = ["TV", "MOVIE", "OVA", "ONA", "SPECIAL", "MUSIC", "TV_SHORT"];
-const formatOrder = [
-  "TV",
-  "MOVIE",
-  "OVA",
-  "ONA",
-  "SPECIAL",
-  "MUSIC",
-  "TV_SHORT",
-];
 const formatDistribution = computed(() => {
   const map: Record<string, number> = {};
   for (const e of completedEntries.value) {
