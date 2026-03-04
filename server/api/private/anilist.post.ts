@@ -25,22 +25,6 @@ interface NormalizedAniList {
   entries: NormalizedAniUserMediaEntry[]
 }
 
-type AniDashboardStats = {
-  episodesWatched: number | null
-  minutesWatched: number | null
-}
-
-type AniDashboardQueryResponse = AniListCollection<AniUserMediaEntry> & {
-  User?: {
-    statistics?: {
-      anime?: {
-        episodesWatched?: number | null
-        minutesWatched?: number | null
-      } | null
-    } | null
-  } | null
-}
-
 function isPresent<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined
 }
@@ -94,14 +78,6 @@ export default defineEventHandler(async (event) => {
    * ----------------------------- */
   const query = `
     query ($userName: String) {
-      User(name: $userName) {
-        statistics {
-          anime {
-            episodesWatched
-            minutesWatched
-          }
-        }
-      }
       MediaListCollection(userName: $userName, type: ANIME) {
         lists {
           entries {
@@ -124,13 +100,9 @@ export default defineEventHandler(async (event) => {
     }
   `;
 
-  const res = await anilistRequest<AniDashboardQueryResponse>(query, {
+  const res = await anilistRequest<AniListCollection<AniUserMediaEntry>>(query, {
     userName,
   });
-  const stats: AniDashboardStats = {
-    episodesWatched: res.User?.statistics?.anime?.episodesWatched ?? null,
-    minutesWatched: res.User?.statistics?.anime?.minutesWatched ?? null,
-  }
 
   const lists = normalizeAniLists(res)
   /* -----------------------------
@@ -222,7 +194,6 @@ export default defineEventHandler(async (event) => {
    * ----------------------------- */
   return {
     data: {
-      stats,
       MediaListCollection: {
         lists: enrichedLists,
       },
