@@ -2,6 +2,7 @@ import { mountSuspended, mockNuxtImport } from "@nuxt/test-utils/runtime";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
+import { translations } from "../../app/i18n/translations";
 
 const getMock = vi.fn();
 
@@ -15,7 +16,22 @@ mockNuxtImport("useAnilistUser", () => {
   return () => ref("Leon");
 });
 
-import RecommendationPage from "~/pages/recommendation.vue";
+function resolvePath(table: Record<string, unknown>, segments: string[]): string | null {
+  let current: unknown = table;
+  for (const segment of segments) {
+    if (typeof current !== "object" || current === null) return null;
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return typeof current === "string" ? current : null;
+}
+
+mockNuxtImport("useLocale", () => {
+  return () => ({
+    t: (key: string) => resolvePath(translations.de as Record<string, unknown>, key.split(".")) ?? key,
+  });
+});
+
+import RecommendationPage from "../../app/pages/recommendation.vue";
 
 describe("recommendation page API error handling", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;

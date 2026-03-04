@@ -1,7 +1,7 @@
 import { mountSuspended, mockNuxtImport } from "@nuxt/test-utils/runtime";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
-import DefaultLayout from "~/layouts/default.vue";
+import DefaultLayout from "../../app/layouts/default.vue";
 
 const loginMock = vi.fn(async () => {});
 const logoutMock = vi.fn(async () => {});

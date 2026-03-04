@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { useLocale } from "~/composables/useLocale";
+import { useLocale } from "../../app/composables/useLocale";
 
 describe("useLocale composable", () => {
   it("switches locale and resolves translation keys", () => {
