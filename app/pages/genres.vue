@@ -427,7 +427,7 @@ function formatHours(minutes?: number) {
           :key="a.id"
           class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
         >
-          <img v-if="a.cover" :src="a.cover" class="h-14 aspect-2/3 rounded object-cover" />
+          <ImageWithLoader v-if="a.cover" :src="a.cover" :alt="a.title" class="h-14 aspect-2/3 rounded" />
           <a :href="anilistUrl(a.id)" target="_blank" class="flex-1 hover:underline hover:text-indigo-400">
             {{ a.title }}
           </a>

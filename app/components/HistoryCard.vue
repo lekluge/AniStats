@@ -67,12 +67,11 @@ function anilistUrl(id: number) {
     </span>
 
     <div class="flex gap-3 items-start">
-      <img
+      <ImageWithLoader
         v-if="data.cover"
         :src="data.cover"
-        class="h-24 aspect-2/3 rounded-lg object-cover shrink-0"
         :alt="data.title"
-        loading="lazy"
+        class="h-24 aspect-2/3 rounded-lg shrink-0"
       />
 
       <div class="min-w-0 flex-1">

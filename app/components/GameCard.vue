@@ -82,7 +82,11 @@ function goToList() {
         rel="noopener"
         class="shrink-0"
       >
-        <img :src="data.covers[0].cover" class="h-32 aspect-2/3 rounded-lg object-cover" />
+        <ImageWithLoader
+          :src="data.covers[0].cover"
+          :alt="data.covers[0].title"
+          class="h-32 aspect-2/3 rounded-lg"
+        />
       </a>
 
       <div class="flex-1 grid grid-cols-3 gap-2 text-sm">
@@ -111,9 +115,10 @@ function goToList() {
         :title="anime.title"
         class="shrink-0"
       >
-        <img
+        <ImageWithLoader
           :src="anime.cover"
-          class="h-16 aspect-2/3 rounded-md object-cover transition hover:scale-105"
+          :alt="anime.title"
+          class="h-16 aspect-2/3 rounded-md transition hover:scale-105"
         />
       </a>
 
