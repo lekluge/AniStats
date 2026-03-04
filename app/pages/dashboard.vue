@@ -339,9 +339,46 @@ type AtlasPoint = {
   score: number;
   density: number;
   scoreNorm: number;
+  isWatched: boolean;
   color?: string;
   value: [number, number, number, number];
 };
+
+type AtlasTag = {
+  name: string;
+  rank: number;
+};
+
+type AtlasEntry = {
+  id: number;
+  titleEn: string;
+  titleRo: string;
+  genres: string[];
+  tags: AtlasTag[];
+  score: number;
+  progress: number;
+  duration: number | null;
+  seasonYear: number | null;
+  completedYear: number | null;
+  isWatched: boolean;
+};
+
+type AtlasSourceMode = "mine" | "all";
+type AtlasCatalogApiItem = {
+  id: number;
+  titleEn: string | null;
+  titleRo: string | null;
+  averageScore: number | null;
+  seasonYear: number | null;
+  startYear: number | null;
+  genres: string[];
+  tags: Array<{ name: string; rank: number | null }>;
+};
+
+const atlasSourceMode = ref<AtlasSourceMode>("mine");
+const atlasCatalogLoading = ref(false);
+const atlasCatalogError = ref<string | null>(null);
+const atlasCatalogItems = ref<AtlasCatalogApiItem[]>([]);
 
 const atlasSearch = ref("");
 const atlasSelectedGenres = ref<string[]>([]);
@@ -361,10 +398,84 @@ const atlasGenrePalette = [
   "#22d3ee",
 ];
 
+async function loadAtlasCatalog() {
+  if (atlasCatalogItems.value.length > 0 || atlasCatalogLoading.value) return;
+
+  atlasCatalogLoading.value = true;
+  atlasCatalogError.value = null;
+
+  try {
+    const res = await api.get<{ total: number; items: AtlasCatalogApiItem[] }>("/api/private/atlas-catalog");
+    atlasCatalogItems.value = res.data.items ?? [];
+  } catch {
+    atlasCatalogError.value = `${t("common.errorPrefix")}: ${t("dashboard.atlasCatalogLoadError")}`;
+  } finally {
+    atlasCatalogLoading.value = false;
+  }
+}
+
+watch(
+  atlasSourceMode,
+  async (mode) => {
+    if (mode === "all") {
+      await loadAtlasCatalog();
+    }
+  },
+  { immediate: true }
+);
+
+const atlasWatchedBaseEntries = computed<AtlasEntry[]>(() =>
+  watchedEntries.value
+    .filter((entry) => (entry.genres?.length ?? 0) > 0 || (entry.tags?.length ?? 0) > 0)
+    .map((entry) => ({
+      id: entry.id,
+      titleEn: entry.title.english ?? entry.title.romaji ?? `#${entry.id}`,
+      titleRo: entry.title.romaji ?? entry.title.english ?? "",
+      genres: entry.genres ?? [],
+      tags: (entry.tags ?? []).map((tag) => ({
+        name: tag.name,
+        rank: Number(tag.rank ?? 0),
+      })),
+      score: Number(entry.score ?? 0),
+      progress: Number(entry.progress ?? 0),
+      duration: entry.duration ?? null,
+      seasonYear: entry.seasonYear ?? null,
+      completedYear: entry.completedAt?.year ?? null,
+      isWatched: true,
+    }))
+);
+
+const atlasCatalogBaseEntries = computed<AtlasEntry[]>(() =>
+  atlasCatalogItems.value.map((entry) => ({
+    id: entry.id,
+    titleEn: entry.titleEn ?? entry.titleRo ?? `#${entry.id}`,
+    titleRo: entry.titleRo ?? entry.titleEn ?? "",
+    genres: entry.genres ?? [],
+    tags: (entry.tags ?? []).map((tag) => ({
+      name: tag.name,
+      rank: Number(tag.rank ?? 0),
+    })),
+    score: typeof entry.averageScore === "number" ? Number((entry.averageScore / 10).toFixed(1)) : 0,
+    progress: 0,
+    duration: null,
+    seasonYear: entry.seasonYear ?? entry.startYear ?? null,
+    completedYear: null,
+    isWatched: false,
+  }))
+);
+
+const atlasBaseEntries = computed<AtlasEntry[]>(() => {
+  if (atlasSourceMode.value === "mine") return atlasWatchedBaseEntries.value;
+
+  const watchedIds = new Set<number>(atlasWatchedBaseEntries.value.map((entry) => entry.id));
+  const unseenCatalog = atlasCatalogBaseEntries.value.filter((entry) => !watchedIds.has(entry.id));
+  return [...atlasWatchedBaseEntries.value, ...unseenCatalog];
+});
+
 const atlasGenreOptions = computed(() => {
   const map = new Map<string, number>();
-  for (const entry of watchedEntries.value) {
-    for (const genre of entry.genres ?? []) {
+  for (const entry of atlasBaseEntries.value) {
+    for (const genre of entry.genres) {
       map.set(genre, (map.get(genre) ?? 0) + 1);
     }
   }
@@ -375,12 +486,12 @@ const atlasGenreOptions = computed(() => {
 });
 
 const atlasBounds = computed(() => {
-  const scoreValues = watchedEntries.value
+  const scoreValues = atlasBaseEntries.value
     .map((entry) => Number(entry.score ?? 0))
     .filter((value) => Number.isFinite(value) && value >= 0);
 
-  const yearValues = watchedEntries.value
-    .map((entry) => entry.seasonYear ?? entry.completedAt?.year ?? null)
+  const yearValues = atlasBaseEntries.value
+    .map((entry) => entry.seasonYear ?? entry.completedYear ?? null)
     .filter((value): value is number => typeof value === "number" && value > 0);
 
   const scoreMin = scoreValues.length ? Math.floor(Math.min(...scoreValues)) : 0;
@@ -428,26 +539,23 @@ function resetAtlasFilters() {
 const atlasFilteredEntries = computed(() => {
   const query = atlasSearch.value.trim().toLowerCase();
 
-  return watchedEntries.value.filter((entry) => {
-    if ((entry.genres?.length ?? 0) === 0 && (entry.tags?.length ?? 0) === 0) return false;
-
+  return atlasBaseEntries.value.filter((entry) => {
     const score = Number(entry.score ?? 0);
     if (score < atlasScoreMin.value || score > atlasScoreMax.value) return false;
 
-    const year = entry.seasonYear ?? entry.completedAt?.year ?? null;
+    const year = entry.seasonYear ?? entry.completedYear ?? null;
     if (year && (year < atlasYearMin.value || year > atlasYearMax.value)) return false;
 
     if (atlasSelectedGenres.value.length > 0) {
-      const entryGenres = entry.genres ?? [];
-      if (!atlasSelectedGenres.value.every((genre) => entryGenres.includes(genre))) return false;
+      if (!atlasSelectedGenres.value.every((genre) => entry.genres.includes(genre))) return false;
     }
 
     if (!query) return true;
 
-    const titleEn = entry.title.english?.toLowerCase() ?? "";
-    const titleRo = entry.title.romaji?.toLowerCase() ?? "";
-    const genres = (entry.genres ?? []).join(" ").toLowerCase();
-    const tags = (entry.tags ?? []).map((tag) => tag.name).join(" ").toLowerCase();
+    const titleEn = entry.titleEn.toLowerCase();
+    const titleRo = entry.titleRo.toLowerCase();
+    const genres = entry.genres.join(" ").toLowerCase();
+    const tags = entry.tags.map((tag) => tag.name).join(" ").toLowerCase();
 
     return titleEn.includes(query) || titleRo.includes(query) || genres.includes(query) || tags.includes(query);
   });
@@ -466,6 +574,7 @@ type AtlasDerivedPoint = {
   size: number;
   x: number;
   y: number;
+  isWatched: boolean;
 };
 
 function buildAtlasDerivedPoints(): AtlasDerivedPoint[] {
@@ -484,7 +593,7 @@ function buildAtlasDerivedPoints(): AtlasDerivedPoint[] {
     const score = Number(entry.score ?? 0);
     const dominantGenre = entry.genres[0] ?? t("common.unknown");
     const rankedTags = [...entry.tags]
-      .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0))
+      .sort((a, b) => b.rank - a.rank)
       .slice(0, 12);
 
     // Genre-Modus: Positionierung primär nach Hauptgenre.
@@ -530,8 +639,8 @@ function buildAtlasDerivedPoints(): AtlasDerivedPoint[] {
 
     return {
       id: entry.id,
-      title: entry.title.english ?? entry.title.romaji ?? `#${entry.id}`,
-      subtitle: entry.title.romaji ?? entry.title.english ?? "",
+      title: entry.titleEn,
+      subtitle: entry.titleRo,
       genres: entry.genres,
       tags: rankedTags.map((tag) => tag.name),
       dominantGenre,
@@ -539,6 +648,7 @@ function buildAtlasDerivedPoints(): AtlasDerivedPoint[] {
       x,
       y,
       size,
+      isWatched: entry.isWatched,
     };
   });
 
@@ -591,6 +701,7 @@ function buildAtlasDerivedPoints(): AtlasDerivedPoint[] {
       size: item.size,
       x: item.nx,
       y: item.ny,
+      isWatched: item.isWatched,
     };
   });
 
@@ -632,6 +743,7 @@ const atlasPoints = computed<AtlasPoint[]>(() =>
     score: point.score,
     density: point.density,
     scoreNorm: point.scoreNorm,
+    isWatched: point.isWatched,
     color: atlasGenreColorMap.value.get(point.dominantGenre) ?? "#64748b",
     value: [point.x, point.y, point.scoreNorm, point.size],
   }))
@@ -639,31 +751,86 @@ const atlasPoints = computed<AtlasPoint[]>(() =>
 
 const atlasGenreSeries = computed(() => {
   const topGenres = atlasGenreLegendRows.value.map((row) => row.genre);
-  const series = atlasGenreLegendRows.value.map((row) => ({
-    type: "scatter",
-    name: row.genre,
-    data: atlasPoints.value.filter((point) => point.dominantGenre === row.genre),
-    symbolSize: (value: [number, number, number, number]) => value[3],
-    itemStyle: {
-      color: row.color,
-      opacity: 0.86,
-      shadowBlur: 12,
-      shadowColor: "rgba(20, 190, 255, 0.28)",
-    },
-  }));
+  const series: Array<Record<string, unknown>> = [];
+
+  for (const row of atlasGenreLegendRows.value) {
+    const genrePoints = atlasPoints.value.filter((point) => point.dominantGenre === row.genre);
+    const watchedPoints = genrePoints.filter((point) => point.isWatched);
+    const unseenPoints = genrePoints.filter((point) => !point.isWatched);
+
+    if (watchedPoints.length) {
+      series.push({
+        type: "scatter",
+        name: `${row.genre}-watched`,
+        data: watchedPoints,
+        symbolSize: (value: [number, number, number, number]) => Math.max(4.5, value[3] * 0.92),
+        itemStyle: {
+          color: row.color,
+          opacity: 0.75,
+          shadowBlur: 12,
+          shadowColor: "rgba(20, 190, 255, 0.28)",
+          borderColor: "#ffffff",
+          borderWidth: 0.5,
+        },
+      });
+    }
+
+    if (unseenPoints.length) {
+      series.push({
+        type: "scatter",
+        name: `${row.genre}-unseen`,
+        data: unseenPoints,
+        symbol: "diamond",
+        symbolSize: (value: [number, number, number, number]) => Math.max(9, value[3] * 1.4),
+        itemStyle: {
+          color: "#ff4d6d",
+          opacity: 0.92,
+          borderColor: "#ffffff",
+          borderWidth: 1.35,
+          shadowBlur: 18,
+          shadowColor: "rgba(255, 77, 109, 0.55)",
+        },
+      });
+    }
+  }
 
   const others = atlasPoints.value.filter((point) => !topGenres.includes(point.dominantGenre));
   if (others.length) {
-    series.push({
-      type: "scatter",
-      name: t("common.unknown"),
-      data: others,
-      symbolSize: (value: [number, number, number, number]) => value[3],
-      itemStyle: {
-        color: "#64748b",
-        opacity: 0.78,
-      },
-    });
+    const otherWatched = others.filter((point) => point.isWatched);
+    const otherUnseen = others.filter((point) => !point.isWatched);
+
+    if (otherWatched.length) {
+      series.push({
+        type: "scatter",
+        name: "others-watched",
+        data: otherWatched,
+        symbolSize: (value: [number, number, number, number]) => Math.max(4.5, value[3] * 0.92),
+        itemStyle: {
+          color: "#64748b",
+          opacity: 0.68,
+          borderColor: "#ffffff",
+          borderWidth: 0.5,
+        },
+      });
+    }
+
+    if (otherUnseen.length) {
+      series.push({
+        type: "scatter",
+        name: "others-unseen",
+        data: otherUnseen,
+        symbol: "diamond",
+        symbolSize: (value: [number, number, number, number]) => Math.max(9, value[3] * 1.4),
+        itemStyle: {
+          color: "#ff4d6d",
+          opacity: 0.9,
+          borderColor: "#ffffff",
+          borderWidth: 1.35,
+          shadowBlur: 16,
+          shadowColor: "rgba(255, 77, 109, 0.55)",
+        },
+      });
+    }
   }
 
   return series;
@@ -691,6 +858,7 @@ const atlasOption = computed(() => {
           data.subtitle && data.subtitle !== data.title
             ? `<span style="display:block;max-width:320px;white-space:normal;word-break:break-word;">${data.subtitle}</span>`
             : "",
+          `<span>${t("dashboard.atlasTooltipType")}: ${data.isWatched ? t("dashboard.atlasPointWatched") : t("dashboard.atlasPointRecommendation")}</span>`,
           `<span>${t("common.score")}: ${scoreLabel}</span>`,
           `<span>${t("dashboard.atlasPrimaryGenre")}: ${data.dominantGenre}</span>`,
           genres ? `<span>Genres: ${genres}</span>` : "",
@@ -1049,6 +1217,30 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
           <div class="atlas-hint">{{ t("dashboard.atlasHint") }}</div>
         </div>
 
+        <div class="atlas-source-toggle mb-3">
+          <div class="dashboard-toggle">
+            <button
+              class="rounded-full px-3 py-1"
+              :class="atlasSourceMode === 'mine' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'"
+              @click="atlasSourceMode = 'mine'"
+            >
+              {{ t("dashboard.atlasSourceMine") }}
+            </button>
+            <button
+              class="rounded-full px-3 py-1"
+              :class="atlasSourceMode === 'all' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'"
+              @click="atlasSourceMode = 'all'"
+            >
+              {{ t("dashboard.atlasSourceAll") }}
+            </button>
+          </div>
+          <div v-if="atlasSourceMode === 'all' && atlasCatalogLoading" class="atlas-source-loading">
+            {{ t("common.loading") }}
+          </div>
+        </div>
+
+        <div v-if="atlasCatalogError" class="atlas-source-error">{{ atlasCatalogError }}</div>
+
         <div class="atlas-filter-panel">
           <div class="atlas-filter-top">
             <label class="atlas-filter-search">
@@ -1061,7 +1253,7 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
               />
             </label>
             <div class="atlas-filter-summary">
-              {{ atlasFilteredEntries.length }} / {{ watchedEntries.length }} {{ t("dashboard.atlasFilterAnimeCount") }}
+              {{ atlasFilteredEntries.length }} / {{ atlasBaseEntries.length }} {{ t("dashboard.atlasFilterAnimeCount") }}
             </div>
             <button class="atlas-reset-btn" type="button" @click="resetAtlasFilters">
               {{ t("dashboard.atlasFilterReset") }}
@@ -1165,6 +1357,16 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
 
         <div class="atlas-legend">
           <div class="atlas-legend-title">{{ t("dashboard.atlasLegendTitle") }}</div>
+          <div class="atlas-point-legend">
+            <span class="atlas-point-legend-item">
+              <span class="atlas-point-marker atlas-point-marker-watched" />
+              {{ t("dashboard.atlasPointWatched") }}
+            </span>
+            <span class="atlas-point-legend-item">
+              <span class="atlas-point-marker atlas-point-marker-recommendation" />
+              {{ t("dashboard.atlasPointRecommendation") }}
+            </span>
+          </div>
           <div class="atlas-genre-legend">
             <div v-for="row in atlasGenreLegendRows" :key="row.genre" class="atlas-genre-row">
               <span class="atlas-genre-swatch" :style="{ background: row.color }" />
@@ -1325,6 +1527,24 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
   justify-content: center;
   color: var(--text-muted);
   font-size: 0.95rem;
+}
+
+.atlas-source-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.atlas-source-loading {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.atlas-source-error {
+  margin-bottom: 0.7rem;
+  font-size: 0.82rem;
+  color: #ef4444;
 }
 
 .atlas-filter-panel {
@@ -1524,6 +1744,41 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
   margin-bottom: 0.5rem;
 }
 
+.atlas-point-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.atlas-point-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.atlas-point-marker {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+}
+
+.atlas-point-marker-watched {
+  border-radius: 999px;
+  background: var(--primary);
+  border: 1px solid #ffffff;
+}
+
+.atlas-point-marker-recommendation {
+  background: #ff4d6d;
+  transform: rotate(45deg);
+  opacity: 0.95;
+  border: 1px solid #ffffff;
+  box-shadow: 0 0 10px rgba(255, 77, 109, 0.45);
+}
+
 .atlas-genre-legend {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
@@ -1565,6 +1820,11 @@ const countryPercentLabels = computed(() => buildPercentLabels(countryDistributi
 }
 
 @media (max-width: 900px) {
+  .atlas-source-toggle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .atlas-filter-top {
     grid-template-columns: 1fr;
     align-items: stretch;
