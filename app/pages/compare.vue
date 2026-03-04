@@ -548,7 +548,7 @@ watch(
       >
         <div class="flex gap-3 items-start justify-between">
           <div class="flex gap-3 min-w-0">
-            <img v-if="a.cover" :src="a.cover" class="h-20 aspect-2/3 rounded-lg object-cover shrink-0" />
+            <ImageWithLoader v-if="a.cover" :src="a.cover" :alt="a.title" class="h-20 aspect-2/3 rounded-lg shrink-0" />
 
             <div class="flex-1 min-w-0">
               <a
