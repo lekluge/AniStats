@@ -14,6 +14,11 @@ export interface AnimeTag {
   rank: number
 }
 
+export interface AnimeNextAiringEpisode {
+  episode: number
+  airingAt: number
+}
+
 export interface AnimeEntry {
   id: number
   status: string
@@ -30,4 +35,5 @@ export interface AnimeEntry {
   completedAt: FuzzyDate | null
   coverImage: string | null
   title: AnimeTitle
+  nextAiringEpisode: AnimeNextAiringEpisode | null
 }
