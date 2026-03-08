@@ -88,7 +88,7 @@ async function loadRelations() {
 
 onMounted(loadRelations);
 
-const pageSize = 20;
+const pageSize = 10;
 const currentPage = ref(1);
 
 const filteredGroups = computed(() => {
