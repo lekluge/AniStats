@@ -80,6 +80,32 @@ Most analytics routes are intentionally private and require authentication.
 - Current cron: `0 3 * * *` (03:00 UTC) on `/api/cron/anilist-sync`.
 - Monitor health endpoint and cron execution failures.
 
+## Automatic Screenshots
+
+You can generate consistent screenshots (for forum posts and feature explanations) with Playwright.
+
+1. Install browser once:
+   `npm run screenshots:install`
+2. Start app locally:
+   `npm run dev`
+3. In another terminal run:
+   `npm run screenshots`
+
+Screenshots are written to `./screenshots` by default.
+
+Useful environment variables:
+
+- `SCREENSHOT_BASE_URL` (default: `http://127.0.0.1:3000`)
+- `SCREENSHOT_OUTPUT_DIR` (default: `screenshots`)
+- `SCREENSHOT_LOCALES` (default: `de,en`)
+- `SCREENSHOT_ROUTES` (default includes dashboard/calendar/etc.)
+- `SCREENSHOT_VIEWPORTS` (default: `desktop:1440x900,mobile:390x844`)
+- `SCREENSHOT_THEME` (`light` or `dark`, default: `light`)
+- `SCREENSHOT_FULL_PAGE` (`true`/`false`, default: `true`)
+- `SCREENSHOT_WAIT_MS` (default: `2500`)
+- `SCREENSHOT_ANILIST_TOKEN` (recommended for private pages)
+- `SCREENSHOT_ANILIST_USER` (optional helper cookie)
+
 ## SEO and Privacy
 
 - Canonical, OpenGraph and Twitter meta tags are configured.
