@@ -6,5 +6,6 @@ export default defineConfig({
     include: ["tests/perf/**/*.test.ts"],
     environment: "node",
     globals: true,
+    silent: true,
   },
 });

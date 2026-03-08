@@ -7,5 +7,6 @@ export default defineConfig({
     exclude: ["tests/frontend/**", "tests/perf/**"],
     environment: "node",
     globals: true,
+    silent: true,
   },
 });

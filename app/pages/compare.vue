@@ -35,7 +35,7 @@ const allAnime = ref<CompareAnimeItem[]>([]);
 const search = ref("");
 const seenFilter = ref<SeenFilter>("allUsers");
 
-const pageSize = 50;
+const pageSize = 24;
 const currentPage = ref(1);
 const sortKey = ref<CompareSortKey>("popularity");
 const sortDirection = ref<SortDirection>("desc");
@@ -44,6 +44,10 @@ const genreStates = ref<Record<string, FilterState>>({});
 const tagStates = ref<Record<string, FilterState>>({});
 const tagMinRank = ref<Record<string, number>>({});
 const tagSearch = ref("");
+const genrePageSize = 32;
+const genreCurrentPage = ref(1);
+const tagPageSize = 40;
+const tagCurrentPage = ref(1);
 
 function getEntryTitle(entry: AnimeEntry): { en: string; ro: string; display: string } {
   const en = entry.title.english ?? "";
@@ -191,6 +195,20 @@ const visibleTags = computed(() => {
   filteredTags.value.forEach((tag) => set.add(tag));
   return [...set].sort();
 });
+const totalGenrePages = computed(() =>
+  Math.max(1, Math.ceil(allGenres.value.length / genrePageSize))
+);
+const paginatedGenres = computed(() => {
+  const start = (genreCurrentPage.value - 1) * genrePageSize;
+  return allGenres.value.slice(start, start + genrePageSize);
+});
+const totalTagPages = computed(() =>
+  Math.max(1, Math.ceil(visibleTags.value.length / tagPageSize))
+);
+const paginatedTags = computed(() => {
+  const start = (tagCurrentPage.value - 1) * tagPageSize;
+  return visibleTags.value.slice(start, start + tagPageSize);
+});
 
 const filteredAnime = computed(() => {
   const q = search.value.toLowerCase();
@@ -314,6 +332,22 @@ const paginatedAnime = computed(() => {
 watch(totalPages, (next) => {
   if (currentPage.value > next) currentPage.value = next;
 });
+watch(totalGenrePages, (next) => {
+  if (genreCurrentPage.value > next) genreCurrentPage.value = next;
+});
+watch(totalTagPages, (next) => {
+  if (tagCurrentPage.value > next) tagCurrentPage.value = next;
+});
+watch([search, seenFilter, sortKey, sortDirection], () => {
+  currentPage.value = 1;
+});
+watch([tagSearch, selectedTags], () => {
+  tagCurrentPage.value = 1;
+});
+watch([genreStates, tagStates], () => {
+  currentPage.value = 1;
+  genreCurrentPage.value = 1;
+}, { deep: true });
 
 const animeCount = computed(() => filteredAnime.value.length);
 
@@ -453,7 +487,7 @@ watch(
         <h2 class="text-sm font-semibold text-zinc-300">{{ t("nav.genres") }}</h2>
         <div class="flex flex-wrap gap-2">
           <button
-            v-for="g in allGenres"
+            v-for="g in paginatedGenres"
             :key="g"
             @click="cycleState(genreStates, g)"
             class="px-3 py-1.5 text-xs rounded-full border"
@@ -466,12 +500,21 @@ watch(
             {{ g }}
           </button>
         </div>
+        <div class="flex items-center justify-between text-xs" v-if="totalGenrePages > 1">
+          <button class="px-2 py-1 rounded border" :disabled="genreCurrentPage === 1" @click="genreCurrentPage--">
+            &larr; {{ t("common.back") }}
+          </button>
+          <span>{{ t("common.page") }} {{ genreCurrentPage }} / {{ totalGenrePages }}</span>
+          <button class="px-2 py-1 rounded border" :disabled="genreCurrentPage === totalGenrePages" @click="genreCurrentPage++">
+            {{ t("common.next") }} &rarr;
+          </button>
+        </div>
       </div>
 
       <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
 
       <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
-        <div v-for="tag in visibleTags" :key="tag" class="relative">
+        <div v-for="tag in paginatedTags" :key="tag" class="relative">
           <input
             v-if="tagStates[tag] === 'include'"
             type="range"
@@ -502,6 +545,15 @@ watch(
             </span>
           </button>
         </div>
+      </div>
+      <div v-if="(tagSearch.trim() || selectedTags.length) && totalTagPages > 1" class="flex items-center justify-between text-xs">
+        <button class="px-2 py-1 rounded border" :disabled="tagCurrentPage === 1" @click="tagCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ tagCurrentPage }} / {{ totalTagPages }}</span>
+        <button class="px-2 py-1 rounded border" :disabled="tagCurrentPage === totalTagPages" @click="tagCurrentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
       </div>
     </section>
 
