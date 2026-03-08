@@ -30,6 +30,7 @@
             <NuxtLink to="/compare" class="nav-link">{{ t("nav.compare") }}</NuxtLink>
             <NuxtLink to="/recommendation" class="nav-link">{{ t("nav.recommendation") }}</NuxtLink>
             <NuxtLink to="/history" class="nav-link">{{ t("nav.history") }}</NuxtLink>
+            <NuxtLink to="/calendar" class="nav-link">{{ t("nav.calendar") }}</NuxtLink>
           </template>
         </nav>
 
@@ -112,6 +113,7 @@
             <NuxtLink to="/compare" class="nav-link" @click="closeMenu">{{ t("nav.compare") }}</NuxtLink>
             <NuxtLink to="/recommendation" class="nav-link" @click="closeMenu">{{ t("nav.recommendation") }}</NuxtLink>
             <NuxtLink to="/history" class="nav-link" @click="closeMenu">{{ t("nav.history") }}</NuxtLink>
+            <NuxtLink to="/calendar" class="nav-link" @click="closeMenu">{{ t("nav.calendar") }}</NuxtLink>
           </template>
         </nav>
       </div>
