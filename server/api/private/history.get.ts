@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto"
+import { createError, defineEventHandler, getCookie, getQuery, setHeader } from "h3"
+import { enqueueAniList } from "../../../services/anilist/anilistQueue"
 import { prisma } from "../../../utils/prisma"
-import { createError } from "h3"
 import type {
   AniGraphQLResponse,
   AniHistoryPageData,
@@ -12,6 +14,49 @@ interface HistoryEntry {
   mediaId: number
   startedAt: FuzzyDate | null
   completedAt: FuzzyDate | null
+}
+
+const MAX_RETRIES = 5
+const RESULT_CACHE_TTL_SECONDS = 60 * 10
+const VIEWER_CACHE_TTL_SECONDS = 60 * 60 * 6
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function aniAuthRequest<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+  attempt = 1
+): Promise<AniGraphQLResponse<T>> {
+  return enqueueAniList(async () => {
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+    })
+
+    if (res.status === 429) {
+      if (attempt >= MAX_RETRIES) {
+        throw createError({ statusCode: 429, statusMessage: "AniList rate limit exceeded" })
+      }
+
+      const retryAfter = res.headers.get("retry-after")
+      const waitMs = retryAfter ? Number(retryAfter) * 1000 : 1000 * Math.pow(2, attempt)
+      console.warn(`[AniList] 429 - history retry ${attempt}/${MAX_RETRIES} in ${waitMs}ms`)
+      await sleep(waitMs)
+      return aniAuthRequest<T>(token, query, variables, attempt + 1)
+    }
+
+    if (!res.ok) {
+      throw createError({ statusCode: res.status, statusMessage: await res.text() })
+    }
+
+    return (await res.json()) as AniGraphQLResponse<T>
+  })
 }
 
 function getViewerId(response: AniViewerIdResponse): number | null {
@@ -42,6 +87,8 @@ function getPageEntries(
 }
 
 export default defineEventHandler(async (event) => {
+  setHeader(event, "Cache-Control", `private, max-age=${RESULT_CACHE_TTL_SECONDS}`)
+
   const token = getCookie(event, "anilist_token")
 
   if (!token) {
@@ -64,28 +111,37 @@ export default defineEventHandler(async (event) => {
 
   const startInt = toFuzzyDateInt(start as string)
   const endInt = toFuzzyDateInt(end as string)
+  const tokenHash = createHash("sha256").update(token).digest("hex")
+
+  const storage = useStorage("cache")
+  const rangeCacheKey = `history:v2:${tokenHash}:${start}:${end}`
+  const cachedRange = await storage.getItem<unknown[]>(rangeCacheKey)
+  if (cachedRange) return cachedRange
 
   /* -----------------------------
    * 1. Viewer ID holen
    * ----------------------------- */
-  const viewerRes = await $fetch<AniViewerIdResponse>("https://graphql.anilist.co", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: {
-      query: `
+  const viewerIdCacheKey = `history:viewer-id:${tokenHash}`
+  let userId = await storage.getItem<number>(viewerIdCacheKey)
+
+  if (!userId) {
+    const viewerRes = await aniAuthRequest<AniViewerIdResponse["data"]>(
+      token,
+      `
         query {
           Viewer {
             id
           }
         }
       `,
-    },
-  })
+      {}
+    )
 
-  const userId = getViewerId(viewerRes)
+    userId = getViewerId({ data: viewerRes.data })
+    if (userId) {
+      await storage.setItem(viewerIdCacheKey, userId, { ttl: VIEWER_CACHE_TTL_SECONDS })
+    }
+  }
 
   if (!userId) {
     throw createError({
@@ -103,16 +159,9 @@ export default defineEventHandler(async (event) => {
   const allEntries: HistoryEntry[] = []
 
   while (hasNextPage) {
-    const response = await $fetch<AniGraphQLResponse<AniHistoryPageData>>(
-      "https://graphql.anilist.co",
-      {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: {
-        query: `
+    const response = await aniAuthRequest<AniHistoryPageData>(
+      token,
+      `
           query ($userId: Int, $start: FuzzyDateInt, $end: FuzzyDateInt, $page: Int) {
             Page(page: $page, perPage: 50) {
               pageInfo {
@@ -140,13 +189,11 @@ export default defineEventHandler(async (event) => {
             }
           }
         `,
-        variables: {
-          userId,
-          start: startInt,
-          end: endInt,
-          page,
-        },
-      },
+      {
+        userId,
+        start: startInt,
+        end: endInt,
+        page,
       }
     )
 
@@ -198,6 +245,8 @@ export default defineEventHandler(async (event) => {
       }
     })
     .filter(Boolean)
+
+  await storage.setItem(rangeCacheKey, result, { ttl: RESULT_CACHE_TTL_SECONDS })
 
   return result
 })

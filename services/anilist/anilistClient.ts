@@ -1,9 +1,12 @@
 import { enqueueAniList } from "./anilistQueue";
 
-export async function anilistRequest<T>(
+const inFlightRequests = new Map<string, Promise<unknown>>();
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function performAniListRequest<T>(
   query: string,
   variables: Record<string, unknown>,
-  attempt = 1
+  attempt: number,
 ): Promise<T> {
   return enqueueAniList(async () => {
     const res = await fetch("https://graphql.anilist.co", {
@@ -25,10 +28,10 @@ export async function anilistRequest<T>(
         ? Number(retryAfter) * 1000
         : 1000 * Math.pow(2, attempt);
 
-      console.warn(`[AniList] 429 – retry ${attempt}/5 in ${waitMs}ms`);
+      console.warn(`[AniList] 429 - retry ${attempt}/5 in ${waitMs}ms`);
 
-      await new Promise((r) => setTimeout(r, waitMs));
-      return anilistRequest(query, variables, attempt + 1);
+      await sleep(waitMs);
+      return performAniListRequest(query, variables, attempt + 1);
     }
 
     if (!res.ok) {
@@ -44,4 +47,21 @@ export async function anilistRequest<T>(
 
     return json.data as T;
   });
+}
+
+export async function anilistRequest<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  attempt = 1,
+): Promise<T> {
+  const key = `${query}::${JSON.stringify(variables)}`;
+  const existing = inFlightRequests.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+
+  const request = performAniListRequest<T>(query, variables, attempt).finally(() => {
+    inFlightRequests.delete(key);
+  });
+
+  inFlightRequests.set(key, request as Promise<unknown>);
+  return request;
 }
