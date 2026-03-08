@@ -447,7 +447,7 @@ const atlasCatalogItems = ref<AtlasCatalogApiItem[]>([]);
 
 const atlasSearch = ref("");
 const atlasSelectedGenres = ref<string[]>([]);
-const atlasScoreMin = ref(0);
+const atlasScoreMin = ref(5);
 const atlasScoreMax = ref(10);
 const atlasYearMin = ref(2000);
 const atlasYearMax = ref(new Date().getFullYear());
