@@ -11,6 +11,10 @@ interface RawMedia {
   title?: AnimeTitle | null;
   tags?: Array<Partial<AnimeTag> | null> | null;
   coverImage?: { large?: string | null; extraLarge?: string | null } | null;
+  nextAiringEpisode?: {
+    episode?: number | null;
+    airingAt?: number | null;
+  } | null;
 }
 
 interface RawEntry {
@@ -106,6 +110,14 @@ export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
         startedAt: entry.startedAt ?? null,
         completedAt: entry.completedAt ?? null,
         coverImage: media.coverImage?.large ?? media.coverImage?.extraLarge ?? null,
+        nextAiringEpisode:
+          typeof media.nextAiringEpisode?.episode === "number" &&
+          typeof media.nextAiringEpisode?.airingAt === "number"
+            ? {
+                episode: media.nextAiringEpisode.episode,
+                airingAt: media.nextAiringEpisode.airingAt,
+              }
+            : null,
       };
 
       const existing = byId.get(normalized.id);
@@ -135,6 +147,8 @@ export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
         startedAt: pickLatestDate(existing.startedAt, normalized.startedAt),
         completedAt: pickLatestDate(existing.completedAt, normalized.completedAt),
         coverImage: preferred.coverImage ?? fallback.coverImage ?? null,
+        nextAiringEpisode:
+          preferred.nextAiringEpisode ?? fallback.nextAiringEpisode ?? null,
       });
     }
   }
