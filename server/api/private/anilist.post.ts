@@ -21,6 +21,11 @@ interface NormalizedAniUserMediaEntry {
     duration: number | null;
     episodes: number | null;
     countryOfOrigin: string | null;
+    nextAiringEpisode: {
+      episode: number | null;
+      airingAt: number | null;
+      timeUntilAiring: number | null;
+    } | null;
   };
 }
 
@@ -74,6 +79,14 @@ function normalizeAniLists(
         duration: entry.media.duration ?? null,
         episodes: entry.media.episodes ?? null,
         countryOfOrigin: entry.media.countryOfOrigin ?? null,
+        nextAiringEpisode: entry.media.nextAiringEpisode
+          ? {
+              episode: entry.media.nextAiringEpisode.episode ?? null,
+              airingAt: entry.media.nextAiringEpisode.airingAt ?? null,
+              timeUntilAiring:
+                entry.media.nextAiringEpisode.timeUntilAiring ?? null,
+            }
+          : null,
       },
     })),
   }));
@@ -115,6 +128,11 @@ export default defineEventHandler(async (event) => {
               duration
               episodes
               countryOfOrigin
+              nextAiringEpisode {
+                episode
+                airingAt
+                timeUntilAiring
+              }
             }
           }
         }
@@ -188,6 +206,7 @@ export default defineEventHandler(async (event) => {
           duration: e.media.duration,
           episodes: e.media.episodes,
           countryOfOrigin: e.media.countryOfOrigin,
+          nextAiringEpisode: e.media.nextAiringEpisode,
 
           title: {
             romaji: a.titleRo ?? null,

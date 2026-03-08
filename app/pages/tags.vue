@@ -10,6 +10,10 @@ const route = useRoute();
 
 const pageSize = 50;
 const currentPage = ref(1);
+const gridPageSize = 18;
+const gridCurrentPage = ref(1);
+const filterTagPageSize = 40;
+const filterTagCurrentPage = ref(1);
 
 type TagCover = { id: number; title: string; cover: string };
 type LayoutMode = "grid" | "list";
@@ -109,6 +113,13 @@ const visibleTags = computed(() => {
   const rest = all.filter((tag) => !pinned.includes(tag));
 
   return [...pinned, ...rest.slice(0, 40)];
+});
+const filterTagTotalPages = computed(() =>
+  Math.max(1, Math.ceil(visibleTags.value.length / filterTagPageSize))
+);
+const paginatedVisibleTags = computed(() => {
+  const start = (filterTagCurrentPage.value - 1) * filterTagPageSize;
+  return visibleTags.value.slice(start, start + filterTagPageSize);
 });
 
 const filteredEntries = computed(() => {
@@ -273,6 +284,13 @@ const displayedTags = computed(() => {
     };
   });
 });
+const totalGridPages = computed(() =>
+  Math.max(1, Math.ceil(displayedTags.value.length / gridPageSize))
+);
+const paginatedDisplayedTags = computed(() => {
+  const start = (gridCurrentPage.value - 1) * gridPageSize;
+  return displayedTags.value.slice(start, start + gridPageSize);
+});
 
 const listAnime = computed(() =>
   filteredEntries.value.map((e) => ({
@@ -310,6 +328,23 @@ const paginatedListAnime = computed(() => {
 
 watch(totalPages, (next) => {
   if (currentPage.value > next) currentPage.value = next;
+});
+watch(totalGridPages, (next) => {
+  if (gridCurrentPage.value > next) gridCurrentPage.value = next;
+});
+watch(filterTagTotalPages, (next) => {
+  if (filterTagCurrentPage.value > next) filterTagCurrentPage.value = next;
+});
+watch([tagSearch, selectedTags], () => {
+  filterTagCurrentPage.value = 1;
+});
+watch([listSortKey, listSortDirection], () => {
+  currentPage.value = 1;
+  gridCurrentPage.value = 1;
+});
+watch(layoutMode, () => {
+  currentPage.value = 1;
+  gridCurrentPage.value = 1;
 });
 
 function toggleTag(tag: string) {
@@ -404,7 +439,7 @@ function formatHours(minutes?: number) {
 
       <div v-if="!loading && (tagSearch.trim() || selectedTags.length)" class="flex flex-wrap gap-2">
         <button
-          v-for="tag in visibleTags"
+          v-for="tag in paginatedVisibleTags"
           :key="tag"
           @click="toggleTag(tag)"
           class="px-3 py-2 rounded-full text-xs border"
@@ -417,6 +452,19 @@ function formatHours(minutes?: number) {
           {{ tag }}
         </button>
       </div>
+      <div v-if="!loading && (tagSearch.trim() || selectedTags.length) && filterTagTotalPages > 1" class="flex items-center justify-between text-xs">
+        <button class="px-2 py-1 rounded border" :disabled="filterTagCurrentPage === 1" @click="filterTagCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ filterTagCurrentPage }} / {{ filterTagTotalPages }}</span>
+        <button
+          class="px-2 py-1 rounded border"
+          :disabled="filterTagCurrentPage === filterTagTotalPages"
+          @click="filterTagCurrentPage++"
+        >
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
     </section>
 
     <div v-if="loading" class="flex items-center justify-center py-12">
@@ -424,15 +472,26 @@ function formatHours(minutes?: number) {
     </div>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-if="!loading && !error && layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div v-if="!loading && !error && layoutMode === 'grid'" class="space-y-3">
+      <div class="flex items-center justify-between text-sm mb-2">
+        <button class="px-3 py-1 rounded border" :disabled="gridCurrentPage === 1" @click="gridCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ gridCurrentPage }} / {{ totalGridPages }}</span>
+        <button class="px-3 py-1 rounded border" :disabled="gridCurrentPage === totalGridPages" @click="gridCurrentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard
-        v-for="(g, i) in displayedTags"
+        v-for="(g, i) in paginatedDisplayedTags"
         :key="g.genre"
-        :rank="i + 1"
+        :rank="(gridCurrentPage - 1) * gridPageSize + i + 1"
         :data="g"
         target="/tags"
         :filter="{ key: 'filter', typeKey: 'filterType', typeValue: 'tag', modeKey: 'filterMode', modeValue: 'include' }"
       />
+      </div>
     </div>
 
     <div v-else-if="!loading && !error">

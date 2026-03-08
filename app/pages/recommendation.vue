@@ -44,6 +44,10 @@ const allTags = ref<string[]>([]);
 const expandedTagCards = ref<Record<number, boolean>>({});
 const MAX_VISIBLE_TAGS = 8;
 const GRID_VISIBLE_TAGS = 4;
+const pageSize = 24;
+const currentPage = ref(1);
+const filterTagPageSize = 40;
+const filterTagCurrentPage = ref(1);
 
 definePageMeta({ title: "Recommendations", middleware: "auth" });
 
@@ -67,6 +71,13 @@ const visibleTags = computed(() => {
   selectedTags.value.forEach((tag) => set.add(tag));
   filteredTags.value.forEach((tag) => set.add(tag));
   return [...set].sort();
+});
+const filterTagTotalPages = computed(() =>
+  Math.max(1, Math.ceil(visibleTags.value.length / filterTagPageSize))
+);
+const paginatedVisibleTags = computed(() => {
+  const start = (filterTagCurrentPage.value - 1) * filterTagPageSize;
+  return visibleTags.value.slice(start, start + filterTagPageSize);
 });
 
 async function loadRecommendations() {
@@ -122,6 +133,28 @@ onMounted(async () => {
 });
 
 const currentItems = computed(() => items.value[activeTab.value] ?? []);
+const totalPages = computed(() => Math.max(1, Math.ceil(currentItems.value.length / pageSize)));
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return currentItems.value.slice(start, start + pageSize);
+});
+watch(totalPages, (next) => {
+  if (currentPage.value > next) currentPage.value = next;
+});
+watch([activeTab, layoutMode], () => {
+  currentPage.value = 1;
+});
+watch(
+  [tagSearch, selectedTags, genreStates, filterSeason, seasonYearMin, seasonYearMax, episodesMin, episodesMax, averageScoreMin, includeUpcoming],
+  () => {
+    filterTagCurrentPage.value = 1;
+    currentPage.value = 1;
+  },
+  { deep: true }
+);
+watch(filterTagTotalPages, (next) => {
+  if (filterTagCurrentPage.value > next) filterTagCurrentPage.value = next;
+});
 
 function cycleState(map: Record<string, FilterState>, key: string) {
   if (!map[key]) map[key] = "include";
@@ -276,7 +309,7 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
 
       <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
         <button
-          v-for="tag in visibleTags"
+          v-for="tag in paginatedVisibleTags"
           :key="tag"
           @click="cycleState(tagStates, tag)"
           class="px-3 py-1.5 text-xs rounded-full border"
@@ -287,6 +320,19 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
           }"
         >
           {{ tag }}
+        </button>
+      </div>
+      <div v-if="(tagSearch.trim() || selectedTags.length) && filterTagTotalPages > 1" class="flex items-center justify-between text-xs">
+        <button class="px-2 py-1 rounded border" :disabled="filterTagCurrentPage === 1" @click="filterTagCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ filterTagCurrentPage }} / {{ filterTagTotalPages }}</span>
+        <button
+          class="px-2 py-1 rounded border"
+          :disabled="filterTagCurrentPage === filterTagTotalPages"
+          @click="filterTagCurrentPage++"
+        >
+          {{ t("common.next") }} &rarr;
         </button>
       </div>
 
@@ -328,16 +374,26 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
 
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
-    <div v-else-if="layoutMode === 'grid'" class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+    <div v-else-if="layoutMode === 'grid'" class="space-y-3">
+      <div class="flex items-center justify-between text-sm">
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ currentPage }} / {{ totalPages }}</span>
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === totalPages" @click="currentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
       <div
-        v-for="(a, i) in currentItems"
+        v-for="(a, i) in paginatedItems"
         :key="a.id"
         class="ui-card relative h-full overflow-hidden p-3"
       >
         <span
           class="absolute right-3 top-3 inline-flex items-center rounded-full border border-indigo-500/40 bg-indigo-600/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-400"
         >
-          #{{ i + 1 }}
+          #{{ (currentPage - 1) * pageSize + i + 1 }}
         </span>
         <div class="flex gap-3 items-center">
           <ImageWithLoader v-if="a.cover" :src="a.cover" :alt="a.titleEn ?? a.titleRo ?? ''" class="h-24 aspect-2/3 rounded-lg shrink-0" />
@@ -390,11 +446,21 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
           </div>
         </div>
       </div>
+      </div>
     </div>
 
     <div v-else class="space-y-2">
+      <div class="flex items-center justify-between text-sm">
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === 1" @click="currentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ currentPage }} / {{ totalPages }}</span>
+        <button class="px-3 py-1 rounded border" :disabled="currentPage === totalPages" @click="currentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
       <div
-        v-for="a in currentItems"
+        v-for="a in paginatedItems"
         :key="a.id"
         class="flex gap-3 items-center p-3 rounded-xl border border-zinc-800 bg-zinc-900/30"
       >
