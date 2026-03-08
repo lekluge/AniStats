@@ -11,6 +11,12 @@ const route = useRoute();
 
 const pageSize = 50;
 const currentPage = ref(1);
+const gridPageSize = 18;
+const gridCurrentPage = ref(1);
+const genrePageSize = 32;
+const genreCurrentPage = ref(1);
+const tagPageSize = 40;
+const tagCurrentPage = ref(1);
 
 type Cover = {
   id: number;
@@ -131,6 +137,20 @@ const visibleTags = computed(() => {
   selectedTags.value.forEach((tag) => set.add(tag));
   filteredTags.value.forEach((tag) => set.add(tag));
   return [...set].sort();
+});
+const totalGenrePages = computed(() =>
+  Math.max(1, Math.ceil(allGenres.value.length / genrePageSize))
+);
+const paginatedGenres = computed(() => {
+  const start = (genreCurrentPage.value - 1) * genrePageSize;
+  return allGenres.value.slice(start, start + genrePageSize);
+});
+const totalTagPages = computed(() =>
+  Math.max(1, Math.ceil(visibleTags.value.length / tagPageSize))
+);
+const paginatedTags = computed(() => {
+  const start = (tagCurrentPage.value - 1) * tagPageSize;
+  return visibleTags.value.slice(start, start + tagPageSize);
 });
 
 const filteredEntries = computed(() => {
@@ -310,6 +330,13 @@ const displayedGrid = computed<GridCard[]>(() => {
     };
   });
 });
+const totalGridPages = computed(() =>
+  Math.max(1, Math.ceil(displayedGrid.value.length / gridPageSize))
+);
+const paginatedGrid = computed(() => {
+  const start = (gridCurrentPage.value - 1) * gridPageSize;
+  return displayedGrid.value.slice(start, start + gridPageSize);
+});
 
 const listAnime = computed(() =>
   filteredEntries.value.map((entry) => ({
@@ -348,6 +375,23 @@ const paginatedListAnime = computed(() => {
 watch(totalPages, (next) => {
   if (currentPage.value > next) currentPage.value = next;
 });
+watch(totalGridPages, (next) => {
+  if (gridCurrentPage.value > next) gridCurrentPage.value = next;
+});
+watch(totalGenrePages, (next) => {
+  if (genreCurrentPage.value > next) genreCurrentPage.value = next;
+});
+watch(totalTagPages, (next) => {
+  if (tagCurrentPage.value > next) tagCurrentPage.value = next;
+});
+watch([tagSearch, selectedTags], () => {
+  tagCurrentPage.value = 1;
+});
+watch([genreStates, tagStates], () => {
+  currentPage.value = 1;
+  gridCurrentPage.value = 1;
+  genreCurrentPage.value = 1;
+}, { deep: true });
 
 function cycleState(map: Record<string, FilterState>, key: string) {
   if (!map[key]) map[key] = "include";
@@ -438,7 +482,7 @@ function formatHours(minutes?: number) {
       <div class="flex flex-wrap gap-2">
         <h2 class="w-full font-semibold">{{ t("nav.genres") }}</h2>
         <button
-          v-for="g in allGenres"
+          v-for="g in paginatedGenres"
           :key="g"
           @click="cycleState(genreStates, g)"
           class="px-3 py-2 text-xs rounded-full border"
@@ -451,12 +495,21 @@ function formatHours(minutes?: number) {
           {{ g }}
         </button>
       </div>
+      <div class="flex items-center justify-between text-xs" v-if="totalGenrePages > 1">
+        <button class="px-2 py-1 rounded border" :disabled="genreCurrentPage === 1" @click="genreCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ genreCurrentPage }} / {{ totalGenrePages }}</span>
+        <button class="px-2 py-1 rounded border" :disabled="genreCurrentPage === totalGenrePages" @click="genreCurrentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
 
       <input v-model="tagSearch" :placeholder="t('common.searchTags')" class="ui-input w-full px-4" />
 
       <div v-if="tagSearch.trim() || selectedTags.length" class="flex flex-wrap gap-2">
         <button
-          v-for="tag in visibleTags"
+          v-for="tag in paginatedTags"
           :key="tag"
           @click="cycleState(tagStates, tag)"
           class="px-3 py-2 rounded-full text-xs border"
@@ -469,17 +522,37 @@ function formatHours(minutes?: number) {
           {{ tag }}
         </button>
       </div>
+      <div v-if="(tagSearch.trim() || selectedTags.length) && totalTagPages > 1" class="flex items-center justify-between text-xs">
+        <button class="px-2 py-1 rounded border" :disabled="tagCurrentPage === 1" @click="tagCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ tagCurrentPage }} / {{ totalTagPages }}</span>
+        <button class="px-2 py-1 rounded border" :disabled="tagCurrentPage === totalTagPages" @click="tagCurrentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
     </section>
 
-    <div v-if="layoutMode === 'grid'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div v-if="layoutMode === 'grid'" class="space-y-3">
+      <div class="flex items-center justify-between text-sm mb-2">
+        <button class="px-3 py-1 rounded border" :disabled="gridCurrentPage === 1" @click="gridCurrentPage--">
+          &larr; {{ t("common.back") }}
+        </button>
+        <span>{{ t("common.page") }} {{ gridCurrentPage }} / {{ totalGridPages }}</span>
+        <button class="px-3 py-1 rounded border" :disabled="gridCurrentPage === totalGridPages" @click="gridCurrentPage++">
+          {{ t("common.next") }} &rarr;
+        </button>
+      </div>
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <GameCard
-        v-for="(g, i) in displayedGrid"
+        v-for="(g, i) in paginatedGrid"
         :key="g.genre"
-        :rank="i + 1"
+        :rank="(gridCurrentPage - 1) * gridPageSize + i + 1"
         :data="g"
         target="/combine"
         :filter="g.filterType ? { key: g.filterType } : undefined"
       />
+      </div>
     </div>
 
     <div v-else-if="layoutMode === 'list'">
