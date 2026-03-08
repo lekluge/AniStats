@@ -39,6 +39,11 @@ export interface AniUserMediaEntry {
     duration?: number | null
     episodes?: number | null
     countryOfOrigin?: string | null
+    nextAiringEpisode?: {
+      episode?: number | null
+      airingAt?: number | null
+      timeUntilAiring?: number | null
+    } | null
   } | null
 }
 
