@@ -2,6 +2,8 @@ import { prisma } from "../../utils/prisma";
 import { anilistRequest } from "./anilistClient";
 import crypto from "crypto";
 
+const ANILIST_REQUEST_DELAY_MS = 300;
+
 const QUERY = `
 query FullAnime($id: Int!) {
   Media(id: $id, type: ANIME) {
@@ -258,5 +260,5 @@ export async function syncAnime(anilistId: number) {
   }
 
   // Mini Rate-Limit Guard
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, ANILIST_REQUEST_DELAY_MS));
 }

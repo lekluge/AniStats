@@ -47,6 +47,8 @@ function normalizeStatusLists(
   }));
 }
 
+const ANILIST_REQUEST_DELAY_MS = 300;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function aniFetch(
@@ -98,7 +100,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Invalid username format" });
   }
 
-  await sleep(300);
+  await sleep(ANILIST_REQUEST_DELAY_MS);
 
   const res = await aniFetch(USER_LIST_QUERY, { user });
   const lists = normalizeStatusLists(res);

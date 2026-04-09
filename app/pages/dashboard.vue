@@ -1140,7 +1140,8 @@ const episodeDist = computed(() => {
     const ep = e.episodes ?? null;
     const bucket =
       episodeBins.find((b) => b.match(ep))?.label ?? t("common.unknown");
-    const cur = map.get(bucket)!;
+    const cur = map.get(bucket);
+    if (!cur) continue;
     cur.titles += 1;
     cur.hours += ((e.progress ?? 0) * (e.duration ?? 20)) / 60;
     if (Number(e.score || 0) > 0) {
@@ -1150,9 +1151,11 @@ const episodeDist = computed(() => {
   }
 
   const labels = episodeBins.map((b) => b.label);
-  const values = labels.map((l) =>
-    computeMetricValue(map.get(l)!, episodeMetric.value),
-  );
+  const values = labels.map((l) => {
+    const bucket = map.get(l);
+    if (!bucket) return 0;
+    return computeMetricValue(bucket, episodeMetric.value);
+  });
   return { labels, values };
 });
 
