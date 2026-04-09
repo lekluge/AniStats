@@ -34,6 +34,7 @@ const seasonYearMax = ref<number | null>(CURRENT_YEAR);
 const episodesMin = ref<number | null>(null);
 const episodesMax = ref<number | null>(null);
 const averageScoreMin = ref<number | null>(null);
+const minTagRank = ref<number>(0);
 
 const genreStates = ref<Record<string, FilterState>>({});
 const tagStates = ref<Record<string, FilterState>>({});
@@ -98,6 +99,7 @@ async function loadRecommendations() {
     if (episodesMin.value) params.episodesMin = episodesMin.value;
     if (episodesMax.value) params.episodesMax = episodesMax.value;
     if (averageScoreMin.value) params.averageScoreMin = averageScoreMin.value;
+    if (minTagRank.value > 0) params.minTagRank = minTagRank.value;
 
     const includeGenres = Object.entries(genreStates.value)
       .filter(([, state]) => state === "include")
@@ -146,7 +148,7 @@ watch([activeTab, layoutMode], () => {
   currentPage.value = 1;
 });
 watch(
-  [tagSearch, selectedTags, genreStates, filterSeason, seasonYearMin, seasonYearMax, episodesMin, episodesMax, averageScoreMin, includeUpcoming],
+  [tagSearch, selectedTags, genreStates, filterSeason, seasonYearMin, seasonYearMax, episodesMin, episodesMax, averageScoreMin, includeUpcoming, minTagRank],
   () => {
     filterTagCurrentPage.value = 1;
     currentPage.value = 1;
@@ -271,6 +273,28 @@ function hiddenGridTagCount(item: ApiRecommendationItem) {
         <input v-model.number="episodesMax" type="number" :placeholder="t('common.maxEpisodes')" class="ui-input" />
 
         <input v-model.number="averageScoreMin" type="number" :placeholder="t('common.minAvgScore')" class="ui-input" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-zinc-400 font-medium">
+          {{ t("recommendation.minTagRankLabel") }}: <span class="text-zinc-200">{{ minTagRank }}%</span>
+          <span class="ml-2 text-zinc-500">{{ t("recommendation.minTagRankHint") }}</span>
+        </label>
+        <input
+          v-model.number="minTagRank"
+          type="range"
+          min="0"
+          max="85"
+          step="5"
+          class="w-full accent-indigo-500"
+          @change="loadRecommendations"
+        />
+        <div class="flex justify-between text-[10px] text-zinc-600">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>85%</span>
+        </div>
       </div>
 
       <div class="flex items-center gap-2">
