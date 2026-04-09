@@ -29,7 +29,6 @@ export default defineEventHandler(async (event) => {
       body: params.toString(),
     }
   );
-  console.log("Received AniList token response:", tokenRes);
   setAniListAuthCookies(event, tokenRes);
 
   return sendRedirect(event, "/");

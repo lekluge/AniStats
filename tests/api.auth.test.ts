@@ -92,7 +92,7 @@ describe("api/auth/callback.get", () => {
       expect.anything(),
       "anilist_refresh_token",
       "refresh-1",
-      expect.objectContaining({ httpOnly: true, path: "/", maxAge: 3600, expires: expect.any(Date) })
+      expect.objectContaining({ httpOnly: true, path: "/", maxAge: 60 * 60 * 24 * 365, expires: expect.any(Date) })
     )
     expect((globalThis as any).setCookie).toHaveBeenCalledWith(
       expect.anything(),

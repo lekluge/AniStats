@@ -37,7 +37,7 @@ export function setAniListAuthCookies(event: H3Event, tokenResponse: AniOAuthTok
   setCookie(event, ACCESS_TOKEN_COOKIE, access_token, getCookieOptions(cookieMaxAge))
 
   if (refresh_token) {
-    setCookie(event, REFRESH_TOKEN_COOKIE, refresh_token, getCookieOptions(cookieMaxAge))
+    setCookie(event, REFRESH_TOKEN_COOKIE, refresh_token, getCookieOptions(DEFAULT_COOKIE_MAX_AGE_SECONDS))
   }
 
   if (typeof expires_in === "number" && Number.isFinite(expires_in)) {

@@ -16,7 +16,7 @@ function hasViewerId(response: AniViewerIdResponse): boolean {
 
 async function verifyAniListToken(token: string): Promise<boolean> {
   const storage = useStorage("cache")
-  const tokenHash = crypto.createHash("sha1").update(token).digest("hex")
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
   const cacheKey = `auth:anilist-token-valid:${tokenHash}`
   const cached = await storage.getItem<boolean>(cacheKey)
 
