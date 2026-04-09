@@ -75,7 +75,12 @@ async function aniFetch(
   }
 
   if (!res.ok) {
-    throw createError({ statusCode: res.status, statusMessage: await res.text() });
+    const rawText = await res.text();
+    console.error(`[AniList] API error ${res.status}:`, rawText);
+    throw createError({
+      statusCode: res.status >= 500 ? 503 : res.status,
+      statusMessage: "External service error",
+    });
   }
 
   return res.json();
@@ -87,6 +92,10 @@ export default defineEventHandler(async (event) => {
 
   if (!user) {
     throw createError({ statusCode: 400, statusMessage: "Missing query param: user" });
+  }
+
+  if (!/^[a-zA-Z0-9_-]{1,30}$/.test(user)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid username format" });
   }
 
   await sleep(300);
