@@ -47,6 +47,11 @@ export default defineEventHandler(async (event) => {
 
   const token = getCookie(event, "anilist_token")
   if (!token) {
+    console.warn("[auth] rejected request:", {
+      url: event.node.req.url,
+      reason: "no_token",
+      timestamp: new Date().toISOString(),
+    })
     throw createError({
       statusCode: 401,
       statusMessage: "Unauthorized",
@@ -57,6 +62,11 @@ export default defineEventHandler(async (event) => {
     const isValid = await verifyAniListToken(token)
 
     if (!isValid) {
+      console.warn("[auth] rejected request:", {
+        url: event.node.req.url,
+        reason: "invalid_token",
+        timestamp: new Date().toISOString(),
+      })
       deleteCookie(event, "anilist_token", { path: "/" })
       throw createError({
         statusCode: 401,
