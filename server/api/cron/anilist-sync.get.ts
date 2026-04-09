@@ -7,20 +7,11 @@ export default defineEventHandler(async () => {
     where: { key: "anilist_sync_running" },
   });
 
-  if (running?.value) {
-    const startedAt = Number(running.value);
-    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-    if (!isNaN(startedAt) && Date.now() - startedAt < TWO_HOURS_MS) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: "AniList sync already running",
-      });
-    }
-    if (!isNaN(startedAt)) {
-      console.warn(
-        `[AniList Sync] Stale lock detected (started ${new Date(startedAt).toISOString()}), proceeding anyway`
-      );
-    }
+  if (running?.value === "1") {
+    throw createError({
+      statusCode: 409,
+      statusMessage: "AniList sync already running",
+    });
   }
 
   return runHourlyAniListSync();
