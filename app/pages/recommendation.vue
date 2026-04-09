@@ -120,7 +120,8 @@ async function loadRecommendations() {
     const res = await api.get<ApiRecommendationResponse>("/api/private/recommendation", { params });
     items.value = res.data.items;
     expandedTagCards.value = {};
-  } catch {
+  } catch (e) {
+    console.error("[Recommendation]", e);
     error.value = `${t("common.errorPrefix")}: ${t("recommendation.loadError")}`;
   } finally {
     loading.value = false;

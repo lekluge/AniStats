@@ -67,7 +67,8 @@ async function loadAnime() {
       params: { user: username.value },
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
-  } catch {
+  } catch (e) {
+    console.error("[Combine]", e);
     error.value = `${t("common.errorPrefix")}: ${t("combine.loadError")}`;
   } finally {
     loading.value = false;
