@@ -30,7 +30,7 @@ describe("api/cron/anilist-sync.get", () => {
   })
 
   it("returns 409 when sync is already running", async () => {
-    state.runningValue = String(Date.now())
+    state.runningValue = "1"
     const mod = await import("../server/api/cron/anilist-sync.get")
 
     await expect(mod.default({} as any)).rejects.toMatchObject({

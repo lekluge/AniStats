@@ -9,8 +9,8 @@ export async function runHourlyAniListSync() {
 
   await prisma.syncState.upsert({
     where: { key: "anilist_sync_running" },
-    update: { value: String(Date.now()) },
-    create: { key: "anilist_sync_running", value: String(Date.now()) },
+    update: { value: "1" },
+    create: { key: "anilist_sync_running", value: "1" },
   })
 
   const state = await prisma.syncState.findUnique({
@@ -59,17 +59,12 @@ export async function runHourlyAniListSync() {
         `[AniList Sync] checking anime id=${m.id} updatedAt=${m.updatedAt}`
       )
 
-      try {
-        const changed = await syncAnime(m.id)
-        checked++
+      const changed = await syncAnime(m.id)
+      checked++
 
-        if (changed) {
-          written++
-          changedOnThisPage = true
-        }
-      } catch (err) {
-        console.error(`[AniList Sync] Failed to sync anime ${m.id}:`, err)
-        // continue to next anime
+      if (changed) {
+        written++
+        changedOnThisPage = true
       }
 
       if (m.updatedAt > newestSeen) {

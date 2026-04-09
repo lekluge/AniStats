@@ -58,17 +58,9 @@ export async function anilistRequest<T>(
   const existing = inFlightRequests.get(key) as Promise<T> | undefined;
   if (existing) return existing;
 
-  if (inFlightRequests.size >= 200) {
-    const firstKey = inFlightRequests.keys().next().value;
-    if (firstKey !== undefined) inFlightRequests.delete(firstKey);
-  }
-
-  const promise = performAniListRequest<T>(query, variables, attempt);
-  const cleanup = setTimeout(() => inFlightRequests.delete(key), 60_000);
-  const request = promise.finally(() => {
-    clearTimeout(cleanup);
+  const request = performAniListRequest<T>(query, variables, attempt).finally(() => {
     inFlightRequests.delete(key);
-  }) as Promise<T>;
+  });
 
   inFlightRequests.set(key, request as Promise<unknown>);
   return request;
