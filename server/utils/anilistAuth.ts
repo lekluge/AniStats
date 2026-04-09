@@ -10,7 +10,7 @@ const DEFAULT_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 function getCookieOptions(maxAgeSeconds = DEFAULT_COOKIE_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: "strict" as const,
     path: "/",
     secure: process.env.NODE_ENV === "production",
     maxAge: maxAgeSeconds,
