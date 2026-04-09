@@ -119,6 +119,9 @@ export const translations = {
       china: "China",
       upcomingIncluded: "Include upcoming",
       upcomingHidden: "Hide upcoming",
+      milestones: "Milestones",
+      milestonesAnimeOrdinalSuffix: "th Anime",
+      milestonesWatchDays: "Days Watched",
     },
     index: {
       badge: "AniList-inspired analytics workspace",
@@ -351,6 +354,9 @@ export const translations = {
       china: "China",
       upcomingIncluded: "Upcoming einbeziehen",
       upcomingHidden: "Upcoming ausblenden",
+      milestones: "Meilensteine",
+      milestonesAnimeOrdinalSuffix: ". Anime",
+      milestonesWatchDays: "Tage geschaut",
     },
     index: {
       badge: "AniList-inspiriertes Analytics Workspace",
