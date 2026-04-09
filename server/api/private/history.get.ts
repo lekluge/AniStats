@@ -107,6 +107,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const startDate = new Date(start as string)
+  const endDate = new Date(end as string)
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid date format" })
+  }
+
+  if (endDate < startDate) {
+    throw createError({ statusCode: 400, statusMessage: "End date must be after start date" })
+  }
+
+  const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000 // ~1 year
+  if (endDate.getTime() - startDate.getTime() > MAX_RANGE_MS) {
+    throw createError({ statusCode: 400, statusMessage: "Date range too large (max 1 year)" })
+  }
+
   const toFuzzyDateInt = (dateStr: string) => parseInt(dateStr.replaceAll("-", ""))
 
   const startInt = toFuzzyDateInt(start as string)
