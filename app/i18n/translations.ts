@@ -119,6 +119,9 @@ export const translations = {
       china: "China",
       upcomingIncluded: "Include upcoming",
       upcomingHidden: "Hide upcoming",
+      milestones: "Milestones",
+      milestonesAnimeOrdinalSuffix: "th Anime",
+      milestonesWatchDays: "Days Watched",
     },
     index: {
       badge: "AniList-inspired analytics workspace",
@@ -208,6 +211,8 @@ export const translations = {
       toggleTitleMode: "Toggle title order",
       upcomingHint: "Show not-yet-released anime",
       matchScore: "Match Score",
+      minTagRankLabel: "Min. Tag Percentage",
+      minTagRankHint: "Only consider tags above this AniList percentage threshold",
     },
     compare: {
       title: "Compare Users",
@@ -351,6 +356,9 @@ export const translations = {
       china: "China",
       upcomingIncluded: "Upcoming einbeziehen",
       upcomingHidden: "Upcoming ausblenden",
+      milestones: "Meilensteine",
+      milestonesAnimeOrdinalSuffix: ". Anime",
+      milestonesWatchDays: "Tage geschaut",
     },
     index: {
       badge: "AniList-inspiriertes Analytics Workspace",
@@ -438,6 +446,8 @@ export const translations = {
       toggleTitleMode: "Titelreihenfolge umschalten",
       upcomingHint: "Noch nicht erschienene Anime anzeigen",
       matchScore: "Match Score",
+      minTagRankLabel: "Min. Tag-Prozentsatz",
+      minTagRankHint: "Nur Tags ab diesem AniList-Prozentschwellenwert berücksichtigen",
     },
     compare: {
       title: "User vergleichen",

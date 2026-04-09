@@ -1,6 +1,11 @@
-import { getCookie, createError, deleteCookie } from "h3"
+import { createError } from "h3"
 import crypto from "crypto"
 import type { AniViewerIdResponse } from "../types/api/auth"
+import {
+  clearAniListAuthCookies,
+  getAniListAccessToken,
+  refreshAniListAccessToken,
+} from "../utils/anilistAuth"
 
 const VERIFY_TTL_SECONDS = 60 * 5
 
@@ -11,7 +16,7 @@ function hasViewerId(response: AniViewerIdResponse): boolean {
 
 async function verifyAniListToken(token: string): Promise<boolean> {
   const storage = useStorage("cache")
-  const tokenHash = crypto.createHash("sha1").update(token).digest("hex")
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
   const cacheKey = `auth:anilist-token-valid:${tokenHash}`
   const cached = await storage.getItem<boolean>(cacheKey)
 
@@ -45,19 +50,34 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  const token = getCookie(event, "anilist_token")
-  if (!token) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: "Unauthorized",
-    })
-  }
-
   try {
-    const isValid = await verifyAniListToken(token)
+    let verifiedToken = await getAniListAccessToken(event)
+    if (!verifiedToken) {
+      console.warn("[auth] rejected request:", {
+        url: event.node.req.url,
+        reason: "no_token",
+        timestamp: new Date().toISOString(),
+      })
+      throw createError({
+        statusCode: 401,
+        statusMessage: "Unauthorized",
+      })
+    }
+
+    let isValid = await verifyAniListToken(verifiedToken)
 
     if (!isValid) {
-      deleteCookie(event, "anilist_token", { path: "/" })
+      verifiedToken = await refreshAniListAccessToken(event)
+      isValid = verifiedToken ? await verifyAniListToken(verifiedToken) : false
+    }
+
+    if (!isValid) {
+      console.warn("[auth] rejected request:", {
+        url: event.node.req.url,
+        reason: "invalid_token",
+        timestamp: new Date().toISOString(),
+      })
+      clearAniListAuthCookies(event)
       throw createError({
         statusCode: 401,
         statusMessage: "Unauthorized",

@@ -46,7 +46,8 @@ async function loadAnime() {
       params: { user: username.value },
     });
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
-  } catch {
+  } catch (e) {
+    console.error("[Tags]", e);
     error.value = `${t("common.errorPrefix")}: ${t("tags.loadError")}`;
   } finally {
     loading.value = false;

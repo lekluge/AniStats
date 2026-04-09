@@ -148,6 +148,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Missing user" });
   }
 
+  if (!/^[a-zA-Z0-9_-]{1,30}$/.test(user)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid username format" });
+  }
+
   const filterSeason =
     typeof q.season === "string" ? q.season.toUpperCase() : null;
 
@@ -157,6 +161,8 @@ export default defineEventHandler(async (event) => {
   const episodesMax = parseNumber(q.episodesMax);
   const avgScoreMin = parseNumber(q.averageScoreMin);
   const avgScoreMax = parseNumber(q.averageScoreMax);
+  const minTagRankRaw = parseNumber(q.minTagRank);
+  const minTagRank = minTagRankRaw !== null ? Math.max(0, Math.min(100, Math.round(minTagRankRaw))) : 0;
 
   const includeGenres = parseList(q.genres) ?? [];
   const excludeGenres = parseList(q.excludeGenres) ?? [];
@@ -319,6 +325,7 @@ export default defineEventHandler(async (event) => {
 
   for (const tag of metadata.tags) {
     if (!metadataIdSet.has(tag.animeId)) continue;
+    if (minTagRank > 0 && (tag.rank === null || tag.rank < minTagRank)) continue;
     const compact = {
       tagId: tag.tagId,
       name: tag.name,
