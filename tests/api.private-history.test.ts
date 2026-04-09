@@ -7,18 +7,23 @@ const state = vi.hoisted(() => ({
 
 const prismaFindManyMock = vi.hoisted(() => vi.fn(async () => []))
 
-vi.mock("h3", () => ({
-  defineEventHandler: (handler: any) => handler,
-  setHeader: () => {},
-  getCookie: () => state.token,
-  getQuery: () => state.query,
-  createError: (input: { statusCode: number; statusMessage: string }) => {
-    const err = new Error(input.statusMessage) as any
-    err.statusCode = input.statusCode
-    err.statusMessage = input.statusMessage
-    return err
-  },
-}))
+vi.mock("h3", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("h3")>()
+
+  return {
+    ...actual,
+    createError: (input: { statusCode: number; statusMessage: string }) => {
+      const err = new Error(input.statusMessage) as any
+      err.statusCode = input.statusCode
+      err.statusMessage = input.statusMessage
+      return err
+    },
+    defineEventHandler: (handler: any) => handler,
+    getCookie: (_event: any, _name: string) => state.token,
+    getQuery: () => state.query,
+    setHeader: vi.fn(),
+  }
+})
 
 vi.mock("../utils/prisma", () => ({
   prisma: {
@@ -35,13 +40,21 @@ describe("api/private/history.get", () => {
     state.query = {}
     prismaFindManyMock.mockReset()
     ;(globalThis as any).defineEventHandler = (handler: any) => handler
-    ;(globalThis as any).getCookie = () => state.token
+    ;(globalThis as any).getCookie = (_event: any, _name: string) => state.token
     ;(globalThis as any).getQuery = () => state.query
-    ;(globalThis as any).$fetch = vi.fn()
-    ;(globalThis as any).useStorage = () => ({
-      getItem: vi.fn(async () => null),
-      setItem: vi.fn(async () => undefined),
+    ;(globalThis as any).setHeader = vi.fn()
+    ;(globalThis as any).deleteCookie = vi.fn()
+    ;(globalThis as any).setCookie = vi.fn()
+    ;(globalThis as any).useRuntimeConfig = () => ({
+      anilistClientId: "client-123",
+      anilistClientSecret: "secret-abc",
     })
+    ;(globalThis as any).useStorage = vi.fn(() => ({
+      getItem: vi.fn(async () => undefined),
+      setItem: vi.fn(async () => undefined),
+    }))
+    ;(globalThis as any).$fetch = vi.fn()
+    ;(globalThis as any).fetch = vi.fn()
   })
 
   it("returns 401 when auth token is missing", async () => {

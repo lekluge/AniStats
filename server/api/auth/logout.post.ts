@@ -1,6 +1,6 @@
+import { clearAniListAuthCookies } from "../../utils/anilistAuth"
+
 export default defineEventHandler(async (event) => {
-  deleteCookie(event, "anilist_token", {
-    path: "/",
-  });
+  clearAniListAuthCookies(event)
   return sendRedirect(event, "/");
 });

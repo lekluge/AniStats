@@ -4,9 +4,18 @@ function createEvent() {
   return {} as any
 }
 
+const cookieState = {
+  anilist_token: undefined as string | undefined,
+  anilist_refresh_token: undefined as string | undefined,
+  anilist_token_expires_at: undefined as string | undefined,
+}
+
 describe("api/auth/login.get", () => {
   beforeEach(() => {
     vi.resetModules()
+    cookieState.anilist_token = undefined
+    cookieState.anilist_refresh_token = undefined
+    cookieState.anilist_token_expires_at = undefined
     ;(globalThis as any).defineEventHandler = (handler: any) => handler
     ;(globalThis as any).useRuntimeConfig = () => ({
       anilistClientId: "client-123",
@@ -31,6 +40,9 @@ describe("api/auth/login.get", () => {
 describe("api/auth/callback.get", () => {
   beforeEach(() => {
     vi.resetModules()
+    cookieState.anilist_token = undefined
+    cookieState.anilist_refresh_token = undefined
+    cookieState.anilist_token_expires_at = undefined
     ;(globalThis as any).defineEventHandler = (handler: any) => handler
     ;(globalThis as any).createError = vi.fn((input: any) => {
       const err = new Error(input.statusMessage) as any
@@ -45,6 +57,7 @@ describe("api/auth/callback.get", () => {
     })
     ;(globalThis as any).getQuery = vi.fn(() => ({}))
     ;(globalThis as any).setCookie = vi.fn()
+    ;(globalThis as any).deleteCookie = vi.fn()
     ;(globalThis as any).sendRedirect = vi.fn((_event: any, to: string) => to)
     ;(globalThis as any).$fetch = vi.fn()
   })
@@ -60,7 +73,11 @@ describe("api/auth/callback.get", () => {
 
   it("stores token and redirects on valid oauth exchange", async () => {
     ;(globalThis as any).getQuery = vi.fn(() => ({ code: "abc123" }))
-    ;(globalThis as any).$fetch = vi.fn(async () => ({ access_token: "token-1" }))
+    ;(globalThis as any).$fetch = vi.fn(async () => ({
+      access_token: "token-1",
+      refresh_token: "refresh-1",
+      expires_in: 3600,
+    }))
 
     const mod = await import("../server/api/auth/callback.get")
     const out = await mod.default(createEvent())
@@ -69,7 +86,19 @@ describe("api/auth/callback.get", () => {
       expect.anything(),
       "anilist_token",
       "token-1",
-      expect.objectContaining({ httpOnly: true, path: "/" })
+      expect.objectContaining({ httpOnly: true, path: "/", maxAge: 3600, expires: expect.any(Date) })
+    )
+    expect((globalThis as any).setCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      "anilist_refresh_token",
+      "refresh-1",
+      expect.objectContaining({ httpOnly: true, path: "/", maxAge: 60 * 60 * 24 * 365, expires: expect.any(Date) })
+    )
+    expect((globalThis as any).setCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      "anilist_token_expires_at",
+      expect.any(String),
+      expect.objectContaining({ httpOnly: true, path: "/", maxAge: 3600, expires: expect.any(Date) })
     )
     expect(out).toBe("/")
   })
@@ -78,6 +107,9 @@ describe("api/auth/callback.get", () => {
 describe("api/auth/logout.post", () => {
   beforeEach(() => {
     vi.resetModules()
+    cookieState.anilist_token = undefined
+    cookieState.anilist_refresh_token = undefined
+    cookieState.anilist_token_expires_at = undefined
     ;(globalThis as any).defineEventHandler = (handler: any) => handler
     ;(globalThis as any).deleteCookie = vi.fn()
     ;(globalThis as any).sendRedirect = vi.fn((_event: any, to: string) => to)
@@ -92,6 +124,16 @@ describe("api/auth/logout.post", () => {
       "anilist_token",
       { path: "/" }
     )
+    expect((globalThis as any).deleteCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      "anilist_refresh_token",
+      { path: "/" }
+    )
+    expect((globalThis as any).deleteCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      "anilist_token_expires_at",
+      { path: "/" }
+    )
     expect(out).toBe("/")
   })
 })
@@ -99,8 +141,23 @@ describe("api/auth/logout.post", () => {
 describe("api/auth/me.get", () => {
   beforeEach(() => {
     vi.resetModules()
+    cookieState.anilist_token = undefined
+    cookieState.anilist_refresh_token = undefined
+    cookieState.anilist_token_expires_at = undefined
     ;(globalThis as any).defineEventHandler = (handler: any) => handler
-    ;(globalThis as any).getCookie = vi.fn(() => undefined)
+    ;(globalThis as any).getCookie = vi.fn((_event: any, name: keyof typeof cookieState) => cookieState[name])
+    ;(globalThis as any).setCookie = vi.fn()
+    ;(globalThis as any).deleteCookie = vi.fn()
+    ;(globalThis as any).useRuntimeConfig = () => ({
+      anilistClientId: "client-123",
+      anilistClientSecret: "secret-abc",
+    })
+    ;(globalThis as any).createError = vi.fn((input: any) => {
+      const err = new Error(input.statusMessage) as any
+      err.statusCode = input.statusCode
+      err.statusMessage = input.statusMessage
+      return err
+    })
     ;(globalThis as any).$fetch = vi.fn()
   })
 
@@ -110,7 +167,7 @@ describe("api/auth/me.get", () => {
   })
 
   it("returns viewer name for valid token", async () => {
-    ;(globalThis as any).getCookie = vi.fn(() => "token-abc")
+    cookieState.anilist_token = "token-abc"
     ;(globalThis as any).$fetch = vi.fn(async () => ({
       data: { Viewer: { name: "Leon" } },
     }))
@@ -122,12 +179,41 @@ describe("api/auth/me.get", () => {
   })
 
   it("returns null user if AniList call fails", async () => {
-    ;(globalThis as any).getCookie = vi.fn(() => "token-abc")
+    cookieState.anilist_token = "token-abc"
     ;(globalThis as any).$fetch = vi.fn(async () => {
       throw new Error("request failed")
     })
 
     const mod = await import("../server/api/auth/me.get")
     await expect(mod.default(createEvent())).resolves.toEqual({ user: null })
+  })
+
+  it("refreshes the access token before loading the user when expired", async () => {
+    cookieState.anilist_token = "expired-token"
+    cookieState.anilist_refresh_token = "refresh-1"
+    cookieState.anilist_token_expires_at = String(Date.now() - 1000)
+
+    ;(globalThis as any).$fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        access_token: "token-2",
+        refresh_token: "refresh-2",
+        expires_in: 3600,
+      })
+      .mockResolvedValueOnce({
+        data: { Viewer: { name: "Leon" } },
+      })
+
+    const mod = await import("../server/api/auth/me.get")
+    await expect(mod.default(createEvent())).resolves.toEqual({
+      user: { name: "Leon" },
+    })
+
+    expect((globalThis as any).setCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      "anilist_token",
+      "token-2",
+      expect.anything()
+    )
   })
 })

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { createError, defineEventHandler, getCookie, getQuery, setHeader } from "h3"
 import { enqueueAniList } from "../../../services/anilist/anilistQueue"
+import { getAniListAccessToken } from "../../utils/anilistAuth"
 import { prisma } from "../../../utils/prisma"
 import type {
   AniGraphQLResponse,
@@ -89,7 +90,7 @@ function getPageEntries(
 export default defineEventHandler(async (event) => {
   setHeader(event, "Cache-Control", `private, max-age=${RESULT_CACHE_TTL_SECONDS}`)
 
-  const token = getCookie(event, "anilist_token")
+  const token = await getAniListAccessToken(event)
 
   if (!token) {
     throw createError({
