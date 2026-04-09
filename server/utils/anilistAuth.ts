@@ -7,10 +7,10 @@ const EXPIRES_AT_COOKIE = "anilist_token_expires_at"
 const REFRESH_SKEW_SECONDS = 60
 const DEFAULT_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
-function getCookieOptions(maxAgeSeconds = DEFAULT_COOKIE_MAX_AGE_SECONDS) {
+function getCookieOptions(maxAgeSeconds = DEFAULT_COOKIE_MAX_AGE_SECONDS, sameSite: "lax" | "strict" = "strict") {
   return {
     httpOnly: true,
-    sameSite: "strict" as const,
+    sameSite,
     path: "/",
     secure: process.env.NODE_ENV === "production",
     maxAge: maxAgeSeconds,
@@ -34,7 +34,11 @@ export function setAniListAuthCookies(event: H3Event, tokenResponse: AniOAuthTok
     throw createError({ statusCode: 500, statusMessage: "No access token received" })
   }
 
-  setCookie(event, ACCESS_TOKEN_COOKIE, access_token, getCookieOptions(cookieMaxAge))
+  // Use "lax" for the access token so browsers include it in the redirect that
+  // follows the OAuth callback (a cross-site top-level navigation). "strict"
+  // would block the cookie from being sent on that redirect chain, preventing
+  // the guest middleware from detecting the authenticated state.
+  setCookie(event, ACCESS_TOKEN_COOKIE, access_token, getCookieOptions(cookieMaxAge, "lax"))
 
   if (refresh_token) {
     setCookie(event, REFRESH_TOKEN_COOKIE, refresh_token, getCookieOptions(DEFAULT_COOKIE_MAX_AGE_SECONDS))
