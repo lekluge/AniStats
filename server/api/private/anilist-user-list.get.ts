@@ -47,6 +47,8 @@ function normalizeStatusLists(
   }));
 }
 
+const ANILIST_REQUEST_DELAY_MS = 300;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function aniFetch(
@@ -75,7 +77,12 @@ async function aniFetch(
   }
 
   if (!res.ok) {
-    throw createError({ statusCode: res.status, statusMessage: await res.text() });
+    const rawText = await res.text();
+    console.error(`[AniList] API error ${res.status}:`, rawText);
+    throw createError({
+      statusCode: res.status >= 500 ? 503 : res.status,
+      statusMessage: "External service error",
+    });
   }
 
   return res.json();
@@ -89,7 +96,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Missing query param: user" });
   }
 
-  await sleep(300);
+  if (!/^[a-zA-Z0-9_-]{1,30}$/.test(user)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid username format" });
+  }
+
+  await sleep(ANILIST_REQUEST_DELAY_MS);
 
   const res = await aniFetch(USER_LIST_QUERY, { user });
   const lists = normalizeStatusLists(res);

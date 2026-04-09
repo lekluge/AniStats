@@ -24,13 +24,7 @@ type CalendarDay = {
 
 const { t, locale } = useLocale();
 
-const usernameCookie = useCookie<string>("anilist-user", { default: () => "" });
-const username = computed({
-  get: () => usernameCookie.value ?? "",
-  set: (val: string) => {
-    usernameCookie.value = val.trim();
-  },
-});
+const username = useAnilistUser();
 
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -91,6 +85,12 @@ async function loadAnime() {
       return;
     }
 
+    if (!/^[a-zA-Z0-9_-]{1,30}$/.test(currentUser)) {
+      error.value = "Invalid username format";
+      loading.value = false;
+      return;
+    }
+
     const res = await api.get("/api/private/anilist-airing-calendar", {
       params: {
         user: currentUser,
@@ -117,7 +117,8 @@ async function loadAnime() {
       }),
     );
     lastLoadedUser.value = currentUser;
-  } catch {
+  } catch (e) {
+    console.error("[Calendar]", e);
     error.value = `${t("common.errorPrefix")}: ${t("calendar.loadError")}`;
   } finally {
     loading.value = false;

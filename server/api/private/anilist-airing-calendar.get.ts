@@ -117,6 +117,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Missing query param: user" });
   }
 
+  if (!/^[a-zA-Z0-9_-]{1,30}$/.test(user)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid username format" });
+  }
+
   const storage = useStorage("cache");
   const cacheKey = `anilist:airing-calendar:${user.toLowerCase()}:${includePlanningNotYetReleased ? "planning" : "current"}`;
   const cached = await storage.getItem<{

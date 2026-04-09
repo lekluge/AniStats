@@ -13,7 +13,7 @@ import type {
 const { t } = useLocale();
 const { theme } = useTheme();
 
-const anilistUser = useCookie<string>("anilist-user", { default: () => "" });
+const anilistUser = useAnilistUser();
 
 type SeenFilter = "all" | "allUsers" | "noneUsers";
 type FilterState = "include" | "exclude";
@@ -81,6 +81,11 @@ async function addUser() {
   const name = userInput.value.trim();
   if (!name || users.value.includes(name)) return;
 
+  if (!/^[a-zA-Z0-9_-]{1,30}$/.test(name)) {
+    error.value = "Invalid username format";
+    return;
+  }
+
   users.value.push(name);
   userInput.value = "";
 
@@ -102,7 +107,8 @@ async function loadSingleUser(username: string) {
     });
 
     entriesByUser.value[username] = normalizeAnilist(res.data.data.MediaListCollection.lists);
-  } catch {
+  } catch (e) {
+    console.error("[Compare]", e);
     error.value = `${t("common.errorPrefix")}: ${t("compare.loadError")}`;
   } finally {
     loading.value = false;
