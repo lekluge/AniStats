@@ -10,28 +10,13 @@ import { TooltipComponent, LegendComponent, GridComponent, VisualMapComponent } 
 import VChart from "vue-echarts";
 
 use([CanvasRenderer, PieChart, LineChart, BarChart, ScatterChart, TooltipComponent, LegendComponent, GridComponent, VisualMapComponent]);
-use([
-  CanvasRenderer,
-  PieChart,
-  LineChart,
-  BarChart,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-]);
 
 type MetricMode = "titles" | "hours" | "score";
 
 definePageMeta({ title: "Dashboard", middleware: "auth" });
 const { t } = useLocale();
 
-const usernameCookie = useCookie<string>("anilist-user", { default: () => "" });
-const username = computed({
-  get: () => usernameCookie.value ?? "",
-  set: (val: string) => {
-    usernameCookie.value = val.trim();
-  },
-});
+const username = useAnilistUser();
 
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -97,6 +82,12 @@ async function loadAnime() {
       return;
     }
 
+    if (!/^[a-zA-Z0-9_-]{1,30}$/.test(currentUser)) {
+      error.value = "Invalid username format";
+      loading.value = false;
+      return;
+    }
+
     const res = await api.post("/api/private/anilist", null, {
       params: { user: currentUser },
     });
@@ -115,7 +106,8 @@ async function loadAnime() {
         : null,
     };
     lastLoadedUser.value = currentUser;
-  } catch {
+  } catch (e) {
+    console.error("[Dashboard]", e);
     error.value = `${t("common.errorPrefix")}: ${t("dashboard.loadError")}`;
     anilistStats.value = { episodesWatched: null, minutesWatched: null };
   } finally {
@@ -472,7 +464,8 @@ async function loadAtlasCatalog() {
   try {
     const res = await api.get<{ total: number; items: AtlasCatalogApiItem[] }>("/api/private/atlas-catalog");
     atlasCatalogItems.value = res.data.items ?? [];
-  } catch {
+  } catch (e) {
+    console.error("[Dashboard]", e);
     atlasCatalogError.value = `${t("common.errorPrefix")}: ${t("dashboard.atlasCatalogLoadError")}`;
   } finally {
     atlasCatalogLoading.value = false;

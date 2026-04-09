@@ -79,7 +79,8 @@ async function loadRelations() {
         })),
       })),
     }));
-  } catch {
+  } catch (e) {
+    console.error("[Relations]", e);
     error.value = `${t("common.errorPrefix")}: ${t("relations.loadError")}`;
   } finally {
     loading.value = false;
