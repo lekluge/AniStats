@@ -1,4 +1,5 @@
 import type { AniOAuthTokenResponse } from "../../types/api/auth"
+import { setAniListAuthCookies } from "../../utils/anilistAuth"
 
 export default defineEventHandler(async (event) => {
   const { code } = getQuery(event);
@@ -28,19 +29,8 @@ export default defineEventHandler(async (event) => {
       body: params.toString(),
     }
   );
-
-  const token = tokenRes.access_token;
-
-  if (!token) {
-    throw createError({ statusCode: 500, statusMessage: "No token received" });
-  }
-
-  setCookie(event, "anilist_token", token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    secure: process.env.NODE_ENV === "production",
-  });
+  console.log("Received AniList token response:", tokenRes);
+  setAniListAuthCookies(event, tokenRes);
 
   return sendRedirect(event, "/");
 });
