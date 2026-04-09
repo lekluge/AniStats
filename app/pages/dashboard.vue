@@ -185,6 +185,97 @@ const totalPlannedDays = computed(() => {
   return Number((plannedMinutes / 60 / 24).toFixed(1));
 });
 
+// ─── Milestones ──────────────────────────────────────────────────────────────
+
+interface Milestone {
+  kind: "anime" | "watchtime";
+  label: string;     // e.g. "100th Anime" | "50 Days Watched"
+  value: number;     // count or days
+  title: string | null;
+  date: string | null;
+}
+
+function fuzzyDateToTimestamp(fd: { year?: number | null; month?: number | null; day?: number | null } | null): number {
+  if (!fd?.year) return 0;
+  return Date.UTC(fd.year, Math.max((fd.month ?? 1) - 1, 0), Math.max(fd.day ?? 1, 1));
+}
+
+function formatFuzzyDate(fd: { year?: number | null; month?: number | null; day?: number | null } | null): string | null {
+  if (!fd?.year) return null;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const parts: string[] = [];
+  if (fd.day) parts.push(String(fd.day));
+  if (fd.month) parts.push(months[(fd.month ?? 1) - 1]);
+  parts.push(String(fd.year));
+  return parts.join(" ");
+}
+
+const ANIME_MILESTONE_INTERVALS = [1, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500];
+const WATCHTIME_MILESTONE_DAYS = [10, 25, 50, 75, 100, 150, 200, 250, 300];
+
+const milestones = computed<Milestone[]>(() => {
+  const result: Milestone[] = [];
+
+  // Sort completed entries by completedAt date ascending
+  const sorted = [...completedEntries.value]
+    .filter((e) => fuzzyDateToTimestamp(e.completedAt) > 0)
+    .sort((a, b) => fuzzyDateToTimestamp(a.completedAt) - fuzzyDateToTimestamp(b.completedAt));
+
+  if (sorted.length === 0) return result;
+
+  // Anime count milestones
+  for (const n of ANIME_MILESTONE_INTERVALS) {
+    if (n > sorted.length) break;
+    const entry = sorted[n - 1];
+    const titleEn = entry.title?.english?.trim() || null;
+    const titleRo = entry.title?.romaji?.trim() || null;
+    result.push({
+      kind: "anime",
+      label: `${n}`,
+      value: n,
+      title: titleEn ?? titleRo,
+      date: formatFuzzyDate(entry.completedAt),
+    });
+  }
+
+  // Watch-time milestones: accumulate minutes up to each completedAt date
+  // Use per-entry estimate: progress * duration
+  let cumulativeMinutes = 0;
+  let nextDayMilestoneIndex = 0;
+
+  for (const entry of sorted) {
+    const entryMinutes = (entry.progress ?? 0) * (entry.duration ?? 20);
+    cumulativeMinutes += entryMinutes;
+
+    while (
+      nextDayMilestoneIndex < WATCHTIME_MILESTONE_DAYS.length &&
+      cumulativeMinutes / 60 / 24 >= WATCHTIME_MILESTONE_DAYS[nextDayMilestoneIndex]
+    ) {
+      const days = WATCHTIME_MILESTONE_DAYS[nextDayMilestoneIndex];
+      // Only add if we have at least a rough date
+      if (fuzzyDateToTimestamp(entry.completedAt) > 0) {
+        result.push({
+          kind: "watchtime",
+          label: `${days}`,
+          value: days,
+          title: null,
+          date: formatFuzzyDate(entry.completedAt),
+        });
+      }
+      nextDayMilestoneIndex++;
+    }
+
+  }
+
+  // Sort milestones by kind (anime first), then by value ascending
+  result.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "anime" ? -1 : 1;
+    return a.value - b.value;
+  });
+
+  return result;
+});
+
 const scoredEntries = computed(() =>
   completedEntries.value.filter((e) => Number(e.score ?? 0) > 0),
 );
@@ -1758,6 +1849,25 @@ const countryPercentLabels = computed(() =>
           />
         </ClientOnly>
       </section>
+
+      <section v-if="milestones.length" class="dashboard-panel">
+        <h2 class="mb-4 text-xl font-semibold">{{ t("dashboard.milestones") }}</h2>
+        <div class="milestones-grid">
+          <div
+            v-for="m in milestones"
+            :key="`${m.kind}-${m.value}`"
+            class="milestone-card"
+            :class="m.kind === 'watchtime' ? 'milestone-card-time' : 'milestone-card-anime'"
+          >
+            <div class="milestone-badge">
+              <span v-if="m.kind === 'anime'">{{ m.value }}{{ t("dashboard.milestonesAnimeOrdinalSuffix") }}</span>
+              <span v-else>{{ m.value }} {{ t("dashboard.milestonesWatchDays") }}</span>
+            </div>
+            <div v-if="m.title" class="milestone-title">{{ m.title }}</div>
+            <div v-if="m.date" class="milestone-date">{{ m.date }}</div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -2158,6 +2268,64 @@ const countryPercentLabels = computed(() =>
   .atlas-filter-ranges {
     grid-template-columns: 1fr;
   }
+}
+
+/* ─── Milestones ─────────────────────────────────────────────────────────── */
+.milestones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.milestone-card {
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.milestone-card-anime {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.03));
+  border-color: rgba(99, 102, 241, 0.25);
+}
+
+.milestone-card-time {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.03));
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.milestone-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.milestone-card-anime .milestone-badge {
+  color: #818cf8;
+}
+
+.milestone-card-time .milestone-badge {
+  color: #34d399;
+}
+
+.milestone-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.milestone-date {
+  font-size: 0.74rem;
+  color: var(--text-muted);
 }
 </style>
 
