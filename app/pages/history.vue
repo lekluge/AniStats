@@ -123,7 +123,8 @@ async function loadHistory() {
     })
 
     results.value = [...(res ?? [])].sort((a, b) => completedKey(b) - completedKey(a))
-  } catch {
+  } catch (e) {
+    console.error("[History]", e)
     error.value = `${t("common.errorPrefix")}: ${t("history.loadError")}`
   } finally {
     loading.value = false
