@@ -92,7 +92,7 @@ type FullAnimeResponse = {
 
 function hashAnime(m: FullAnimeResponse["Media"]) {
   return crypto
-    .createHash("sha1")
+    .createHash("sha256")
     .update(
       JSON.stringify({
         en: m.title.english,

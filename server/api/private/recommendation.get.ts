@@ -148,6 +148,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Missing user" });
   }
 
+  if (!/^[a-zA-Z0-9_-]{1,30}$/.test(user)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid username format" });
+  }
+
   const filterSeason =
     typeof q.season === "string" ? q.season.toUpperCase() : null;
 
