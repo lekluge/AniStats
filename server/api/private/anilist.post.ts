@@ -12,6 +12,7 @@ interface NormalizedAniUserMediaEntry {
   status: string | null;
   score: number | null;
   progress: number | null;
+  repeat: number | null;
   completedAt: AniUserMediaEntry["completedAt"];
   startedAt: AniUserMediaEntry["startedAt"];
   media: {
@@ -70,6 +71,7 @@ function normalizeAniLists(
       status: entry.status ?? null,
       score: entry.score ?? null,
       progress: entry.progress ?? null,
+      repeat: entry.repeat ?? null,
       completedAt: entry.completedAt ?? null,
       startedAt: entry.startedAt ?? null,
       media: {
@@ -119,6 +121,7 @@ export default defineEventHandler(async (event) => {
             status
             score
             progress
+            repeat
             completedAt { year month day }
             startedAt { year month day }
             media {

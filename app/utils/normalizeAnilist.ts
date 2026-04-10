@@ -21,6 +21,7 @@ interface RawEntry {
   status?: string | null;
   score?: number | null;
   progress?: number | null;
+  repeat?: number | null;
   startedAt?: FuzzyDate | null;
   completedAt?: FuzzyDate | null;
   media?: RawMedia | null;
@@ -99,6 +100,7 @@ export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
         status: entry.status ?? "",
         score: typeof entry.score === "number" ? entry.score : 0,
         progress: typeof entry.progress === "number" ? entry.progress : 0,
+        repeat: typeof entry.repeat === "number" ? entry.repeat : 0,
         episodes: media.episodes ?? null,
         duration: media.duration ?? null,
         format: media.format ?? null,
@@ -133,6 +135,7 @@ export function normalizeAnilist(lists: RawList[]): AnimeEntry[] {
         ...preferred,
         score: Math.max(existing.score, normalized.score),
         progress: Math.max(existing.progress, normalized.progress),
+        repeat: Math.max(existing.repeat, normalized.repeat),
         episodes: preferred.episodes ?? fallback.episodes ?? null,
         duration: preferred.duration ?? fallback.duration ?? null,
         format: preferred.format ?? fallback.format ?? null,
