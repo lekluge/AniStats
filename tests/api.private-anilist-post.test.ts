@@ -105,4 +105,35 @@ describe("api/private/anilist.post", () => {
     ])
     expect(prismaFindManyMock).toHaveBeenCalledTimes(1)
   })
+
+  it("returns scoreFormat from user mediaListOptions", async () => {
+    state.query = { user: "Leon" }
+    anilistRequestMock.mockResolvedValueOnce({
+      User: {
+        statistics: { anime: { episodesWatched: 100, minutesWatched: 2400 } },
+        mediaListOptions: { scoreFormat: "POINT_5" },
+      },
+      MediaListCollection: { lists: [] },
+    })
+    prismaFindManyMock.mockResolvedValueOnce([])
+
+    const mod = await import("../server/api/private/anilist.post")
+    const out = await mod.default({} as any)
+
+    expect(out.data.scoreFormat).toBe("POINT_5")
+  })
+
+  it("returns null scoreFormat when user has no mediaListOptions", async () => {
+    state.query = { user: "Leon" }
+    anilistRequestMock.mockResolvedValueOnce({
+      User: { statistics: { anime: {} } },
+      MediaListCollection: { lists: [] },
+    })
+    prismaFindManyMock.mockResolvedValueOnce([])
+
+    const mod = await import("../server/api/private/anilist.post")
+    const out = await mod.default({} as any)
+
+    expect(out.data.scoreFormat).toBeNull()
+  })
 })
