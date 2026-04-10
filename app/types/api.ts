@@ -83,6 +83,7 @@ export interface ApiUserListResponse {
 
 export interface ApiAnilistResponse {
   data: {
+    scoreFormat: string | null;
     MediaListCollection: {
       lists: unknown[];
     };
