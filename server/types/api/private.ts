@@ -52,6 +52,7 @@ export interface RelationItem {
   titleEn: string | null
   titleRo: string | null
   cover: string | null
+  averageScore: number | null
   relationType: string
   genres: string[]
   tags: RelationTag[]
@@ -62,6 +63,7 @@ export interface ChainItem {
   titleEn: string | null
   titleRo: string | null
   cover: string | null
+  averageScore: number | null
   genres: string[]
   tags: RelationTag[]
   related: RelationItem[]
