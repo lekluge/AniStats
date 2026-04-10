@@ -204,6 +204,7 @@ export const translations = {
       title: "Anime Relations",
       loadError: "Failed to load relations",
       franchisesFound: "franchises found",
+      averageScoreTitle: "Your average score for this series",
     },
     recommendation: {
       title: "Recommendations",
@@ -439,6 +440,7 @@ export const translations = {
       title: "Anime Relations",
       loadError: "Relations konnten nicht geladen werden",
       franchisesFound: "Franchises gefunden",
+      averageScoreTitle: "Dein Durchschnittswert für diese Serie",
     },
     recommendation: {
       title: "Empfehlungen",

@@ -13,6 +13,7 @@ interface RelationNode {
   titleEn: string | null;
   titleRo: string | null;
   cover: string | null;
+  averageScore: number | null;
   genres: string[];
   tags: RelationTag[];
 }
@@ -30,7 +31,7 @@ interface RelationDatasetCache {
 
 const CHAIN_REL = new Set<string>(["PREQUEL", "SEQUEL"]);
 const ROOT_REL = new Set<string>(["PREQUEL", "PARENT"]);
-const RELATIONS_CACHE_KEY = "anime-relations-graph/v2";
+const RELATIONS_CACHE_KEY = "anime-relations-graph/v3";
 
 function pickDeterministic<T extends { toId: number }>(edges: T[]) {
   let chosen: T | null = null;
@@ -59,6 +60,7 @@ async function loadDatasetFromDb(): Promise<RelationDatasetCache> {
         titleEn: true,
         titleRo: true,
         cover: true,
+        averageScore: true,
       },
     }),
     prisma.animeGenre.findMany({
@@ -113,6 +115,7 @@ async function loadDatasetFromDb(): Promise<RelationDatasetCache> {
       titleEn: item.titleEn,
       titleRo: item.titleRo,
       cover: item.cover,
+      averageScore: item.averageScore ?? null,
       genres: genresByAnimeId.get(item.id) ?? [],
       tags: tagsByAnimeId.get(item.id) ?? [],
     }));
@@ -207,6 +210,7 @@ export default defineEventHandler(async (event) => {
         titleEn: currentNode.titleEn,
         titleRo: currentNode.titleRo,
         cover: currentNode.cover,
+        averageScore: currentNode.averageScore,
         genres: currentNode.genres,
         tags: currentNode.tags,
       });
@@ -244,6 +248,7 @@ export default defineEventHandler(async (event) => {
             titleEn: target.titleEn,
             titleRo: target.titleRo,
             cover: target.cover,
+            averageScore: target.averageScore,
             relationType: r.relationType,
             genres: target.genres,
             tags: target.tags,
