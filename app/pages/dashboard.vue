@@ -17,6 +17,7 @@ definePageMeta({ title: "Dashboard", middleware: "auth" });
 const { t } = useLocale();
 
 const username = useAnilistUser();
+const { mode: rewatchMode, setMode: setRewatchMode, initMode: initRewatchMode } = useRewatchMode();
 
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -138,6 +139,10 @@ watch(
   { immediate: true },
 );
 
+onMounted(() => {
+  initRewatchMode();
+});
+
 onUnmounted(() => {
   if (autoLoadTimer) clearTimeout(autoLoadTimer);
 });
@@ -156,18 +161,50 @@ const watchedEntries = computed(() =>
 );
 
 const totalAnime = computed(() => completedEntries.value.length);
-const totalEpisodes = computed(() =>
+
+// Base stats from AniList (excludes rewatches by design on AniList's end)
+const totalEpisodesBase = computed(() =>
   typeof anilistStats.value.episodesWatched === "number"
     ? anilistStats.value.episodesWatched
     : watchedEntries.value.reduce((sum, e) => sum + (e.progress ?? 0), 0)
 );
-const totalMinutes = computed(() =>
+const totalMinutesBase = computed(() =>
   typeof anilistStats.value.minutesWatched === "number"
     ? anilistStats.value.minutesWatched
     : watchedEntries.value.reduce((sum, e) => {
       if (!e.progress || !e.duration) return sum;
       return sum + e.progress * e.duration;
     }, 0)
+);
+
+// Extra episodes/minutes contributed by rewatches
+// Formula: repeat × total_episodes (falls back to progress if total_episodes unknown)
+const rewatchExtraEpisodes = computed(() =>
+  watchedEntries.value.reduce((sum, e) => {
+    const repeats = e.repeat ?? 0;
+    if (repeats <= 0) return sum;
+    const totalEp = e.episodes ?? e.progress ?? 0;
+    return sum + repeats * totalEp;
+  }, 0)
+);
+const rewatchExtraMinutes = computed(() =>
+  watchedEntries.value.reduce((sum, e) => {
+    const repeats = e.repeat ?? 0;
+    if (repeats <= 0 || !e.duration) return sum;
+    const totalEp = e.episodes ?? e.progress ?? 0;
+    return sum + repeats * totalEp * e.duration;
+  }, 0)
+);
+
+const totalEpisodes = computed(() =>
+  rewatchMode.value === "include"
+    ? totalEpisodesBase.value + rewatchExtraEpisodes.value
+    : totalEpisodesBase.value
+);
+const totalMinutes = computed(() =>
+  rewatchMode.value === "include"
+    ? totalMinutesBase.value + rewatchExtraMinutes.value
+    : totalMinutesBase.value
 );
 const totalDaysWatched = computed(() =>
   Number((totalMinutes.value / 60 / 24).toFixed(1)),
@@ -298,8 +335,18 @@ const scoreStdDev = computed(() => {
 
 const overviewStats = computed(() => [
   { label: t("dashboard.totalAnime"), value: totalAnime.value },
-  { label: t("dashboard.episodesWatched"), value: totalEpisodes.value },
-  { label: t("dashboard.daysWatched"), value: totalDaysWatched.value },
+  {
+    label: rewatchMode.value === "include"
+      ? t("dashboard.episodesWatchedWithRewatches")
+      : t("dashboard.episodesWatched"),
+    value: totalEpisodes.value,
+  },
+  {
+    label: rewatchMode.value === "include"
+      ? t("dashboard.daysWatchedWithRewatches")
+      : t("dashboard.daysWatched"),
+    value: totalDaysWatched.value,
+  },
   { label: t("dashboard.daysPlanned"), value: totalPlannedDays.value },
   { label: t("dashboard.meanScore"), value: meanScore.value },
   { label: t("dashboard.standardDeviation"), value: scoreStdDev.value },
@@ -1403,6 +1450,18 @@ const countryPercentLabels = computed(() =>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <div v-else class="dashboard-shell">
+      <div class="flex items-center justify-end mb-2">
+        <div class="dashboard-toggle">
+          <button
+            :class="rewatchMode === 'exclude' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'"
+            @click="setRewatchMode('exclude')"
+          >{{ t("dashboard.rewatchExclude") }}</button>
+          <button
+            :class="rewatchMode === 'include' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'"
+            @click="setRewatchMode('include')"
+          >{{ t("dashboard.rewatchInclude") }}</button>
+        </div>
+      </div>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <div
           v-for="item in overviewStats"
