@@ -46,6 +46,9 @@ type AniDashboardQueryResponse = AniListCollection<AniUserMediaEntry> & {
         minutesWatched?: number | null;
       } | null;
     } | null;
+    mediaListOptions?: {
+      scoreFormat?: string | null;
+    } | null;
   } | null;
 };
 function isPresent<T>(value: T | null | undefined): value is T {
@@ -114,6 +117,9 @@ export default defineEventHandler(async (event) => {
             minutesWatched
           }
         }
+        mediaListOptions {
+          scoreFormat
+        }
       }
       MediaListCollection(userName: $userName, type: ANIME) {
         lists {
@@ -150,6 +156,8 @@ export default defineEventHandler(async (event) => {
     episodesWatched: res.User?.statistics?.anime?.episodesWatched ?? null,
     minutesWatched: res.User?.statistics?.anime?.minutesWatched ?? null,
   };
+
+  const scoreFormat = res.User?.mediaListOptions?.scoreFormat ?? null;
 
   const lists = normalizeAniLists(res);
   /* -----------------------------
@@ -240,6 +248,7 @@ export default defineEventHandler(async (event) => {
   return {
     data: {
       stats,
+      scoreFormat,
       MediaListCollection: {
         lists: enrichedLists,
       },
