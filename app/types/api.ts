@@ -47,6 +47,7 @@ export interface ApiRelationItem {
   titleEn: string | null;
   titleRo: string | null;
   cover: string | null;
+  averageScore: number | null;
   relationType: string;
   genres: string[];
   tags: ApiRelationTag[];
@@ -57,6 +58,7 @@ export interface ApiRelationChainItem {
   titleEn: string | null;
   titleRo: string | null;
   cover: string | null;
+  averageScore: number | null;
   genres: string[];
   tags: ApiRelationTag[];
   related: ApiRelationItem[];
@@ -79,6 +81,7 @@ export interface ApiUserListResponse {
   user: string;
   count: number;
   statusMap: Record<number, string>;
+  scoreMap: Record<number, number>;
 }
 
 export interface ApiAnilistResponse {

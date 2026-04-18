@@ -12,6 +12,7 @@ const USER_LIST_QUERY = `
         entries {
           mediaId
           status
+          score
         }
       }
     }
@@ -21,6 +22,7 @@ const USER_LIST_QUERY = `
 interface NormalizedStatusEntry {
   mediaId: number;
   status: string;
+  score: number | null;
 }
 
 function isPresent<T>(value: T | null | undefined): value is T {
@@ -36,6 +38,11 @@ function isNormalizedStatusEntry(
     typeof value.status === "string" &&
     value.status.length > 0
   );
+}
+
+function toNormalizedScore(value: AniUserStatusEntry): number | null {
+  if (typeof value.score === "number" && value.score > 0) return value.score;
+  return null;
 }
 
 function normalizeStatusLists(
@@ -106,9 +113,12 @@ export default defineEventHandler(async (event) => {
   const lists = normalizeStatusLists(res);
 
   const statusMap: Record<number, string> = {};
+  const scoreMap: Record<number, number> = {};
   for (const list of lists) {
     for (const entry of list.entries) {
       statusMap[entry.mediaId] = entry.status;
+      const score = toNormalizedScore(entry);
+      if (score !== null) scoreMap[entry.mediaId] = score;
     }
   }
 
@@ -117,5 +127,6 @@ export default defineEventHandler(async (event) => {
     user,
     count: Object.keys(statusMap).length,
     statusMap,
+    scoreMap,
   };
 });
