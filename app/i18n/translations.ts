@@ -209,7 +209,9 @@ export const translations = {
       title: "Anime Relations",
       loadError: "Failed to load relations",
       franchisesFound: "franchises found",
-      averageScoreTitle: "Your average score for this series",
+      averageScoreTitle: "AniList community average score for this series",
+      userAverageScoreTitle: "Your average score for this series",
+      yourScoreTitle: "Your score",
     },
     recommendation: {
       title: "Recommendations",
@@ -450,7 +452,9 @@ export const translations = {
       title: "Anime Relations",
       loadError: "Relations konnten nicht geladen werden",
       franchisesFound: "Franchises gefunden",
-      averageScoreTitle: "Dein Durchschnittswert für diese Serie",
+      averageScoreTitle: "AniList Community-Durchschnitt für diese Serie",
+      userAverageScoreTitle: "Dein Durchschnittswert für diese Serie",
+      yourScoreTitle: "Deine Wertung",
     },
     recommendation: {
       title: "Empfehlungen",

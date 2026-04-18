@@ -16,14 +16,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const search = ref("");
 
-type RelationItemWithStatus = ApiRelationItem & { status?: string };
+type RelationItemWithStatus = ApiRelationItem & { status?: string; userScore?: number };
 type RelationChainWithStatus = Omit<ApiRelationChainItem, "related"> & {
   status?: string;
+  userScore?: number;
   related: RelationItemWithStatus[];
 };
 type RelationGroupWithStatus = Omit<ApiRelationGroup, "chain"> & {
   rootStatus?: string;
   averageScore?: number;
+  userAverageScore?: number;
   chain: RelationChainWithStatus[];
 };
 
@@ -51,6 +53,7 @@ async function loadRelations() {
       params: { user: username.value },
     });
     const statusMap = userRes.data.statusMap ?? {};
+    const scoreMap = userRes.data.scoreMap ?? {};
 
     const relRes = await api.get<ApiRelationsResponse>("/api/private/relations");
     const allGroups = relRes.data.groups ?? [];
@@ -72,28 +75,38 @@ async function loadRelations() {
       const chain = group.chain.map((chainItem) => ({
         ...chainItem,
         status: statusMap[chainItem.id],
+        userScore: scoreMap[chainItem.id],
         related: (chainItem.related ?? []).map((related) => ({
           ...related,
           status: statusMap[related.id],
+          userScore: scoreMap[related.id],
         })),
       }));
 
       const allScores: number[] = [];
+      const userScores: number[] = [];
       for (const item of chain) {
         if (item.averageScore) allScores.push(item.averageScore);
+        if (item.userScore) userScores.push(item.userScore);
         for (const r of item.related) {
           if (r.averageScore) allScores.push(r.averageScore);
+          if (r.userScore) userScores.push(r.userScore);
         }
       }
       const averageScore =
         allScores.length > 0
           ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
           : undefined;
+      const userAverageScore =
+        userScores.length > 0
+          ? Math.round((userScores.reduce((a, b) => a + b, 0) / userScores.length) * 10) / 10
+          : undefined;
 
       return {
         ...group,
         rootStatus: statusMap[group.rootId],
         averageScore,
+        userAverageScore,
         chain,
       };
     });
@@ -296,6 +309,13 @@ function watchedInGroup(group: RelationGroupWithStatus) {
                 >
                   ★ {{ group.averageScore }}
                 </span>
+                <span
+                  v-if="group.userAverageScore !== undefined"
+                  class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30"
+                  :title="t('relations.userAverageScoreTitle')"
+                >
+                  ♥ {{ group.userAverageScore }}
+                </span>
               </div>
             </div>
             <a
@@ -340,6 +360,13 @@ function watchedInGroup(group: RelationGroupWithStatus) {
                         >
                           ★ {{ item.averageScore }}
                         </span>
+                        <span
+                          v-if="item.userScore"
+                          class="inline-flex items-center gap-0.5 rounded-md px-2 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30"
+                          :title="t('relations.yourScoreTitle')"
+                        >
+                          ♥ {{ item.userScore }}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -375,6 +402,13 @@ function watchedInGroup(group: RelationGroupWithStatus) {
                             class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-500/30"
                           >
                             ★ {{ r.averageScore }}
+                          </span>
+                          <span
+                            v-if="r.userScore"
+                            class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30"
+                            :title="t('relations.yourScoreTitle')"
+                          >
+                            ♥ {{ r.userScore }}
                           </span>
                         </div>
                       </div>
