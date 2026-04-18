@@ -30,6 +30,7 @@ export interface AniUserMediaEntry {
   status?: string | null
   score?: number | null
   progress?: number | null
+  repeat?: number | null
   completedAt?: FuzzyDate | null
   startedAt?: FuzzyDate | null
   media?: {
