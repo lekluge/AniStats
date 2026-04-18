@@ -1450,7 +1450,8 @@ const countryPercentLabels = computed(() =>
     <div v-else-if="error" class="text-red-400">{{ error }}</div>
 
     <div v-else class="dashboard-shell">
-      <div class="flex items-center justify-end mb-2">
+      <div class="flex items-center justify-end gap-2">
+        <span class="text-sm text-[var(--text-muted)]">{{ t("dashboard.rewatchLabel") }}</span>
         <div class="dashboard-toggle">
           <button
             :class="rewatchMode === 'exclude' ? 'dashboard-toggle-btn-active' : 'dashboard-toggle-btn'"
@@ -1984,12 +1985,20 @@ const countryPercentLabels = computed(() =>
 }
 
 .dashboard-toggle-btn {
+  padding: 0.2rem 0.7rem;
+  border-radius: 9999px;
   color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
 .dashboard-toggle-btn-active {
+  padding: 0.2rem 0.7rem;
+  border-radius: 9999px;
   background: var(--primary);
   color: #fff;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
 .atlas-shell {
