@@ -62,6 +62,7 @@ function getEntryTitle(entry: AnimeEntry): { en: string; ro: string; display: st
 }
 
 async function loadAllAnime() {
+  if (!process.client) return;
   const res = await api.get<ApiRelationsResponse>("/api/private/relations");
 
   allAnime.value = res.data.groups.flatMap((group: ApiRelationGroup) =>
@@ -101,6 +102,7 @@ function removeUser(name: string) {
 }
 
 async function loadSingleUser(username: string) {
+  if (!process.client) return;
   loading.value = true;
   error.value = null;
 

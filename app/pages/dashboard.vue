@@ -70,6 +70,7 @@ const chartPalette = computed(() => {
 });
 
 async function loadAnime() {
+  if (!process.client) return;
   loading.value = true;
   error.value = null;
 
