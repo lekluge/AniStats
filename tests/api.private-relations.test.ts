@@ -135,7 +135,7 @@ describe("api/private/relations.get", () => {
 
     expect(setItemMock).toHaveBeenCalled()
     expect(setItemMock).toHaveBeenCalledWith(
-      "anime-relations-graph/v2",
+      "anime-relations-graph/v3",
       expect.objectContaining({
         nodes: expect.any(Array),
         edges: expect.any(Array),
