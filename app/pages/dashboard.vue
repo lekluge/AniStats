@@ -1089,7 +1089,7 @@ const statusLabels = computed<Record<string, string>>(() => ({
 }));
 const statusDistribution = computed(() => {
   const map: Record<string, number> = {};
-  for (const e of completedEntries.value) {
+  for (const e of entries.value) {
     map[e.status] = (map[e.status] || 0) + 1;
   }
   return Object.entries(map).map(([name, value]) => ({
