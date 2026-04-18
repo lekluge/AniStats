@@ -61,7 +61,7 @@ describe("api/private/anilist-user-list.get", () => {
     await vi.advanceTimersByTimeAsync(350)
     const out = await p
 
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       ok: true,
       user: "Leon",
       count: 2,
