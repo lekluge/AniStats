@@ -24,6 +24,7 @@ export interface AniListCollection<TEntry> {
 export interface AniUserStatusEntry {
   mediaId?: number | null
   status?: string | null
+  score?: number | null
 }
 
 export interface AniUserMediaEntry {
