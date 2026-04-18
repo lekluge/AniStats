@@ -24,6 +24,7 @@ export interface AnimeEntry {
   status: string
   score: number
   progress: number
+  repeat: number
   duration: number | null
   episodes: number | null
   format: string | null

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
+import { normalizeScoreTo100 } from "~/utils/normalizeScore";
 import type { AnimeEntry } from "~/types/anime";
 import type {
   ApiAnilistResponse,
@@ -30,6 +31,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 const entriesByUser = ref<Record<string, AnimeEntry[]>>({});
+const scoreFormatByUser = ref<Record<string, string | null>>({});
 const allAnime = ref<CompareAnimeItem[]>([]);
 
 const search = ref("");
@@ -95,6 +97,7 @@ async function addUser() {
 function removeUser(name: string) {
   users.value = users.value.filter((u) => u !== name);
   delete entriesByUser.value[name];
+  delete scoreFormatByUser.value[name];
 }
 
 async function loadSingleUser(username: string) {
@@ -107,6 +110,7 @@ async function loadSingleUser(username: string) {
     });
 
     entriesByUser.value[username] = normalizeAnilist(res.data.data.MediaListCollection.lists);
+    scoreFormatByUser.value[username] = res.data.data.scoreFormat ?? null;
   } catch (e) {
     console.error("[Compare]", e);
     error.value = `${t("common.errorPrefix")}: ${t("compare.loadError")}`;
@@ -290,9 +294,15 @@ function compareValues(a: number | string, b: number | string, direction: SortDi
   return direction === "asc" ? cmp : -cmp;
 }
 
+function normalizedScore(user: string, entry: AnimeEntry): number {
+  const raw = Number(entry.score ?? 0);
+  if (raw === 0) return 0;
+  return normalizeScoreTo100(raw, scoreFormatByUser.value[user]);
+}
+
 function averageScore(anime: CompareAnimeItem) {
-  const values = Object.values(anime.users)
-    .map((entry) => Number(entry.score ?? 0))
+  const values = Object.entries(anime.users)
+    .map(([user, entry]) => normalizedScore(user, entry))
     .filter((value) => value > 0);
 
   if (!values.length) return 0;
@@ -647,7 +657,13 @@ watch(
             </div>
 
             <template v-if="a.users[u]">
-              <div class="text-xs text-zinc-400">{{ t("common.score") }}: {{ a.users[u].score || "-" }}</div>
+              <div class="text-xs text-zinc-400">
+                {{ t("common.score") }}: {{ a.users[u].score || "-" }}
+                <span
+                  v-if="a.users[u].score && scoreFormatByUser[u] && scoreFormatByUser[u] !== 'POINT_100'"
+                  class="text-zinc-500"
+                >({{ normalizedScore(u, a.users[u]).toFixed(0) }}/100)</span>
+              </div>
             </template>
           </div>
         </div>

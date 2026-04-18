@@ -23,6 +23,7 @@ type RelationChainWithStatus = Omit<ApiRelationChainItem, "related"> & {
 };
 type RelationGroupWithStatus = Omit<ApiRelationGroup, "chain"> & {
   rootStatus?: string;
+  averageScore?: number;
   chain: RelationChainWithStatus[];
 };
 
@@ -67,18 +68,35 @@ async function loadRelations() {
       return false;
     });
 
-    groups.value = visibleGroups.map((group) => ({
-      ...group,
-      rootStatus: statusMap[group.rootId],
-      chain: group.chain.map((chainItem) => ({
+    groups.value = visibleGroups.map((group) => {
+      const chain = group.chain.map((chainItem) => ({
         ...chainItem,
         status: statusMap[chainItem.id],
         related: (chainItem.related ?? []).map((related) => ({
           ...related,
           status: statusMap[related.id],
         })),
-      })),
-    }));
+      }));
+
+      const allScores: number[] = [];
+      for (const item of chain) {
+        if (item.averageScore) allScores.push(item.averageScore);
+        for (const r of item.related) {
+          if (r.averageScore) allScores.push(r.averageScore);
+        }
+      }
+      const averageScore =
+        allScores.length > 0
+          ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+          : undefined;
+
+      return {
+        ...group,
+        rootStatus: statusMap[group.rootId],
+        averageScore,
+        chain,
+      };
+    });
   } catch (e) {
     console.error("[Relations]", e);
     error.value = `${t("common.errorPrefix")}: ${t("relations.loadError")}`;
@@ -267,8 +285,17 @@ function watchedInGroup(group: RelationGroupWithStatus) {
               <div class="truncate text-base font-semibold text-zinc-100">
                 {{ groupTitle(group) }}
               </div>
-              <div class="text-xs text-zinc-400">
-                {{ group.chain.length }} entries - {{ watchedInGroup(group) }} in list
+              <div class="flex flex-wrap items-center gap-2 mt-0.5">
+                <span class="text-xs text-zinc-400">
+                  {{ group.chain.length }} entries - {{ watchedInGroup(group) }} in list
+                </span>
+                <span
+                  v-if="group.averageScore !== undefined"
+                  class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-500/30"
+                  :title="t('relations.averageScoreTitle')"
+                >
+                  ★ {{ group.averageScore }}
+                </span>
               </div>
             </div>
             <a
@@ -303,9 +330,15 @@ function watchedInGroup(group: RelationGroupWithStatus) {
                       >
                         {{ displayTitle(item.titleEn, item.titleRo) }}
                       </a>
-                      <div class="mt-2">
+                      <div class="mt-2 flex flex-wrap items-center gap-1.5">
                         <span class="inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium" :class="statusBadgeClass(item.status)">
                           {{ item.status ?? t("common.notInList") }}
+                        </span>
+                        <span
+                          v-if="item.averageScore"
+                          class="inline-flex items-center gap-0.5 rounded-md px-2 py-0.5 text-[11px] font-medium bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-500/30"
+                        >
+                          ★ {{ item.averageScore }}
                         </span>
                       </div>
                     </div>
@@ -336,6 +369,12 @@ function watchedInGroup(group: RelationGroupWithStatus) {
                           </span>
                           <span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px]" :class="statusBadgeClass(r.status)">
                             {{ r.status ?? t("common.notInList") }}
+                          </span>
+                          <span
+                            v-if="r.averageScore"
+                            class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-500/30"
+                          >
+                            ★ {{ r.averageScore }}
                           </span>
                         </div>
                       </div>
