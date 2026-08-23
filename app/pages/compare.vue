@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import { normalizeScoreTo100 } from "~/utils/normalizeScore";
 import type { AnimeEntry } from "~/types/anime";
@@ -115,7 +116,7 @@ async function loadSingleUser(username: string) {
     scoreFormatByUser.value[username] = res.data.data.scoreFormat ?? null;
   } catch (e) {
     console.error("[Compare]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("compare.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "compare.loadError");
   } finally {
     loading.value = false;
   }

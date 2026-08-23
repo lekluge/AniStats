@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import type {
   ApiRelationChainItem,
   ApiRelationGroup,
@@ -112,7 +113,7 @@ async function loadRelations() {
     });
   } catch (e) {
     console.error("[Relations]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("relations.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "relations.loadError");
   } finally {
     loading.value = false;
   }

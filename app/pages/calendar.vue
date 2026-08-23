@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 
 definePageMeta({ title: "Calendar", middleware: "auth" });
 
@@ -119,7 +120,7 @@ async function loadAnime() {
     lastLoadedUser.value = currentUser;
   } catch (e) {
     console.error("[Calendar]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("calendar.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "calendar.loadError");
   } finally {
     loading.value = false;
   }

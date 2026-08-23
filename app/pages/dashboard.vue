@@ -1,5 +1,6 @@
 ﻿<script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 
@@ -110,7 +111,7 @@ async function loadAnime() {
     lastLoadedUser.value = currentUser;
   } catch (e) {
     console.error("[Dashboard]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("dashboard.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "dashboard.loadError");
     anilistStats.value = { episodesWatched: null, minutesWatched: null };
   } finally {
     loading.value = false;
@@ -605,7 +606,7 @@ async function loadAtlasCatalog() {
     atlasCatalogItems.value = res.data.items ?? [];
   } catch (e) {
     console.error("[Dashboard]", e);
-    atlasCatalogError.value = `${t("common.errorPrefix")}: ${t("dashboard.atlasCatalogLoadError")}`;
+    atlasCatalogError.value = resolveApiErrorMessage(e, t, "dashboard.atlasCatalogLoadError");
   } finally {
     atlasCatalogLoading.value = false;
   }

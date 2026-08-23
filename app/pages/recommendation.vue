@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import type {
   ApiGenreTagsResponse,
   ApiRecommendationItem,
@@ -124,7 +125,7 @@ async function loadRecommendations() {
     expandedTagCards.value = {};
   } catch (e) {
     console.error("[Recommendation]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("recommendation.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "recommendation.loadError");
   } finally {
     loading.value = false;
   }
