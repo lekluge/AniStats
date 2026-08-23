@@ -2,6 +2,7 @@
 definePageMeta({ middleware: "auth", title: "History" })
 
 import HistoryCard from "~/components/HistoryCard.vue"
+import { resolveApiErrorMessage } from "~/composables/useApiError"
 
 const { t } = useLocale()
 
@@ -125,7 +126,7 @@ async function loadHistory() {
     results.value = [...(res ?? [])].sort((a, b) => completedKey(b) - completedKey(a))
   } catch (e) {
     console.error("[History]", e)
-    error.value = `${t("common.errorPrefix")}: ${t("history.loadError")}`
+    error.value = resolveApiErrorMessage(e, t, "history.loadError")
   } finally {
     loading.value = false
   }

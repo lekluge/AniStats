@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 import GameCard from "../components/GameCard.vue";
@@ -48,7 +49,7 @@ async function loadAnime() {
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e) {
     console.error("[Tags]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("tags.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "tags.loadError");
   } finally {
     loading.value = false;
   }

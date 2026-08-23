@@ -1,3 +1,4 @@
+import { createError } from "h3";
 import { enqueueAniList } from "./anilistQueue";
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
@@ -32,6 +33,14 @@ async function performAniListRequest<T>(
 
       await sleep(waitMs);
       return performAniListRequest(query, variables, attempt + 1);
+    }
+
+    if (res.status === 403) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: "AniList API unavailable",
+        data: { anilistUnavailable: true },
+      });
     }
 
     if (!res.ok) {

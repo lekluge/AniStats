@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import { useRoute } from "vue-router";
 import type { AnimeEntry } from "~/types/anime";
@@ -49,7 +50,7 @@ async function loadAnime() {
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e) {
     console.error("[Genres]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("genres.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "genres.loadError");
   } finally {
     loading.value = false;
   }

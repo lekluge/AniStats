@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { api } from "~/composables/useApi";
+import { resolveApiErrorMessage } from "~/composables/useApiError";
 import { normalizeAnilist } from "~/utils/normalizeAnilist";
 import type { AnimeEntry } from "~/types/anime";
 import type { ApiAnilistResponse } from "~/types/api";
@@ -69,7 +70,7 @@ async function loadAnime() {
     entries.value = normalizeAnilist(res.data.data.MediaListCollection.lists);
   } catch (e) {
     console.error("[Combine]", e);
-    error.value = `${t("common.errorPrefix")}: ${t("combine.loadError")}`;
+    error.value = resolveApiErrorMessage(e, t, "combine.loadError");
   } finally {
     loading.value = false;
   }
